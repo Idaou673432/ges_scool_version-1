@@ -110,11 +110,23 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAuditLogs(storageService.getAuditLogs());
   }, []);
 
-  // Initial local load + start Cloud real-time sync
+  // Initial local load + start Cloud real-time sync + auto-bootstrap
   useEffect(() => {
     refreshData();
 
-    // Start Realtime Firestore synchronization for the active school code
+    // 1. Auto-bootstrap Cloud if this is a newly connected school with no cloud data yet
+    cloudSyncService.bootstrapCloudIfEmpty(cloudSchoolCode, {
+      settings: storageService.getSettings(),
+      students: storageService.getStudents(),
+      classes: storageService.getClasses(),
+      subjects: storageService.getSubjects(),
+      teachers: storageService.getTeachers(),
+      grades: storageService.getGrades(),
+      payments: storageService.getPayments(),
+      attendance: storageService.getAttendanceRecords()
+    });
+
+    // 2. Start Realtime Firestore synchronization for the active school code
     cloudSyncService.startRealtimeSync(cloudSchoolCode, {
       onSettingsChange: (newSettings) => {
         isSyncingFromCloud.current = true;
@@ -123,80 +135,60 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onStudentsChange: (cloudStudents) => {
-        if (cloudStudents && cloudStudents.length > 0) {
-          isSyncingFromCloud.current = true;
-          // Merge with local storage
-          const local = storageService.getStudents();
-          const mergedMap = new Map<string, Student>();
-          local.forEach(s => mergedMap.set(s.id, s));
-          cloudStudents.forEach(s => mergedMap.set(s.id, s));
-          const merged = Array.from(mergedMap.values());
-          try {
-            localStorage.setItem('somasikolo_students', JSON.stringify(merged));
-          } catch {}
-          setStudents(merged);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_students', JSON.stringify(cloudStudents));
+        } catch {}
+        setStudents(cloudStudents);
+        isSyncingFromCloud.current = false;
       },
       onClassesChange: (cloudClasses) => {
-        if (cloudClasses && cloudClasses.length > 0) {
-          isSyncingFromCloud.current = true;
-          try {
-            localStorage.setItem('somasikolo_classes', JSON.stringify(cloudClasses));
-          } catch {}
-          setClasses(cloudClasses);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_classes', JSON.stringify(cloudClasses));
+        } catch {}
+        setClasses(cloudClasses);
+        isSyncingFromCloud.current = false;
       },
       onSubjectsChange: (cloudSubjects) => {
-        if (cloudSubjects && cloudSubjects.length > 0) {
-          isSyncingFromCloud.current = true;
-          try {
-            localStorage.setItem('somasikolo_subjects', JSON.stringify(cloudSubjects));
-          } catch {}
-          setSubjects(cloudSubjects);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_subjects', JSON.stringify(cloudSubjects));
+        } catch {}
+        setSubjects(cloudSubjects);
+        isSyncingFromCloud.current = false;
       },
       onTeachersChange: (cloudTeachers) => {
-        if (cloudTeachers && cloudTeachers.length > 0) {
-          isSyncingFromCloud.current = true;
-          try {
-            localStorage.setItem('somasikolo_teachers', JSON.stringify(cloudTeachers));
-          } catch {}
-          setTeachers(cloudTeachers);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_teachers', JSON.stringify(cloudTeachers));
+        } catch {}
+        setTeachers(cloudTeachers);
+        isSyncingFromCloud.current = false;
       },
       onGradesChange: (cloudGrades) => {
-        if (cloudGrades && cloudGrades.length > 0) {
-          isSyncingFromCloud.current = true;
-          try {
-            localStorage.setItem('somasikolo_grades', JSON.stringify(cloudGrades));
-          } catch {}
-          setGrades(cloudGrades);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_grades', JSON.stringify(cloudGrades));
+        } catch {}
+        setGrades(cloudGrades);
+        isSyncingFromCloud.current = false;
       },
       onPaymentsChange: (cloudPayments) => {
-        if (cloudPayments && cloudPayments.length > 0) {
-          isSyncingFromCloud.current = true;
-          try {
-            localStorage.setItem('somasikolo_payments', JSON.stringify(cloudPayments));
-          } catch {}
-          setPayments(cloudPayments);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_payments', JSON.stringify(cloudPayments));
+        } catch {}
+        setPayments(cloudPayments);
+        isSyncingFromCloud.current = false;
       },
       onAttendanceChange: (cloudAttendance) => {
-        if (cloudAttendance && cloudAttendance.length > 0) {
-          isSyncingFromCloud.current = true;
-          try {
-            localStorage.setItem('somasikolo_attendance', JSON.stringify(cloudAttendance));
-          } catch {}
-          setAttendanceRecords(cloudAttendance);
-          isSyncingFromCloud.current = false;
-        }
+        isSyncingFromCloud.current = true;
+        try {
+          localStorage.setItem('somasikolo_attendance', JSON.stringify(cloudAttendance));
+        } catch {}
+        setAttendanceRecords(cloudAttendance);
+        isSyncingFromCloud.current = false;
       },
       onSyncStatusChange: (status, msg) => {
         setSyncStatus(status);
@@ -229,8 +221,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (success) {
       setCloudSchoolCode(cleanCode);
-      // Also push current local seed if remote is empty
-      cloudSyncService.pushAllDataToCloud(cleanCode, {
+      // Auto bootstrap if empty
+      cloudSyncService.bootstrapCloudIfEmpty(cleanCode, {
         settings,
         students,
         classes,
@@ -317,6 +309,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllStudents = () => {
     storageService.clearAllStudents();
+    cloudSyncService.clearCloudCollection('students', cloudSchoolCode);
     refreshData();
   };
 
@@ -335,6 +328,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllClasses = () => {
     storageService.clearAllClasses();
+    cloudSyncService.clearCloudCollection('classes', cloudSchoolCode);
     refreshData();
   };
 
@@ -353,6 +347,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllSubjects = () => {
     storageService.clearAllSubjects();
+    cloudSyncService.clearCloudCollection('subjects', cloudSchoolCode);
     refreshData();
   };
 
@@ -371,6 +366,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllTeachers = () => {
     storageService.clearAllTeachers();
+    cloudSyncService.clearCloudCollection('teachers', cloudSchoolCode);
     refreshData();
   };
 
@@ -389,6 +385,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllGrades = () => {
     storageService.clearAllGrades();
+    cloudSyncService.clearCloudCollection('grades', cloudSchoolCode);
     refreshData();
   };
 
@@ -414,6 +411,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllPayments = () => {
     storageService.clearAllPayments();
+    cloudSyncService.clearCloudCollection('payments', cloudSchoolCode);
     refreshData();
   };
 
@@ -433,6 +431,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleClearAllAttendanceRecords = () => {
     storageService.clearAllAttendanceRecords();
+    cloudSyncService.clearCloudCollection('attendance', cloudSchoolCode);
     refreshData();
   };
 

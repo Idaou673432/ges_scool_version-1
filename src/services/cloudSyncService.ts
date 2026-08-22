@@ -7,11 +7,11 @@ import {
   collection,
   doc,
   setDoc,
+  getDoc,
   deleteDoc,
   onSnapshot,
   getDocs,
   writeBatch,
-  DocumentData,
   Unsubscribe
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -26,16 +26,6 @@ import {
   AuditLog,
   AttendanceRecord
 } from '../types';
-
-export interface CloudSchoolMetadata {
-  schoolCode: string;
-  schoolName: string;
-  pinCode: string;
-  adminEmail?: string;
-  adminPhone?: string;
-  createdAt: string;
-  lastSyncAt: string;
-}
 
 export interface CloudSyncListeners {
   onSettingsChange?: (settings: SchoolSettings) => void;
@@ -53,20 +43,26 @@ export interface CloudSyncListeners {
 class CloudSyncService {
   private activeSchoolCode: string = '';
   private unsubscribers: Unsubscribe[] = [];
-  private isOnline: boolean = navigator.onLine;
+  private isOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   constructor() {
-    window.addEventListener('online', () => {
-      this.isOnline = true;
-    });
-    window.addEventListener('offline', () => {
-      this.isOnline = false;
-    });
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        this.isOnline = true;
+      });
+      window.addEventListener('offline', () => {
+        this.isOnline = false;
+      });
+    }
   }
 
   public getActiveSchoolCode(): string {
     if (!this.activeSchoolCode) {
-      this.activeSchoolCode = localStorage.getItem('kalangest_cloud_school_code') || 'ECOLE-PRINCIPALE';
+      if (typeof localStorage !== 'undefined') {
+        this.activeSchoolCode = localStorage.getItem('kalangest_cloud_school_code') || 'ECOLE-PRINCIPALE';
+      } else {
+        this.activeSchoolCode = 'ECOLE-PRINCIPALE';
+      }
     }
     return this.activeSchoolCode;
   }
@@ -74,7 +70,9 @@ class CloudSyncService {
   public setActiveSchoolCode(code: string): void {
     const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'ECOLE-PRINCIPALE';
     this.activeSchoolCode = cleanCode;
-    localStorage.setItem('kalangest_cloud_school_code', cleanCode);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('kalangest_cloud_school_code', cleanCode);
+    }
   }
 
   /**
@@ -107,6 +105,38 @@ class CloudSyncService {
   }
 
   /**
+   * Check if Cloud database has data for this school; if empty, initialize with local seed.
+   */
+  public async bootstrapCloudIfEmpty(
+    schoolCode: string,
+    seedData: {
+      settings: SchoolSettings;
+      students: Student[];
+      classes: SchoolClass[];
+      subjects: Subject[];
+      teachers: Teacher[];
+      grades: EvaluationGrade[];
+      payments: Payment[];
+      attendance: AttendanceRecord[];
+    }
+  ): Promise<boolean> {
+    try {
+      const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
+      const settingsRef = doc(db, `schools/${code}/settings`, 'config');
+      const snap = await getDoc(settingsRef);
+
+      if (!snap.exists()) {
+        console.info(`[CloudSync] Initializing empty cloud school [${code}] with seed data...`);
+        return await this.pushAllDataToCloud(code, seedData);
+      }
+      return true;
+    } catch (e) {
+      console.warn('[CloudSync] Bootstrap check notice:', e);
+      return false;
+    }
+  }
+
+  /**
    * Subscribe to real-time updates for the current active school
    */
   public startRealtimeSync(schoolCode: string, listeners: CloudSyncListeners): void {
@@ -114,7 +144,7 @@ class CloudSyncService {
     this.setActiveSchoolCode(schoolCode);
     const code = this.getActiveSchoolCode();
 
-    listeners.onSyncStatusChange?.('SYNCING', 'Connexion au Cloud...');
+    listeners.onSyncStatusChange?.('SYNCING', `Connexion Cloud [${code}]...`);
 
     try {
       // 1. Settings Listener
@@ -126,6 +156,7 @@ class CloudSyncService {
         }
       }, (err) => {
         console.warn('Settings sync error:', err);
+        listeners.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne');
       });
       this.unsubscribers.push(unsubSettings);
 
@@ -136,9 +167,8 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Student);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onStudentsChange?.(list);
-        }
+        listeners.onStudentsChange?.(list);
+        listeners.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}]`);
       }, (err) => {
         console.warn('Students sync error:', err);
       });
@@ -151,9 +181,9 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as SchoolClass);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onClassesChange?.(list);
-        }
+        listeners.onClassesChange?.(list);
+      }, (err) => {
+        console.warn('Classes sync error:', err);
       });
       this.unsubscribers.push(unsubClasses);
 
@@ -164,9 +194,9 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Subject);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onSubjectsChange?.(list);
-        }
+        listeners.onSubjectsChange?.(list);
+      }, (err) => {
+        console.warn('Subjects sync error:', err);
       });
       this.unsubscribers.push(unsubSubjects);
 
@@ -177,9 +207,9 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Teacher);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onTeachersChange?.(list);
-        }
+        listeners.onTeachersChange?.(list);
+      }, (err) => {
+        console.warn('Teachers sync error:', err);
       });
       this.unsubscribers.push(unsubTeachers);
 
@@ -190,9 +220,9 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as EvaluationGrade);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onGradesChange?.(list);
-        }
+        listeners.onGradesChange?.(list);
+      }, (err) => {
+        console.warn('Grades sync error:', err);
       });
       this.unsubscribers.push(unsubGrades);
 
@@ -203,9 +233,9 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Payment);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onPaymentsChange?.(list);
-        }
+        listeners.onPaymentsChange?.(list);
+      }, (err) => {
+        console.warn('Payments sync error:', err);
       });
       this.unsubscribers.push(unsubPayments);
 
@@ -216,16 +246,16 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as AttendanceRecord);
         });
-        if (list.length > 0 || snapshot.metadata.fromCache === false) {
-          listeners.onAttendanceChange?.(list);
-        }
+        listeners.onAttendanceChange?.(list);
+      }, (err) => {
+        console.warn('Attendance sync error:', err);
       });
       this.unsubscribers.push(unsubAttendance);
 
-      listeners.onSyncStatusChange?.('CONNECTED', `Synchronisé en direct avec l'Établissement [${code}]`);
+      listeners.onSyncStatusChange?.('CONNECTED', `Synchronisé en direct avec [${code}]`);
     } catch (e) {
       console.error('Error starting realtime sync:', e);
-      listeners.onSyncStatusChange?.('ERROR', 'Mode hors-ligne actif');
+      listeners.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne');
     }
   }
 
@@ -358,6 +388,22 @@ class CloudSyncService {
       await deleteDoc(docRef);
     } catch (e) {
       console.warn(`Failed to delete cloud document from ${collectionName}:`, e);
+    }
+  }
+
+  public async clearCloudCollection(
+    collectionName: string,
+    schoolCode?: string
+  ): Promise<void> {
+    try {
+      const code = schoolCode || this.getActiveSchoolCode();
+      const collRef = collection(db, `schools/${code}/${collectionName}`);
+      const snap = await getDocs(collRef);
+      const batch = writeBatch(db);
+      snap.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    } catch (e) {
+      console.warn(`Failed to clear cloud collection ${collectionName}:`, e);
     }
   }
 
