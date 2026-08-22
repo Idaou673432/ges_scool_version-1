@@ -1,0 +1,6 @@
+{
+  "name": "KalanGest",
+  "description": "Application professionnelle de gestion scolaire adaptée aux établissements d'enseignement au Mali (Fondamental, Lycées, CAP/BT).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

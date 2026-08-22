@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="book" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Shield/Card -->
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="url(#accent)" stroke-width="6" opacity="0.4"/>
+
+  <!-- Golden Emblem Header Circle -->
+  <circle cx="256" cy="140" r="48" fill="url(#accent)"/>
+  <!-- Graduation Cap -->
+  <path d="M256 112 L296 132 L256 152 L216 132 Z" fill="#ffffff"/>
+  <path d="M228 138 V158 C228 166 284 166 284 158 V138" fill="none" stroke="#ffffff" stroke-width="4"/>
+  <path d="M288 136 V168" fill="none" stroke="#fef08a" stroke-width="3"/>
+  <circle cx="288" cy="170" r="4" fill="#fef08a"/>
+
+  <!-- Open Book -->
+  <path d="M128 230 Q256 200 256 250 V390 Q256 340 128 360 Z" fill="url(#book)" stroke="#cbd5e1" stroke-width="2"/>
+  <path d="M384 230 Q256 200 256 250 V390 Q256 340 384 360 Z" fill="url(#book)" stroke="#cbd5e1" stroke-width="2"/>
+  <path d="M256 250 V390" stroke="#94a3b8" stroke-width="4"/>
+
+  <!-- Book Pages Lines -->
+  <line x1="152" y1="270" x2="232" y2="280" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+  <line x1="152" y1="298" x2="232" y2="308" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+  <line x1="152" y1="326" x2="212" y2="334" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+
+  <line x1="360" y1="270" x2="280" y2="280" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+  <line x1="360" y1="298" x2="280" y2="308" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+  <line x1="360" y1="326" x2="300" y2="334" stroke="#64748b" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Star Badge -->
+  <polygon points="256,410 263,425 280,427 268,439 271,456 256,448 241,456 244,439 232,427 249,425" fill="url(#accent)"/>
+</svg>
