@@ -1,5 +1,6 @@
 /**
- * SomaSikolo - Header Bar Component
+ * SomaSikolo / KalanGest - Header Bar Component
+ * Responsive header with mobile drawer toggle, desktop sidebar collapse toggle, search & quick actions
  */
 
 import React, { useState } from 'react';
@@ -7,14 +8,15 @@ import {
   Search, 
   Bell, 
   Calendar, 
-  WifiOff, 
   AlertTriangle, 
   CheckCircle2, 
-  ChevronDown, 
   Database,
-  Building2,
   Lock,
-  Download
+  Download,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,13 +26,23 @@ import { PwaInstallModal } from '../common/PwaInstallModal';
 interface HeaderProps {
   onSearchQuery?: (q: string) => void;
   onLock?: () => void;
+  isSidebarCollapsed: boolean;
+  onToggleSidebarCollapse: () => void;
+  onOpenMobileMenu: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onSearchQuery, onLock }) => {
+export const Header: React.FC<HeaderProps> = ({ 
+  onSearchQuery, 
+  onLock,
+  isSidebarCollapsed,
+  onToggleSidebarCollapse,
+  onOpenMobileMenu
+}) => {
   const { settings, payments } = useSchool();
   const { currentUser } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [search, setSearch] = useState('');
 
   // Pending payment count
@@ -42,98 +54,134 @@ export const Header: React.FC<HeaderProps> = ({ onSearchQuery, onLock }) => {
   };
 
   return (
-    <header className="no-print h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 lg:px-10 flex items-center justify-between shrink-0 z-20">
-      {/* Title & Eyebrow Header */}
-      <div className="flex items-center gap-4">
+    <header className="no-print h-16 sm:h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 px-3 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 z-20 transition-all">
+      {/* Left Section: Menu Toggles & School Branding */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {/* Mobile Hamburger Button */}
+        <button
+          type="button"
+          onClick={onOpenMobileMenu}
+          className="lg:hidden p-2 -ml-1 text-slate-700 hover:text-blue-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+          title="Ouvrir le menu"
+          aria-label="Ouvrir le menu de navigation"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+
+        {/* Desktop Sidebar Collapse Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleSidebarCollapse}
+          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-slate-600 hover:text-blue-900 hover:bg-blue-50 border border-slate-200/80 rounded-xl transition-all cursor-pointer text-xs font-bold"
+          title={isSidebarCollapsed ? "Agrandir le menu latéral" : "Masquer / Réduire le menu pour plus d'espace"}
+        >
+          {isSidebarCollapsed ? (
+            <>
+              <PanelLeftOpen className="w-4 h-4 text-blue-900" />
+              <span className="text-[11px] text-blue-900 font-black">Menu</span>
+            </>
+          ) : (
+            <>
+              <PanelLeftClose className="w-4 h-4 text-slate-500" />
+              <span className="text-[11px] text-slate-600">Masquer</span>
+            </>
+          )}
+        </button>
+
+        {/* School Logo */}
         {settings.logoUrl && (
           <img
             src={settings.logoUrl}
             alt="Logo Établissement"
-            className="w-11 h-11 object-contain rounded-xl border border-slate-200 p-0.5 bg-white shrink-0 shadow-xs"
+            className="w-8 h-8 sm:w-11 sm:h-11 object-contain rounded-xl border border-slate-200 p-0.5 bg-white shrink-0 shadow-2xs"
           />
         )}
-        <div className="flex flex-col">
-          <h1 className="text-xs font-black text-slate-400 uppercase tracking-widest">
-            {settings.academyName} • {settings.capName}
+
+        {/* School Info */}
+        <div className="flex flex-col min-w-0 max-w-[150px] sm:max-w-[240px] md:max-w-xs lg:max-w-md">
+          <h1 className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">
+            {settings.academyName || 'Académie'} • {settings.capName || 'CAP'}
           </h1>
-          <p className="text-xl font-black text-slate-900 tracking-tight">
-            {settings.schoolName}
+          <p className="text-xs sm:text-base lg:text-lg font-black text-slate-900 tracking-tight truncate leading-tight">
+            {settings.schoolName || 'KalanGest Mali'}
           </p>
         </div>
       </div>
 
       {/* Global Search & Indicators */}
-      <div className="flex items-center gap-6">
-        {/* Search Input */}
-        <div className="hidden md:flex items-center relative w-64 lg:w-80">
+      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+        {/* Desktop / Tablet Search Input */}
+        <div className="hidden md:flex items-center relative w-48 lg:w-72 xl:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={handleSearchChange}
-            placeholder="Rechercher élève, matricule, classe..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all"
+            placeholder="Rechercher élève, classe..."
+            className="w-full pl-9 pr-4 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all"
           />
         </div>
 
-        {/* System Badges & PWA Install Button */}
+        {/* Mobile Search Toggle */}
+        <button
+          type="button"
+          onClick={() => setShowMobileSearch(!showMobileSearch)}
+          className="md:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+          title="Rechercher"
+        >
+          <Search className="w-5 h-5" />
+        </button>
+
+        {/* System Badges (Desktop Only) */}
         <div className="hidden xl:flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setShowPwaModal(true)}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-full text-[11px] font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer border border-amber-400/50"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-full text-[11px] font-black uppercase tracking-wider shadow-2xs transition-all cursor-pointer border border-amber-400/50"
             title="Installer KalanGest sur votre téléphone ou PC"
           >
             <Download className="w-3.5 h-3.5 text-slate-950" />
             <span>Installer l'App</span>
           </button>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 text-blue-900 rounded-full text-[10px] font-black uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-100 text-blue-900 rounded-full text-[10px] font-black uppercase tracking-wider">
             <Calendar className="w-3.5 h-3.5 text-blue-700" />
             <span>{settings.currentAcademicYear}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase tracking-wider">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase tracking-wider">
             <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>SQLite Offline</span>
+            <span>Offline</span>
           </div>
         </div>
-
-        {/* Mobile Install App Button */}
-        <button
-          onClick={() => setShowPwaModal(true)}
-          className="xl:hidden flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer"
-          title="Installer l'Application"
-        >
-          <Download className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Installer</span>
-        </button>
 
         {/* Notifications Popover Button */}
         <div className="relative">
           <button
+            type="button"
             onClick={() => setShowNotifications(!showNotifications)}
-            className="p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl relative transition-all cursor-pointer"
+            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl relative transition-all cursor-pointer"
             title="Alertes & Notifications"
           >
             <Bell className="w-5 h-5" />
             {pendingPayments.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
+              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
             )}
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl py-3 z-50 text-xs">
+            <div className="absolute right-0 mt-3 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl py-3 z-50 text-xs animate-in fade-in zoom-in-95">
               <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
                 <span className="font-black text-slate-900 uppercase tracking-wide text-[11px]">
-                  Alertes Retards
+                  Alertes & Retards
                 </span>
                 <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-black text-[10px]">
-                  {pendingPayments.length} élève(s)
+                  {pendingPayments.length} retard(s)
                 </span>
               </div>
 
               <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
-                {pendingPayments.map((p) => (
+                {pendingPayments.slice(0, 5).map((p) => (
                   <div key={p.id} className="p-3 hover:bg-slate-50 flex items-start gap-2.5">
                     <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -154,7 +202,7 @@ export const Header: React.FC<HeaderProps> = ({ onSearchQuery, onLock }) => {
                       Inscriptions DEF & BAC Activées
                     </p>
                     <p className="text-slate-500 text-[11px]">
-                      Examens nationaux Mali 2026.
+                      Session scolaire Mali {settings.currentAcademicYear}.
                     </p>
                   </div>
                 </div>
@@ -166,29 +214,61 @@ export const Header: React.FC<HeaderProps> = ({ onSearchQuery, onLock }) => {
         {/* Lock App Button */}
         {onLock && (
           <button
+            type="button"
             onClick={onLock}
-            className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer flex items-center gap-1"
+            className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer flex items-center gap-1"
             title="Verrouiller l'Application (Code PIN)"
           >
-            <Lock className="w-5 h-5 text-slate-500" />
+            <Lock className="w-5 h-5 text-slate-600" />
           </button>
         )}
 
-        {/* Director Profile Badge */}
-        <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-black text-slate-900 leading-tight">
+        {/* User Profile Badge */}
+        <div className="flex items-center gap-2 sm:gap-3 pl-1 sm:pl-3 border-l border-slate-200">
+          <div className="text-right hidden md:block">
+            <p className="text-xs font-black text-slate-900 leading-tight truncate max-w-[120px]">
               {currentUser?.fullName}
             </p>
-            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+            <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest truncate">
               {AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}
             </p>
           </div>
-          <div className="w-11 h-11 rounded-full bg-blue-900 text-white font-black text-sm flex items-center justify-center border-2 border-white shadow-md shrink-0">
-            {currentUser?.fullName.charAt(0)}
+          <div 
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-900 text-white font-black text-xs sm:text-sm flex items-center justify-center border-2 border-white shadow-xs shrink-0"
+            title={`${currentUser?.fullName} (${AuthService.getRoleLabel(currentUser?.role || 'ADMIN')})`}
+          >
+            {currentUser?.fullName?.charAt(0) || 'A'}
           </div>
         </div>
       </div>
+
+      {/* Mobile Search Overlay Bar */}
+      {showMobileSearch && (
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-slate-200 p-3 shadow-md z-30 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              autoFocus
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Rechercher élève, classe..."
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-900"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowMobileSearch(false);
+              setSearch('');
+              if (onSearchQuery) onSearchQuery('');
+            }}
+            className="p-2 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* PWA Install Guide Modal */}
       <PwaInstallModal isOpen={showPwaModal} onClose={() => setShowPwaModal(false)} />

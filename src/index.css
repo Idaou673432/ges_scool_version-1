@@ -12,6 +12,17 @@
     background: #cbd5e1;
     border-radius: 9999px;
   }
+  
+  /* Touch smooth scrolling for mobile devices */
+  .touch-pan-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Base mobile improvements */
+html, body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 @media print {
