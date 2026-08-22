@@ -1,0 +1,14 @@
+{
+  "entities": {
+    "School": {
+      "fields": {
+        "id": { "type": "string" },
+        "schoolCode": { "type": "string" },
+        "name": { "type": "string" },
+        "pinCode": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    }
+  }
+}

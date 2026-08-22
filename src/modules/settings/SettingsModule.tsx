@@ -3,7 +3,7 @@
  */
 
 import React, { useState } from 'react';
-import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, ShieldAlert, Upload, Calendar, RotateCcw, Calculator, Sliders } from 'lucide-react';
+import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, ShieldAlert, Upload, Calendar, RotateCcw, Calculator, Sliders, Cloud, Smartphone, Laptop, Copy, Check, Share2, UploadCloud, RefreshCw } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
@@ -15,7 +15,17 @@ const MONTH_OPTIONS = [
 ];
 
 export const SettingsModule: React.FC = () => {
-  const { settings, updateSettings } = useSchool();
+  const { 
+    settings, 
+    updateSettings, 
+    cloudSchoolCode, 
+    syncStatus, 
+    syncStatusMessage, 
+    switchOrJoinSchool, 
+    forceCloudPush,
+    students,
+    classes
+  } = useSchool();
   const [formData, setFormData] = useState({
     ...settings,
     adminPassword: settings.adminPassword || '0022390070321',
@@ -31,7 +41,13 @@ export const SettingsModule: React.FC = () => {
   const [testResult, setTestResult] = useState<'IDLE' | 'SUCCESS' | 'FAIL'>('IDLE');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>('INFO');
+  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA' | 'CLOUD_SYNC'>('INFO');
+  
+  // Cloud Sync form state
+  const [targetCode, setTargetCode] = useState(cloudSchoolCode);
+  const [isCloudBusy, setIsCloudBusy] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [cloudMessage, setCloudMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +160,15 @@ export const SettingsModule: React.FC = () => {
           >
             <Calculator className="w-3.5 h-3.5" />
             <span>Formules de Calcul</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('CLOUD_SYNC')}
+            className={`px-5 py-2.5 rounded-full transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === 'CLOUD_SYNC' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <Cloud className="w-3.5 h-3.5" />
+            <span>Cloud & Multi-Appareils</span>
           </button>
         </div>
       </div>
@@ -1124,6 +1149,194 @@ export const SettingsModule: React.FC = () => {
             </button>
           </div>
         </form>
+      )}
+
+      {/* TAB: CLOUD_SYNC */}
+      {activeTab === 'CLOUD_SYNC' && (
+        <div className="space-y-8">
+          {/* Status & Overview */}
+          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 text-blue-900 rounded-2xl flex items-center justify-center font-black">
+                  <Cloud className="w-6 h-6 text-blue-900" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 uppercase">
+                    Synchronisation Multi-Établissements & Multi-Appareils
+                  </h2>
+                  <p className="text-xs font-bold text-slate-400 mt-0.5">
+                    Permet d'utiliser KalanGest sur plusieurs téléphones et ordinateurs simultanément avec les mêmes données.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
+                  syncStatus === 'CONNECTED' 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}>
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>{syncStatus === 'CONNECTED' ? 'Synchronisé en Direct' : syncStatus}</span>
+                </span>
+              </div>
+            </div>
+
+            {/* School Code Highlight Card */}
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white space-y-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-black uppercase tracking-widest text-sky-300">
+                  Code Établissement Partagé (Identifiant Cloud Unique)
+                </span>
+                <span className="text-[11px] font-bold text-slate-300">
+                  {students.length} Élève(s) • {classes.length} Classe(s)
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex-1 bg-black/50 border border-white/20 px-5 py-3.5 rounded-2xl font-mono text-xl font-black text-amber-300 tracking-wider select-all">
+                  {cloudSchoolCode}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(cloudSchoolCode);
+                    setCodeCopied(true);
+                    setTimeout(() => setCodeCopied(false), 2500);
+                  }}
+                  className="px-6 py-3.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer shrink-0"
+                >
+                  {codeCopied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                  <span>{codeCopied ? 'Code Copié !' : 'Copier le Code'}</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                👉 <strong>Pour connecter votre téléphone ou un autre PC :</strong> Ouvrez l'application sur l'appareil, accédez à cet écran (ou cliquez sur le bouton Cloud dans l'en-tête), collez le code <strong className="text-amber-300">{cloudSchoolCode}</strong> et validez. Vos notes, inscriptions et caisse se synchroniseront automatiquement !
+              </p>
+            </div>
+
+            {/* Form to change / join school code */}
+            <div className="pt-4 space-y-4">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Rejoindre une autre école ou changer de code
+              </h3>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="text"
+                  value={targetCode}
+                  onChange={e => setTargetCode(e.target.value.toUpperCase())}
+                  placeholder="Ex: ECOLE-HAMDALLAYE"
+                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black uppercase text-slate-900 tracking-wider outline-none focus:ring-2 focus:ring-blue-900"
+                />
+
+                <button
+                  type="button"
+                  disabled={isCloudBusy || !targetCode.trim()}
+                  onClick={async () => {
+                    if (!targetCode.trim()) return;
+                    setIsCloudBusy(true);
+                    setCloudMessage(null);
+                    try {
+                      const ok = await switchOrJoinSchool(targetCode, formData.schoolName, formData.adminPassword);
+                      if (ok) {
+                        setCloudMessage({ text: `Connecté à l'établissement [${targetCode.toUpperCase()}] avec succès !`, isError: false });
+                      } else {
+                        setCloudMessage({ text: "Échec de connexion au code établissement.", isError: true });
+                      }
+                    } catch (e) {
+                      setCloudMessage({ text: "Erreur de connexion.", isError: true });
+                    } finally {
+                      setIsCloudBusy(false);
+                    }
+                  }}
+                  className="px-6 py-3 bg-blue-900 hover:bg-blue-950 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isCloudBusy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+                  <span>Se Connecter</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isCloudBusy}
+                  onClick={async () => {
+                    setIsCloudBusy(true);
+                    setCloudMessage(null);
+                    try {
+                      const ok = await forceCloudPush();
+                      if (ok) {
+                        setCloudMessage({ text: "Toutes les données ont été synchronisées vers le Cloud !", isError: false });
+                      } else {
+                        setCloudMessage({ text: "Erreur de synchronisation.", isError: true });
+                      }
+                    } catch (e) {
+                      setCloudMessage({ text: "Erreur réseau Cloud.", isError: true });
+                    } finally {
+                      setIsCloudBusy(false);
+                    }
+                  }}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                  title="Téléverser toutes les données locales vers Firebase Firestore"
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Forcer Envoi Cloud</span>
+                </button>
+              </div>
+
+              {cloudMessage && (
+                <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
+                  cloudMessage.isError ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{cloudMessage.text}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Architecture Multi-Écoles & Multi-Appareils expliquée */}
+            <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-blue-900" />
+                Comment fonctionne l'utilisation simultanée :
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-900 flex items-center justify-center font-black">
+                    <Laptop className="w-4 h-4" />
+                  </div>
+                  <strong className="block text-xs font-black text-slate-900">1. Bureau & Direction</strong>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Le directeur inscrit les élèves, enregistre les paiements et génère les bulletins officiels.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-900 flex items-center justify-center font-black">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <strong className="block text-xs font-black text-slate-900">2. Enseignants sur Mobile</strong>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Les professeurs saisissent les notes de devoirs et compositions directement depuis leur smartphone en classe.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
+                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-900 flex items-center justify-center font-black">
+                    <Cloud className="w-4 h-4" />
+                  </div>
+                  <strong className="block text-xs font-black text-slate-900">3. Cloud Firestore</strong>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Chaque modification est instantanément répliquée sur tous les appareils connectés au même code d'école.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* PWA Installation Modal */}

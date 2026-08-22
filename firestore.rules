@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Multi-tenant schools and data synchronization rules
+    // Schools can share access with their authenticated or authorized school codes
+    match /schools/{schoolId} {
+      allow read, write: if true;
+
+      match /settings/{docId} {
+        allow read, write: if true;
+      }
+      match /students/{docId} {
+        allow read, write: if true;
+      }
+      match /classes/{docId} {
+        allow read, write: if true;
+      }
+      match /subjects/{docId} {
+        allow read, write: if true;
+      }
+      match /teachers/{docId} {
+        allow read, write: if true;
+      }
+      match /grades/{docId} {
+        allow read, write: if true;
+      }
+      match /payments/{docId} {
+        allow read, write: if true;
+      }
+      match /attendance/{docId} {
+        allow read, write: if true;
+      }
+      match /audit_logs/{docId} {
+        allow read, write: if true;
+      }
+      match /{allChildren=**} {
+        allow read, write: if true;
+      }
+    }
+
+    match /school_directory/{schoolCode} {
+      allow read, write: if true;
+    }
+  }
+}

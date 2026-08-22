@@ -1,6 +1,7 @@
 /**
  * SomaSikolo / KalanGest - Header Bar Component
- * Responsive header with mobile drawer toggle, desktop sidebar collapse toggle, search & quick actions
+ * Responsive header with mobile drawer toggle, desktop sidebar collapse toggle,
+ * multi-school cloud switcher, search & quick actions
  */
 
 import React, { useState } from 'react';
@@ -10,18 +11,20 @@ import {
   Calendar, 
   AlertTriangle, 
   CheckCircle2, 
-  Database,
+  Cloud,
   Lock,
   Download,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
-  X
+  X,
+  Share2
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthService } from '../../services/authService';
 import { PwaInstallModal } from '../common/PwaInstallModal';
+import { CloudSchoolSwitcherModal } from '../common/CloudSchoolSwitcherModal';
 
 interface HeaderProps {
   onSearchQuery?: (q: string) => void;
@@ -38,10 +41,11 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebarCollapse,
   onOpenMobileMenu
 }) => {
-  const { settings, payments } = useSchool();
+  const { settings, payments, cloudSchoolCode, syncStatus } = useSchool();
   const { currentUser } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
+  const [showCloudModal, setShowCloudModal] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -98,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* School Info */}
-        <div className="flex flex-col min-w-0 max-w-[150px] sm:max-w-[240px] md:max-w-xs lg:max-w-md">
+        <div className="flex flex-col min-w-0 max-w-[140px] sm:max-w-[200px] md:max-w-xs lg:max-w-md">
           <h1 className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">
             {settings.academyName || 'Académie'} • {settings.capName || 'CAP'}
           </h1>
@@ -109,15 +113,31 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Global Search & Indicators */}
-      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
+      <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
+        {/* Cloud Multi-Device Sync Button */}
+        <button
+          type="button"
+          onClick={() => setShowCloudModal(true)}
+          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] font-black tracking-wider transition-all cursor-pointer border ${
+            syncStatus === 'CONNECTED' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100 shadow-2xs'
+              : 'bg-indigo-50 border-indigo-200 text-indigo-900 hover:bg-indigo-100'
+          }`}
+          title="Gérer la synchronisation Cloud multi-écoles et multi-appareils"
+        >
+          <Cloud className={`w-3.5 h-3.5 ${syncStatus === 'SYNCING' ? 'animate-bounce text-amber-600' : 'text-emerald-600'}`} />
+          <span className="truncate max-w-[90px] sm:max-w-[130px] font-mono">{cloudSchoolCode}</span>
+          <span className="hidden md:inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        </button>
+
         {/* Desktop / Tablet Search Input */}
-        <div className="hidden md:flex items-center relative w-48 lg:w-72 xl:w-80">
+        <div className="hidden md:flex items-center relative w-36 lg:w-60 xl:w-72">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={handleSearchChange}
-            placeholder="Rechercher élève, classe..."
+            placeholder="Rechercher..."
             className="w-full pl-9 pr-4 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all"
           />
         </div>
@@ -147,11 +167,6 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-100 text-blue-900 rounded-full text-[10px] font-black uppercase tracking-wider">
             <Calendar className="w-3.5 h-3.5 text-blue-700" />
             <span>{settings.currentAcademicYear}</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-full text-[10px] font-black uppercase tracking-wider">
-            <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Offline</span>
           </div>
         </div>
 
@@ -199,10 +214,10 @@ export const Header: React.FC<HeaderProps> = ({
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="font-bold text-slate-900">
-                      Inscriptions DEF & BAC Activées
+                      Synchronisation Cloud Live Activée
                     </p>
                     <p className="text-slate-500 text-[11px]">
-                      Session scolaire Mali {settings.currentAcademicYear}.
+                      Vos données sont répliquées en direct sur le Cloud.
                     </p>
                   </div>
                 </div>
@@ -224,9 +239,9 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* User Profile Badge */}
-        <div className="flex items-center gap-2 sm:gap-3 pl-1 sm:pl-3 border-l border-slate-200">
+        <div className="flex items-center gap-2 sm:gap-3 pl-1 sm:pl-2 border-l border-slate-200">
           <div className="text-right hidden md:block">
-            <p className="text-xs font-black text-slate-900 leading-tight truncate max-w-[120px]">
+            <p className="text-xs font-black text-slate-900 leading-tight truncate max-w-[110px]">
               {currentUser?.fullName}
             </p>
             <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest truncate">
@@ -234,8 +249,9 @@ export const Header: React.FC<HeaderProps> = ({
             </p>
           </div>
           <div 
-            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-900 text-white font-black text-xs sm:text-sm flex items-center justify-center border-2 border-white shadow-xs shrink-0"
-            title={`${currentUser?.fullName} (${AuthService.getRoleLabel(currentUser?.role || 'ADMIN')})`}
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-900 text-white font-black text-xs sm:text-sm flex items-center justify-center border-2 border-white shadow-xs shrink-0 cursor-pointer"
+            onClick={() => setShowCloudModal(true)}
+            title={`${currentUser?.fullName} (${AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}) - Cliquez pour gérer la synchronisation Cloud`}
           >
             {currentUser?.fullName?.charAt(0) || 'A'}
           </div>
@@ -272,6 +288,9 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* PWA Install Guide Modal */}
       <PwaInstallModal isOpen={showPwaModal} onClose={() => setShowPwaModal(false)} />
+
+      {/* Multi-School & Cloud Sync Switcher Modal */}
+      <CloudSchoolSwitcherModal isOpen={showCloudModal} onClose={() => setShowCloudModal(false)} />
     </header>
   );
 };

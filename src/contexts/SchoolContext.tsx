@@ -1,9 +1,10 @@
 /**
- * SomaSikolo - Main Domain Data Context
- * Provides reactive access and actions for Students, Classes, Subjects, Teachers, Grades, Payments and Settings.
+ * SomaSikolo - Main Domain Data Context with Real-time Multi-School Cloud Synchronization
+ * Provides reactive access and instant live-sync across multiple devices (PCs, phones, tablets)
+ * and seamless multi-school separation.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   Student,
   SchoolClass,
@@ -20,7 +21,10 @@ import {
   AttendanceRecord
 } from '../types';
 import { storageService } from '../services/storageService';
+import { cloudSyncService } from '../services/cloudSyncService';
 import { getMaliScoreAppreciation, getRelatedTermsForPeriod, getEvaluationsPerTrimesterForClass } from '../constants/maliEducation';
+
+export type SyncStatus = 'CONNECTED' | 'SYNCING' | 'OFFLINE' | 'ERROR';
 
 interface SchoolContextType {
   settings: SchoolSettings;
@@ -34,7 +38,15 @@ interface SchoolContextType {
   auditLogs: AuditLog[];
   stats: SystemStats;
   
-  // Actions
+  // Cloud Multi-School / Multi-Device State
+  cloudSchoolCode: string;
+  syncStatus: SyncStatus;
+  syncStatusMessage: string;
+  isCloudConnected: boolean;
+  switchOrJoinSchool: (schoolCode: string, schoolName?: string, pinCode?: string) => Promise<boolean>;
+  forceCloudPush: () => Promise<boolean>;
+  
+  // Domain Actions
   refreshData: () => void;
   updateSettings: (newSettings: SchoolSettings) => void;
   saveStudent: (student: Partial<Student>) => Student;
@@ -67,7 +79,7 @@ interface SchoolContextType {
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<SchoolSettings>(storageService.getSettings());
+  const [settings, setSettings] = useState<SchoolSettings>(() => storageService.getSettings());
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -76,6 +88,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [payments, setPayments] = useState<Payment[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Multi-school & Cloud Sync Status
+  const [cloudSchoolCode, setCloudSchoolCode] = useState<string>(() => cloudSyncService.getActiveSchoolCode());
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('SYNCING');
+  const [syncStatusMessage, setSyncStatusMessage] = useState<string>('Connexion Cloud...');
+
+  // Avoid circular sync loops
+  const isSyncingFromCloud = useRef<boolean>(false);
 
   const refreshData = useCallback(() => {
     storageService.initDatabase();
@@ -90,9 +110,164 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAuditLogs(storageService.getAuditLogs());
   }, []);
 
+  // Initial local load + start Cloud real-time sync
   useEffect(() => {
     refreshData();
-  }, [refreshData]);
+
+    // Start Realtime Firestore synchronization for the active school code
+    cloudSyncService.startRealtimeSync(cloudSchoolCode, {
+      onSettingsChange: (newSettings) => {
+        isSyncingFromCloud.current = true;
+        storageService.updateSettings(newSettings);
+        setSettings(newSettings);
+        isSyncingFromCloud.current = false;
+      },
+      onStudentsChange: (cloudStudents) => {
+        if (cloudStudents && cloudStudents.length > 0) {
+          isSyncingFromCloud.current = true;
+          // Merge with local storage
+          const local = storageService.getStudents();
+          const mergedMap = new Map<string, Student>();
+          local.forEach(s => mergedMap.set(s.id, s));
+          cloudStudents.forEach(s => mergedMap.set(s.id, s));
+          const merged = Array.from(mergedMap.values());
+          try {
+            localStorage.setItem('somasikolo_students', JSON.stringify(merged));
+          } catch {}
+          setStudents(merged);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onClassesChange: (cloudClasses) => {
+        if (cloudClasses && cloudClasses.length > 0) {
+          isSyncingFromCloud.current = true;
+          try {
+            localStorage.setItem('somasikolo_classes', JSON.stringify(cloudClasses));
+          } catch {}
+          setClasses(cloudClasses);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onSubjectsChange: (cloudSubjects) => {
+        if (cloudSubjects && cloudSubjects.length > 0) {
+          isSyncingFromCloud.current = true;
+          try {
+            localStorage.setItem('somasikolo_subjects', JSON.stringify(cloudSubjects));
+          } catch {}
+          setSubjects(cloudSubjects);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onTeachersChange: (cloudTeachers) => {
+        if (cloudTeachers && cloudTeachers.length > 0) {
+          isSyncingFromCloud.current = true;
+          try {
+            localStorage.setItem('somasikolo_teachers', JSON.stringify(cloudTeachers));
+          } catch {}
+          setTeachers(cloudTeachers);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onGradesChange: (cloudGrades) => {
+        if (cloudGrades && cloudGrades.length > 0) {
+          isSyncingFromCloud.current = true;
+          try {
+            localStorage.setItem('somasikolo_grades', JSON.stringify(cloudGrades));
+          } catch {}
+          setGrades(cloudGrades);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onPaymentsChange: (cloudPayments) => {
+        if (cloudPayments && cloudPayments.length > 0) {
+          isSyncingFromCloud.current = true;
+          try {
+            localStorage.setItem('somasikolo_payments', JSON.stringify(cloudPayments));
+          } catch {}
+          setPayments(cloudPayments);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onAttendanceChange: (cloudAttendance) => {
+        if (cloudAttendance && cloudAttendance.length > 0) {
+          isSyncingFromCloud.current = true;
+          try {
+            localStorage.setItem('somasikolo_attendance', JSON.stringify(cloudAttendance));
+          } catch {}
+          setAttendanceRecords(cloudAttendance);
+          isSyncingFromCloud.current = false;
+        }
+      },
+      onSyncStatusChange: (status, msg) => {
+        setSyncStatus(status);
+        if (msg) setSyncStatusMessage(msg);
+      }
+    });
+
+    return () => {
+      cloudSyncService.stopRealtimeSync();
+    };
+  }, [cloudSchoolCode, refreshData]);
+
+  // Switch or Join a different school database
+  const switchOrJoinSchool = async (
+    schoolCode: string,
+    schoolName?: string,
+    pinCode?: string
+  ): Promise<boolean> => {
+    const cleanCode = schoolCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!cleanCode) return false;
+
+    setSyncStatus('SYNCING');
+    setSyncStatusMessage(`Connexion à l'établissement [${cleanCode}]...`);
+
+    const success = await cloudSyncService.connectOrRegisterSchool(
+      cleanCode,
+      schoolName || settings.schoolName || 'Établissement Scolaire',
+      pinCode || settings.adminPassword || '00223'
+    );
+
+    if (success) {
+      setCloudSchoolCode(cleanCode);
+      // Also push current local seed if remote is empty
+      cloudSyncService.pushAllDataToCloud(cleanCode, {
+        settings,
+        students,
+        classes,
+        subjects,
+        teachers,
+        grades,
+        payments,
+        attendance: attendanceRecords
+      });
+      return true;
+    }
+    return false;
+  };
+
+  // Push all local data to Cloud database
+  const forceCloudPush = async (): Promise<boolean> => {
+    setSyncStatus('SYNCING');
+    setSyncStatusMessage('Téléversement complet des données vers le Cloud...');
+    const ok = await cloudSyncService.pushAllDataToCloud(cloudSchoolCode, {
+      settings,
+      students,
+      classes,
+      subjects,
+      teachers,
+      grades,
+      payments,
+      attendance: attendanceRecords
+    });
+    if (ok) {
+      setSyncStatus('CONNECTED');
+      setSyncStatusMessage(`Toutes les données sont synchronisées sur le Cloud [${cloudSchoolCode}]`);
+    } else {
+      setSyncStatus('ERROR');
+      setSyncStatusMessage('Erreur de téléversement Cloud');
+    }
+    return ok;
+  };
 
   // Calculated System Stats
   const totalStudents = students.filter(s => s.status === 'ACTIF').length;
@@ -102,7 +277,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const totalPendingFeesFCFA = payments.reduce((sum, p) => sum + p.remainingAmount, 0);
   const totalExpensesFCFA = teachers.reduce((sum, t) => sum + (t.status === 'ACTIF' ? t.monthlySalary : 0), 0);
 
-  // Dynamic Attendance Rate calculation
   const totalAttendanceRecords = attendanceRecords.length;
   const presentCount = attendanceRecords.filter(r => r.status === 'PRESENT' || r.status === 'LATE').length;
   const attendanceRatePercent = totalAttendanceRecords > 0 
@@ -121,20 +295,24 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     bacSuccessRatePercent: 82.0
   };
 
+  // Synchronized Mutation Handlers
   const handleUpdateSettings = (newSettings: SchoolSettings) => {
     storageService.updateSettings(newSettings);
-    refreshData();
+    setSettings(newSettings);
+    cloudSyncService.syncSettings(newSettings, cloudSchoolCode);
   };
 
   const handleSaveStudent = (s: Partial<Student>): Student => {
     const res = storageService.saveStudent(s);
     refreshData();
+    cloudSyncService.syncDoc('students', res, cloudSchoolCode);
     return res;
   };
 
   const handleDeleteStudent = (id: string) => {
     storageService.deleteStudent(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('students', id, cloudSchoolCode);
   };
 
   const handleClearAllStudents = () => {
@@ -145,12 +323,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleSaveClass = (c: Partial<SchoolClass>): SchoolClass => {
     const res = storageService.saveClass(c);
     refreshData();
+    cloudSyncService.syncDoc('classes', res, cloudSchoolCode);
     return res;
   };
 
   const handleDeleteClass = (id: string) => {
     storageService.deleteClass(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('classes', id, cloudSchoolCode);
   };
 
   const handleClearAllClasses = () => {
@@ -161,12 +341,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleSaveSubject = (subj: Partial<Subject>): Subject => {
     const res = storageService.saveSubject(subj);
     refreshData();
+    cloudSyncService.syncDoc('subjects', res, cloudSchoolCode);
     return res;
   };
 
   const handleDeleteSubject = (id: string) => {
     storageService.deleteSubject(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('subjects', id, cloudSchoolCode);
   };
 
   const handleClearAllSubjects = () => {
@@ -177,12 +359,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleSaveTeacher = (t: Partial<Teacher>): Teacher => {
     const res = storageService.saveTeacher(t);
     refreshData();
+    cloudSyncService.syncDoc('teachers', res, cloudSchoolCode);
     return res;
   };
 
   const handleDeleteTeacher = (id: string) => {
     storageService.deleteTeacher(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('teachers', id, cloudSchoolCode);
   };
 
   const handleClearAllTeachers = () => {
@@ -193,12 +377,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleSaveGrade = (g: Partial<EvaluationGrade>): EvaluationGrade => {
     const res = storageService.saveGrade(g);
     refreshData();
+    cloudSyncService.syncDoc('grades', res, cloudSchoolCode);
     return res;
   };
 
   const handleDeleteGrade = (id: string) => {
     storageService.deleteGrade(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('grades', id, cloudSchoolCode);
   };
 
   const handleClearAllGrades = () => {
@@ -209,18 +395,21 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleRecordPayment = (p: Partial<Payment>): Payment => {
     const res = storageService.recordPayment(p);
     refreshData();
+    cloudSyncService.syncDoc('payments', res, cloudSchoolCode);
     return res;
   };
 
   const handleUpdatePayment = (p: Payment): Payment => {
     const res = storageService.updatePayment(p);
     refreshData();
+    cloudSyncService.syncDoc('payments', res, cloudSchoolCode);
     return res;
   };
 
   const handleDeletePayment = (id: string) => {
     storageService.deletePayment(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('payments', id, cloudSchoolCode);
   };
 
   const handleClearAllPayments = () => {
@@ -229,13 +418,17 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const handleSaveAttendanceBatch = (records: Partial<AttendanceRecord>[]) => {
-    storageService.saveAttendanceBatch(records);
+    const res = storageService.saveAttendanceBatch(records);
     refreshData();
+    res.forEach((r) => {
+      cloudSyncService.syncDoc('attendance', r, cloudSchoolCode);
+    });
   };
 
   const handleDeleteAttendanceRecord = (id: string) => {
     storageService.deleteAttendanceRecord(id);
     refreshData();
+    cloudSyncService.deleteCloudDoc('attendance', id, cloudSchoolCode);
   };
 
   const handleClearAllAttendanceRecords = () => {
@@ -256,15 +449,12 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const isFirstCycle = studentClass?.category === 'FONDAMENTAL_1';
     const maxScore = isFirstCycle ? 10 : 20;
 
-    // Find all subjects for this class category
     const relevantSubjects = subjects.filter(
       subj => !studentClass || subj.classCategory === studentClass.category
     );
 
-    // Get target terms for this evaluation period (e.g., TRIMESTRE_1 includes EVALUATION_1, EVALUATION_2, etc.)
     const targetTerms = getRelatedTermsForPeriod(term, settings.evaluationCount || 9);
 
-    // Get grades for student in target terms
     const studentGrades = grades.filter(
       g => g.studentId === studentId && targetTerms.includes(g.term)
     );
@@ -276,9 +466,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     relevantSubjects.forEach(subj => {
       const subjGrades = studentGrades.filter(g => g.subjectId === subj.id);
       
-      let classScore = isFirstCycle ? 6.5 : 16.0; // N.Classe / 10 (1er cycle) or / 20
-      let compositionScore = isFirstCycle ? 6.5 : 32.0; // Compos / 10 (1er cycle) or / 40
-      let finalScore = isFirstCycle ? 6.5 : 16.0; // Moy.G / 10 (1er cycle) or / 20
+      let classScore = isFirstCycle ? 6.5 : 16.0;
+      let compositionScore = isFirstCycle ? 6.5 : 32.0;
+      let finalScore = isFirstCycle ? 6.5 : 16.0;
 
       if (subjGrades.length > 0) {
         const classGrades = subjGrades.filter(g => g.type !== 'COMPOSITION' && g.type !== 'EXAMEN');
@@ -323,7 +513,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               const totalW = (wClass + wComp) || 1;
               finalScore = (classScore * wClass + compositionScore * wComp) / totalW;
             } else {
-              // MALI_OFFICIAL or EQUAL_WEIGHT: (Class + Comp) / 2
               finalScore = (classScore + compositionScore) / 2;
             }
           } else if (compGrades.length > 0) {
@@ -336,7 +525,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               : classScore;
           }
         } else {
-          // 2nd cycle / Lycée (Sur 20)
           const mode2nd = settings.calculationFormula2ndCycle || 'MALI_OFFICIAL';
           const wClass = settings.classScoreWeight2nd ?? 1;
           const wComp = settings.compScoreWeight2nd ?? 2;
@@ -352,7 +540,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
               const totalW = (wClass + wComp) || 1;
               finalScore = (classScore * wClass + compSur20 * wComp) / totalW;
             } else {
-              // MALI_OFFICIAL: (Class/20 + Comp/40) / 3
               finalScore = (classScore + compositionScore) / 3;
             }
           } else if (compGrades.length > 0) {
@@ -367,9 +554,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
-      // Round finalScore to 2 decimals
       finalScore = Math.round(finalScore * 100) / 100;
-
       const weightedScore = Math.round(finalScore * subj.coefficient * 100) / 100;
       totalPoints += weightedScore;
       totalCoefficients += subj.coefficient;
@@ -393,11 +578,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const generalAverage = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
 
-    // Calculate Class Rank Simulation
     const classStudents = students.filter(s => s.classId === student.classId && s.status === 'ACTIF');
     const classSize = classStudents.length || 1;
     
-    // Rank calculation logic
     let rankInClass = 1;
     const thresholdHigh = isFirstCycle ? 7 : 14;
     const thresholdMid = isFirstCycle ? 6 : 12;
@@ -438,7 +621,10 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const restoreBackupJSON = (jsonStr: string): boolean => {
     const success = storageService.restoreFullBackupJSON(jsonStr);
-    if (success) refreshData();
+    if (success) {
+      refreshData();
+      forceCloudPush();
+    }
     return success;
   };
 
@@ -455,6 +641,12 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         attendanceRecords,
         auditLogs,
         stats,
+        cloudSchoolCode,
+        syncStatus,
+        syncStatusMessage,
+        isCloudConnected: syncStatus === 'CONNECTED',
+        switchOrJoinSchool,
+        forceCloudPush,
         refreshData,
         updateSettings: handleUpdateSettings,
         saveStudent: handleSaveStudent,
