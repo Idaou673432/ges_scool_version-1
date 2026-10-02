@@ -321,11 +321,13 @@ const INITIAL_PAYMENTS: Payment[] = [
     studentName: 'Aïssata COULIBALY',
     className: '9ème Année A (DEF)',
     category: 'INSCRIPTION',
+    monthCovered: 'Septembre 2025',
     amountPaid: 20000,
     expectedAmount: 20000,
     remainingAmount: 0,
     paymentDate: '2025-09-15',
     method: 'ESPECES',
+    referenceNumber: '',
     cashierName: 'M. Ibrahim TRAORÉ',
     academicYear: '2025-2026',
     notes: 'Inscription intégrale acquittée'
@@ -346,7 +348,8 @@ const INITIAL_PAYMENTS: Payment[] = [
     method: 'ORANGE_MONEY',
     referenceNumber: 'OM-223-984321',
     cashierName: 'M. Ibrahim TRAORÉ',
-    academicYear: '2025-2026'
+    academicYear: '2025-2026',
+    notes: ''
   },
   {
     id: 'pay-3',
@@ -356,13 +359,16 @@ const INITIAL_PAYMENTS: Payment[] = [
     studentName: 'Sekou DIABATÉ',
     className: '9ème Année A (DEF)',
     category: 'INSCRIPTION',
+    monthCovered: 'Septembre 2025',
     amountPaid: 20000,
     expectedAmount: 20000,
     remainingAmount: 0,
     paymentDate: '2025-09-16',
     method: 'ESPECES',
+    referenceNumber: '',
     cashierName: 'M. Ibrahim TRAORÉ',
-    academicYear: '2025-2026'
+    academicYear: '2025-2026',
+    notes: ''
   },
   {
     id: 'pay-4',
@@ -845,23 +851,23 @@ class StorageService {
     const remaining = Math.max(0, expected - paid);
 
     const newPayment: Payment = {
-      id: `pay-${Date.now()}`,
-      receiptNumber: `REC-${year}-${String(count).padStart(4, '0')}`,
+      id: pay.id || `pay-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      receiptNumber: pay.receiptNumber || `REC-${year}-${String(count).padStart(4, '0')}`,
       studentId: pay.studentId || '',
       studentMatricule: pay.studentMatricule || '',
       studentName: pay.studentName || 'Élève',
       className: pay.className || 'Classe',
       category: pay.category || 'MENSUALITE',
-      monthCovered: pay.monthCovered,
+      monthCovered: pay.monthCovered || '',
       amountPaid: paid,
       expectedAmount: expected,
       remainingAmount: remaining,
       paymentDate: pay.paymentDate || new Date().toISOString().split('T')[0],
       method: pay.method || 'ESPECES',
-      referenceNumber: pay.referenceNumber,
+      referenceNumber: pay.referenceNumber || '',
       cashierName: pay.cashierName || 'Comptable',
       academicYear: pay.academicYear || '2025-2026',
-      notes: pay.notes
+      notes: pay.notes || ''
     };
 
     payments.unshift(newPayment);
@@ -873,16 +879,22 @@ class StorageService {
   public updatePayment(payment: Payment): Payment {
     const existing = this.getPayments();
     const index = existing.findIndex(p => p.id === payment.id);
+    const sanitizedPayment: Payment = {
+      ...payment,
+      monthCovered: payment.monthCovered || '',
+      referenceNumber: payment.referenceNumber || '',
+      notes: payment.notes || ''
+    };
     if (index !== -1) {
-      existing[index] = payment;
+      existing[index] = sanitizedPayment;
       this.setItem(STORAGE_KEYS.PAYMENTS, existing);
       this.addAuditLog(
         'MODIFICATION_PAIEMENT',
         'PAIEMENTS',
-        `Modification du reçu ${payment.receiptNumber} - ${payment.amountPaid} FCFA pour ${payment.studentName}`
+        `Modification du reçu ${sanitizedPayment.receiptNumber} - ${sanitizedPayment.amountPaid} FCFA pour ${sanitizedPayment.studentName}`
       );
     }
-    return payment;
+    return sanitizedPayment;
   }
 
   public deletePayment(id: string): void {

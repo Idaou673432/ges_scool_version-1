@@ -45,6 +45,7 @@ interface SchoolContextType {
   isCloudConnected: boolean;
   switchOrJoinSchool: (schoolCode: string, schoolName?: string, pinCode?: string) => Promise<boolean>;
   forceCloudPush: () => Promise<boolean>;
+  forceSyncPayments: () => Promise<boolean>;
   
   // Domain Actions
   refreshData: () => void;
@@ -177,9 +178,27 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onPaymentsChange: (cloudPayments) => {
         isSyncingFromCloud.current = true;
         try {
+          // Check for any offline pending payments that need pushing to cloud
+          let pendingToPush: Payment[] = [];
+          try {
+            const pendingRaw = localStorage.getItem('soma_pending_offline_payments');
+            if (pendingRaw) {
+              pendingToPush = JSON.parse(pendingRaw);
+            }
+          } catch {}
+
+          if (pendingToPush.length > 0) {
+            pendingToPush.forEach(p => {
+              cloudSyncService.syncPayment(p, cloudSchoolCode);
+            });
+          }
+
           localStorage.setItem('somasikolo_payments', JSON.stringify(cloudPayments));
-        } catch {}
-        setPayments(cloudPayments);
+          setPayments(cloudPayments);
+        } catch (e) {
+          console.warn('[SchoolContext] Error in onPaymentsChange:', e);
+          setPayments(cloudPayments);
+        }
         isSyncingFromCloud.current = false;
       },
       onAttendanceChange: (cloudAttendance) => {
@@ -196,8 +215,25 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     });
 
+    // 3. Mobile device resume & online handler: automatically fetch fresh payments on wake up
+    const handleResumeOrOnline = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        cloudSyncService.fetchAllCloudPayments(cloudSchoolCode).then((fresh) => {
+          if (fresh && fresh.length > 0) {
+            localStorage.setItem('somasikolo_payments', JSON.stringify(fresh));
+            setPayments(fresh);
+          }
+        });
+      }
+    };
+
+    window.addEventListener('online', handleResumeOrOnline);
+    document.addEventListener('visibilitychange', handleResumeOrOnline);
+
     return () => {
       cloudSyncService.stopRealtimeSync();
+      window.removeEventListener('online', handleResumeOrOnline);
+      document.removeEventListener('visibilitychange', handleResumeOrOnline);
     };
   }, [cloudSchoolCode, refreshData]);
 
@@ -391,28 +427,79 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const handleRecordPayment = (p: Partial<Payment>): Payment => {
     const res = storageService.recordPayment(p);
-    refreshData();
-    cloudSyncService.syncDoc('payments', res, cloudSchoolCode);
+    setPayments(storageService.getPayments());
+
+    // Track in pending offline queue in case connection drops
+    try {
+      const pendingRaw = localStorage.getItem('soma_pending_offline_payments');
+      const pending: Payment[] = pendingRaw ? JSON.parse(pendingRaw) : [];
+      pending.push(res);
+      localStorage.setItem('soma_pending_offline_payments', JSON.stringify(pending));
+    } catch {}
+
+    // Direct robust synchronization to Cloud Firestore
+    cloudSyncService.syncPayment(res, cloudSchoolCode).then((success) => {
+      if (success) {
+        setSyncStatus('CONNECTED');
+        setSyncStatusMessage(`Paiement [${res.receiptNumber}] synchronisé sur tous vos appareils`);
+        try {
+          const pendingRaw = localStorage.getItem('soma_pending_offline_payments');
+          if (pendingRaw) {
+            const pending: Payment[] = JSON.parse(pendingRaw);
+            const filtered = pending.filter(x => x.id !== res.id);
+            localStorage.setItem('soma_pending_offline_payments', JSON.stringify(filtered));
+          }
+        } catch {}
+      }
+    }).catch(err => {
+      console.warn('[SchoolContext] Cloud payment sync error:', err);
+    });
     return res;
   };
 
   const handleUpdatePayment = (p: Payment): Payment => {
     const res = storageService.updatePayment(p);
-    refreshData();
-    cloudSyncService.syncDoc('payments', res, cloudSchoolCode);
+    setPayments(storageService.getPayments());
+    cloudSyncService.syncPayment(res, cloudSchoolCode).then(() => {
+      setSyncStatus('CONNECTED');
+    });
     return res;
   };
 
   const handleDeletePayment = (id: string) => {
     storageService.deletePayment(id);
-    refreshData();
+    setPayments(storageService.getPayments());
     cloudSyncService.deleteCloudDoc('payments', id, cloudSchoolCode);
   };
 
   const handleClearAllPayments = () => {
     storageService.clearAllPayments();
+    setPayments([]);
     cloudSyncService.clearCloudCollection('payments', cloudSchoolCode);
-    refreshData();
+  };
+
+  const forceSyncPayments = async (): Promise<boolean> => {
+    setSyncStatus('SYNCING');
+    setSyncStatusMessage('Synchronisation des paiements avec le Cloud...');
+    try {
+      const local = storageService.getPayments();
+      for (const p of local) {
+        await cloudSyncService.syncPayment(p, cloudSchoolCode);
+      }
+      const cloudFresh = await cloudSyncService.fetchAllCloudPayments(cloudSchoolCode);
+      if (cloudFresh.length > 0) {
+        localStorage.setItem('somasikolo_payments', JSON.stringify(cloudFresh));
+        setPayments(cloudFresh);
+      }
+      setSyncStatus('CONNECTED');
+      setSyncStatusMessage(`Paiements synchronisés en direct avec [${cloudSchoolCode}]`);
+      return true;
+    } catch (e) {
+      console.warn('Force sync payments error:', e);
+      setSyncStatus('ERROR');
+      setSyncStatusMessage('Erreur lors de la synchronisation des paiements');
+      return false;
+    }
   };
 
   const handleSaveAttendanceBatch = (records: Partial<AttendanceRecord>[]) => {
@@ -646,6 +733,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isCloudConnected: syncStatus === 'CONNECTED',
         switchOrJoinSchool,
         forceCloudPush,
+        forceSyncPayments,
         refreshData,
         updateSettings: handleUpdateSettings,
         saveStudent: handleSaveStudent,

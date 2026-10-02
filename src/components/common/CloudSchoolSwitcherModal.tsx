@@ -18,9 +18,12 @@ import {
   Share2, 
   X,
   UploadCloud,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle,
+  ExternalLink
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { cloudSyncService } from '../../services/cloudSyncService';
 
 interface CloudSchoolSwitcherModalProps {
   isOpen: boolean;
@@ -49,6 +52,23 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
   const [copied, setCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const directSchoolUrl = cloudSyncService.getShareableLink(cloudSchoolCode);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(directSchoolUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2500);
+  };
+
+  const handleWhatsAppShare = () => {
+    const text = encodeURIComponent(
+      `🏫 *Accès Synchronisé KalanGest - ${settings.schoolName || 'Établissement'}*\n\nVoici le lien d'accès direct pour connecter votre téléphone ou ordinateur :\n👉 ${directSchoolUrl}\n\nCode Établissement : *${cloudSchoolCode}*\nTous vos paiements et notes se synchronisent automatiquement en temps réel !`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
 
   if (!isOpen) return null;
 
@@ -166,14 +186,37 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
                 type="button"
                 onClick={handleCopyCode}
                 className="px-4 py-3 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+                title="Copier le code"
               >
                 {copied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
                 <span>{copied ? 'Copié !' : 'Copier'}</span>
               </button>
             </div>
 
+            {/* Quick Share to Mobile (Direct Link) */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-2">
+              <button
+                type="button"
+                onClick={handleWhatsAppShare}
+                className="w-full sm:flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Envoyer le Lien par WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="w-full sm:w-auto py-2.5 px-4 bg-white/15 hover:bg-white/25 active:scale-95 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 border border-white/20 transition-all cursor-pointer"
+                title="Copier le lien direct avec le code inclus pour votre téléphone"
+              >
+                {linkCopied ? <Check className="w-4 h-4 text-emerald-300" /> : <ExternalLink className="w-4 h-4" />}
+                <span>{linkCopied ? 'Lien Copié !' : 'Copier Lien Direct'}</span>
+              </button>
+            </div>
+
             <p className="text-xs text-slate-300 leading-relaxed">
-              👉 <strong>Pour utiliser sur votre téléphone ou un autre ordinateur :</strong> Ouvrez l'application sur l'appareil, venez dans ce menu et collez ce <strong>Code Établissement</strong>. Toutes vos saisies de notes, paiements et élèves apparaîtront instantanément !
+              👉 <strong>Astuce Mobile :</strong> Cliquez sur <em>"Envoyer le Lien par WhatsApp"</em> pour l'ouvrir sur votre téléphone : l'application s'y connectera immédiatement sans que vous n'ayez rien à recopier, et les paiements enregistrés sur votre téléphone apparaîtront en direct sur votre ordinateur !
             </p>
           </div>
 

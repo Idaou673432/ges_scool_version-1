@@ -7,13 +7,16 @@ import {
   CreditCard, Plus, Receipt, Download, Search, CheckCircle2, DollarSign, MessageCircle, Send, 
   Printer, FileText, Smartphone, X, Users, Filter, AlertCircle, XCircle, Clock, UserCheck, ArrowRight,
   FileSpreadsheet, TrendingUp, TrendingDown, PieChart, Wallet, MinusCircle, ArrowUpRight, ArrowDownRight,
-  ShieldAlert, BellRing, FileCheck, Calendar, AlertTriangle, SendHorizontal, Sparkles, RefreshCw, Eye, Trash2, Edit3, Lock, Key, Save
+  ShieldAlert, BellRing, FileCheck, Calendar, AlertTriangle, SendHorizontal, Sparkles, RefreshCw, Eye, Trash2, Edit3, Lock, Key, Save,
+  Cloud, Laptop, Share2, Copy, Check, Phone, MessageSquare
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { Payment, PaymentCategory, PaymentMethod, Student, Expense, ExpenseCategory, TuitionInvoice, InvoiceStatus } from '../../types';
 import { formatFCFA, getAnnualTuitionFee, getEvaluationCountForClass, getMaliEvaluationTerms } from '../../constants/maliEducation';
 import { PdfService } from '../../services/pdfService';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
+import { CloudSchoolSwitcherModal } from '../../components/common/CloudSchoolSwitcherModal';
+import { cloudSyncService } from '../../services/cloudSyncService';
 
 const INITIAL_EXPENSES: Expense[] = [
   {
@@ -63,13 +66,30 @@ const INITIAL_EXPENSES: Expense[] = [
 ];
 
 export const PaymentsModule: React.FC = () => {
-  const { payments, students, classes, recordPayment, updatePayment, deletePayment, deleteAllPayments, settings } = useSchool();
+  const { 
+    payments, 
+    students, 
+    classes, 
+    recordPayment, 
+    updatePayment, 
+    deletePayment, 
+    deleteAllPayments, 
+    settings,
+    cloudSchoolCode,
+    syncStatus,
+    syncStatusMessage,
+    forceSyncPayments
+  } = useSchool();
   const [activeTab, setActiveTab] = useState<'STUDENTS_FINANCES' | 'TRANSACTIONS' | 'EXPENSES' | 'INVOICES'>('STUDENTS_FINANCES');
   const [search, setSearch] = useState('');
   const [studentSearchGlobal, setStudentSearchGlobal] = useState('');
   const [selectedClassFilter, setSelectedClassFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'A_JOUR' | 'PARTIEL' | 'UNPAID'>('ALL');
+  const [financialSort, setFinancialSort] = useState<'REMAINING_DESC' | 'NAME_ASC' | 'CLASS_ASC'>('REMAINING_DESC');
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [showCloudModal, setShowCloudModal] = useState(false);
+  const [isSyncingPayments, setIsSyncingPayments] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [studentSearchInModal, setStudentSearchInModal] = useState('');
@@ -130,13 +150,26 @@ export const PaymentsModule: React.FC = () => {
     parentType: 'FATHER' | 'MOTHER' | 'CUSTOM';
   } | null>(null);
 
-  const [unpaidReminderStudent, setUnpaidReminderStudent] = useState<{
+  // Dedicated Modal State for Individual Unpaid Student Reminder (WhatsApp & SMS)
+  const [unpaidReminderModalData, setUnpaidReminderModalData] = useState<{
+    studentId: string;
     studentName: string;
     matricule: string;
     className: string;
     remainingFee: number;
+    totalPaid: number;
+    annualFee: number;
+    percentPaid: number;
+    status: 'UNPAID' | 'PARTIEL' | 'A_JOUR';
+    fatherName: string;
+    fatherPhone: string;
+    motherName: string;
+    motherPhone: string;
     phone: string;
+    parentType: 'FATHER' | 'MOTHER' | 'CUSTOM';
+    messageText: string;
   } | null>(null);
+  const [reminderCopied, setReminderCopied] = useState(false);
 
   const openWhatsAppModal = (p: Payment) => {
     const student = students.find(s => s.id === p.studentId);
@@ -173,34 +206,100 @@ export const PaymentsModule: React.FC = () => {
     setWhatsappModalPayment(null);
   };
 
+  const generateUnpaidReminderMessage = (
+    studentName: string,
+    matricule: string,
+    className: string,
+    remainingFee: number,
+    totalPaid: number,
+    annualFee: number
+  ): string => {
+    const ecole = settings.schoolName || 'Établissement Scolaire';
+    const annee = settings.currentAcademicYear || '2025-2026';
+    const contact = settings.phone || '';
+
+    return (
+      `*RAPPEL DE SCOLARITÉ - ${ecole.toUpperCase()}*\n` +
+      `----------------------------------------\n` +
+      `Bonjour Chers Parents / Tuteurs,\n\n` +
+      `Nous vous contactons au sujet de la scolarité de l'élève :\n` +
+      `👤 *${studentName}*\n` +
+      `📚 Classe : *${className}*\n` +
+      `🆔 Matricule : *${matricule}*\n` +
+      `📅 Année Scolaire : *${annee}*\n\n` +
+      `📊 *Situation Financière :*\n` +
+      `• Montant total annuel exigible : ${formatFCFA(annualFee)}\n` +
+      `• Montant déjà réglé : ${formatFCFA(totalPaid)}\n` +
+      `⚠️ *SOLDE RESTANT À RÉGLER : ${formatFCFA(remainingFee)}*\n\n` +
+      `Nous vous prions de bien vouloir régulariser ce solde auprès de la caisse de l'établissement ou par mobile money afin de permettre la continuité normale de ses études.\n\n` +
+      (contact ? `📞 Contact Caisse & Direction : ${contact}\n` : '') +
+      `Merci pour votre bonne compréhension et votre confiance.\n` +
+      `----------------------------------------\n` +
+      `_Direction - ${ecole}_`
+    );
+  };
+
   const handleOpenUnpaidReminder = (item: typeof studentsFinancials[0]) => {
-    const phone = item.student.parent.fatherPhone || item.student.parent.motherPhone || settings.phone;
-    setUnpaidReminderStudent({
-      studentName: `${item.student.lastName.toUpperCase()} ${item.student.firstName}`,
+    const fatherPhone = item.student.parent.fatherPhone || '';
+    const motherPhone = item.student.parent.motherPhone || '';
+    const fatherName = item.student.parent.fatherName || 'Père';
+    const motherName = item.student.parent.motherName || 'Mère';
+    const initialPhone = fatherPhone || motherPhone || settings.phone;
+    const parentType: 'FATHER' | 'MOTHER' | 'CUSTOM' = fatherPhone ? 'FATHER' : (motherPhone ? 'MOTHER' : 'CUSTOM');
+    const studentFullName = `${item.student.lastName.toUpperCase()} ${item.student.firstName}`;
+
+    const defaultMsg = generateUnpaidReminderMessage(
+      studentFullName,
+      item.student.matricule,
+      item.clsName,
+      item.remaining,
+      item.totalPaid,
+      item.annualFee
+    );
+
+    setUnpaidReminderModalData({
+      studentId: item.student.id,
+      studentName: studentFullName,
       matricule: item.student.matricule,
       className: item.clsName,
       remainingFee: item.remaining,
-      phone
+      totalPaid: item.totalPaid,
+      annualFee: item.annualFee,
+      percentPaid: item.percentPaid,
+      status: item.status,
+      fatherName,
+      fatherPhone,
+      motherName,
+      motherPhone,
+      phone: initialPhone,
+      parentType,
+      messageText: defaultMsg
     });
   };
 
-  const handleSendUnpaidReminderWhatsApp = () => {
-    if (!unpaidReminderStudent) return;
-    const cleanPhone = unpaidReminderStudent.phone.replace(/[^0-9]/g, '');
-    const message = encodeURIComponent(
-      `*RAPPEL DE SCOLARITÉ - ${settings.schoolName.toUpperCase()}*\n` +
-      `----------------------------------------\n` +
-      `📍 *Établissement:* ${settings.schoolName}\n` +
-      `👤 *Élève:* ${unpaidReminderStudent.studentName} (${unpaidReminderStudent.className})\n` +
-      `🆔 *Matricule:* ${unpaidReminderStudent.matricule}\n` +
-      `----------------------------------------\n` +
-      `⚠️ *Solde Impayé Restant:* ${formatFCFA(unpaidReminderStudent.remainingFee)}\n` +
-      `----------------------------------------\n` +
-      `Chers parents, nous vous prions de bien vouloir régulariser la scolarité de votre enfant auprès de la caisse de l'établissement dans les meilleurs délais.\n\n` +
-      `Merci de votre compréhension.`
-    );
-    window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank');
-    setUnpaidReminderStudent(null);
+  const handleSendReminderViaWhatsApp = () => {
+    if (!unpaidReminderModalData) return;
+    const cleanPhone = unpaidReminderModalData.phone.replace(/[^0-9]/g, '');
+    const encoded = encodeURIComponent(unpaidReminderModalData.messageText);
+    window.open(`https://wa.me/${cleanPhone}?text=${encoded}`, '_blank');
+    setSyncToast(`Relance WhatsApp envoyée pour ${unpaidReminderModalData.studentName} !`);
+    setTimeout(() => setSyncToast(null), 3500);
+  };
+
+  const handleSendReminderViaSMS = () => {
+    if (!unpaidReminderModalData) return;
+    const cleanPhone = unpaidReminderModalData.phone.replace(/[^0-9]/g, '');
+    const encoded = encodeURIComponent(unpaidReminderModalData.messageText);
+    window.location.href = `sms:${cleanPhone}?body=${encoded}`;
+    setSyncToast(`Application SMS ouverte pour ${unpaidReminderModalData.studentName} !`);
+    setTimeout(() => setSyncToast(null), 3500);
+  };
+
+  const handleCopyReminderMessage = () => {
+    if (!unpaidReminderModalData) return;
+    navigator.clipboard.writeText(unpaidReminderModalData.messageText);
+    setReminderCopied(true);
+    setTimeout(() => setReminderCopied(false), 2500);
   };
 
   const [formData, setFormData] = useState<Partial<Payment>>({
@@ -223,6 +322,7 @@ export const PaymentsModule: React.FC = () => {
     const evalCount = getEvaluationCountForClass(cls?.category, settings);
     const annualFee = getAnnualTuitionFee(cls, settings);
     const remaining = Math.max(0, annualFee - totalPaid);
+    const percentPaid = annualFee > 0 ? Math.min(100, Math.round((totalPaid / annualFee) * 100)) : 0;
     
     let status: 'A_JOUR' | 'PARTIEL' | 'UNPAID' = 'UNPAID';
     if (totalPaid >= annualFee) status = 'A_JOUR';
@@ -237,6 +337,7 @@ export const PaymentsModule: React.FC = () => {
       evalCount,
       totalPaid,
       remaining,
+      percentPaid,
       status,
       paymentsCount: studentPayments.length,
       lastPaymentDate: studentPayments[0]?.paymentDate
@@ -258,6 +359,17 @@ export const PaymentsModule: React.FC = () => {
     return matchesSearch && matchesClass && matchesStatus;
   });
 
+  // Dynamic sorting (Highest Debt first by default to flag urgent cases immediately)
+  filteredStudentsFinancials.sort((a, b) => {
+    if (financialSort === 'REMAINING_DESC') {
+      return b.remaining - a.remaining || a.student.lastName.localeCompare(b.student.lastName);
+    }
+    if (financialSort === 'CLASS_ASC') {
+      return a.clsName.localeCompare(b.clsName) || a.student.lastName.localeCompare(b.student.lastName);
+    }
+    return a.student.lastName.localeCompare(b.student.lastName);
+  });
+
   const totalCollected = payments.reduce((acc, curr) => acc + curr.amountPaid, 0);
   const totalExpenses = expenses.reduce((acc, curr) => acc + curr.amount, 0);
   const netBalance = totalCollected - totalExpenses;
@@ -270,6 +382,8 @@ export const PaymentsModule: React.FC = () => {
   const upToDateCount = studentsFinancials.filter(s => s.status === 'A_JOUR').length;
   const partialCount = studentsFinancials.filter(s => s.status === 'PARTIEL').length;
   const unpaidCount = studentsFinancials.filter(s => s.status === 'UNPAID').length;
+  const unpaidTotal = studentsFinancials.filter(s => s.status === 'UNPAID').reduce((acc, curr) => acc + curr.remaining, 0);
+  const partialTotal = studentsFinancials.filter(s => s.status === 'PARTIEL').reduce((acc, curr) => acc + curr.remaining, 0);
 
   // Computation of Automatic Tuition Invoices
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -444,10 +558,38 @@ export const PaymentsModule: React.FC = () => {
     }));
   };
 
+  const handleForceSync = async () => {
+    setIsSyncingPayments(true);
+    try {
+      const ok = await forceSyncPayments();
+      if (ok) {
+        setSyncToast(`Paiements synchronisés en direct avec l'établissement [${cloudSchoolCode}] !`);
+        setTimeout(() => setSyncToast(null), 4000);
+      }
+    } finally {
+      setIsSyncingPayments(false);
+    }
+  };
+
+  const handleShareMobileSyncLink = () => {
+    const link = cloudSyncService.getShareableLink(cloudSchoolCode);
+    const text = encodeURIComponent(
+      `🏫 *Accès Caisse & Paiements KalanGest - ${settings.schoolName || 'Établissement'}*\n\nVoici votre lien de synchronisation direct pour téléphone & PC :\n👉 ${link}\n\nCode Établissement : *${cloudSchoolCode}*\nTous vos règlements et reçus se synchronisent automatiquement en direct !`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newPayment = recordPayment(formData);
+    const newPayment = recordPayment({
+      ...formData,
+      monthCovered: formData.monthCovered || '',
+      referenceNumber: formData.referenceNumber || '',
+      notes: formData.notes || ''
+    });
     setIsModalOpen(false);
+    setSyncToast(`Paiement N° ${newPayment.receiptNumber} (${formatFCFA(newPayment.amountPaid)}) enregistré et synchronisé en direct sur tous vos appareils !`);
+    setTimeout(() => setSyncToast(null), 4500);
     // Au lieu de télécharger automatiquement, ouvrir la fenêtre d'action pour imprimer ou délivrer le reçu
     setReceiptModalPayment(newPayment);
   };
@@ -468,6 +610,7 @@ export const PaymentsModule: React.FC = () => {
     const updated = [newExpense, ...expenses];
     setExpenses(updated);
     localStorage.setItem('soma_expenses', JSON.stringify(updated));
+    cloudSyncService.syncExpense(newExpense, cloudSchoolCode);
     setIsExpenseModalOpen(false);
     setExpenseFormData({
       category: 'SALAIRE',
@@ -668,6 +811,19 @@ export const PaymentsModule: React.FC = () => {
         </div>
       </div>
 
+      {/* Sync Toast Feedback */}
+      {syncToast && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-black flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>{syncToast}</span>
+          </div>
+          <button onClick={() => setSyncToast(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Financial Balance & KPI Overview Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Recettes Total */}
@@ -737,6 +893,88 @@ export const PaymentsModule: React.FC = () => {
         </div>
       </div>
 
+      {/* Visual Notification System for Overdue & Unpaid Students */}
+      {(unpaidCount + partialCount) > 0 && (
+        <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-amber-950 p-6 rounded-[2.2rem] text-white shadow-xl border border-rose-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 animate-in fade-in slide-in-from-top-3">
+          <div className="flex items-start sm:items-center gap-4">
+            <div className="w-13 h-13 rounded-2xl bg-rose-600/30 border border-rose-400/50 flex items-center justify-center shrink-0 relative">
+              <span className="relative flex h-6 w-6">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <AlertTriangle className="relative inline-flex w-6 h-6 text-rose-300" />
+              </span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-3 py-0.5 bg-rose-600 text-white font-black text-[9px] uppercase tracking-widest rounded-full shadow-xs animate-pulse">
+                  🚨 Système d'Alerte Immédiate Impayés
+                </span>
+                <span className="text-xs font-bold text-rose-200">
+                  {unpaidCount + partialCount} élève(s) en retard ou avec solde dû
+                </span>
+              </div>
+              <p className="text-sm font-black text-white mt-1.5 leading-snug">
+                Reste total à recouvrer : <strong className="text-amber-300 font-mono text-base">{formatFCFA(unpaidTotal + partialTotal)}</strong>
+                {' • '}
+                <span className="text-rose-200 font-normal">
+                  <strong className="text-white font-black">{unpaidCount}</strong> élève(s) à 0 FCFA versé et{' '}
+                  <strong className="text-white font-black">{partialCount}</strong> avec mensualités partielles.
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap self-stretch sm:self-end lg:self-center">
+            {unpaidCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('STUDENTS_FINANCES');
+                  setStatusFilter(statusFilter === 'UNPAID' ? 'ALL' : 'UNPAID');
+                }}
+                className={`px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-md ${
+                  statusFilter === 'UNPAID' && activeTab === 'STUDENTS_FINANCES'
+                    ? 'bg-white text-rose-950 ring-2 ring-rose-300'
+                    : 'bg-rose-600 hover:bg-rose-500 text-white'
+                }`}
+                title="Filtrer immédiatement les élèves en retard critique (0 FCFA versé)"
+              >
+                <AlertCircle className="w-3.5 h-3.5 text-white" />
+                <span>{unpaidCount} Retard{unpaidCount > 1 ? 's' : ''} Critique (0 FCFA)</span>
+              </button>
+            )}
+
+            {partialCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('STUDENTS_FINANCES');
+                  setStatusFilter(statusFilter === 'PARTIEL' ? 'ALL' : 'PARTIEL');
+                }}
+                className={`px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-md ${
+                  statusFilter === 'PARTIEL' && activeTab === 'STUDENTS_FINANCES'
+                    ? 'bg-white text-amber-950 ring-2 ring-amber-300'
+                    : 'bg-amber-600 hover:bg-amber-500 text-white'
+                }`}
+                title="Filtrer immédiatement les élèves ayant un solde partiel restant"
+              >
+                <Clock className="w-3.5 h-3.5 text-white" />
+                <span>{partialCount} Solde{partialCount > 1 ? 's' : ''} Partiel</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsBatchReminderModalOpen(true)}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-full shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+              title="Envoyer des rappels automatiques WhatsApp aux parents concernés"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
+              <span>Relance WhatsApp</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabs Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-2">
         <div className="flex flex-wrap items-center gap-3">
@@ -750,6 +988,14 @@ export const PaymentsModule: React.FC = () => {
           >
             <Users className="w-4 h-4" />
             <span>Situation Financière des Élèves ({students.length})</span>
+            {(unpaidCount + partialCount) > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-xs ${
+                activeTab === 'STUDENTS_FINANCES' ? 'bg-rose-500 text-white animate-pulse' : 'bg-rose-100 text-rose-700'
+              }`}>
+                <AlertTriangle className="w-3 h-3" />
+                <span>{unpaidCount + partialCount} Impayés</span>
+              </span>
+            )}
           </button>
 
           <button
@@ -854,6 +1100,116 @@ export const PaymentsModule: React.FC = () => {
       {/* TAB 1: Situation Financière de TOUS les Élèves */}
       {activeTab === 'STUDENTS_FINANCES' && (
         <div className="space-y-6">
+          {/* Centre de Notifications Visuelles pour Retards & Impayés */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Carte 1: Alerte Critique - 0 FCFA Versé */}
+            <div 
+              onClick={() => setStatusFilter(statusFilter === 'UNPAID' ? 'ALL' : 'UNPAID')}
+              className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                statusFilter === 'UNPAID'
+                  ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-500 shadow-md'
+                  : 'bg-white border-rose-100 hover:border-rose-300 hover:shadow-sm'
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                      <span className="relative flex h-4 w-4">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-600"></span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Alerte Retard Critique</span>
+                      <h3 className="text-2xl font-black text-rose-950 mt-0.5">{unpaidCount} Élève{unpaidCount > 1 ? 's' : ''}</h3>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 bg-rose-600 text-white text-[9px] font-black rounded-full uppercase tracking-wider shadow-xs animate-pulse">
+                    0 FCFA Versé
+                  </span>
+                </div>
+                <p className="text-xs text-rose-800 font-bold mt-3">
+                  Élèves n'ayant encore effectué aucun paiement pour l'année scolaire en cours.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-rose-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-bold">Total découvert impayé :</span>
+                <span className="font-black text-rose-700 font-mono text-sm">{formatFCFA(unpaidTotal)}</span>
+              </div>
+            </div>
+
+            {/* Carte 2: Attention - Soldes Partiels Incomplets */}
+            <div 
+              onClick={() => setStatusFilter(statusFilter === 'PARTIEL' ? 'ALL' : 'PARTIEL')}
+              className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                statusFilter === 'PARTIEL'
+                  ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-500 shadow-md'
+                  : 'bg-white border-amber-100 hover:border-amber-300 hover:shadow-sm'
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+                      <Clock className="w-6 h-6 text-amber-600" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-amber-600 tracking-wider">Soldes Partiels en Attente</span>
+                      <h3 className="text-2xl font-black text-amber-950 mt-0.5">{partialCount} Élève{partialCount > 1 ? 's' : ''}</h3>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black rounded-full uppercase tracking-wider">
+                    Solde Dû
+                  </span>
+                </div>
+                <p className="text-xs text-amber-800 font-bold mt-3">
+                  Élèves ayant versé un acompte mais avec des mensualités en souffrance.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-amber-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500 font-bold">Reste à recouvrer :</span>
+                <span className="font-black text-amber-700 font-mono text-sm">{formatFCFA(partialTotal)}</span>
+              </div>
+            </div>
+
+            {/* Carte 3: Actions Express & Relances Directes */}
+            <div className="p-6 rounded-[2rem] border border-blue-900 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white flex flex-col justify-between shadow-md">
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-sky-300 tracking-wider flex items-center gap-1.5">
+                      <BellRing className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
+                      Actions de Recouvrement
+                    </span>
+                    <h3 className="text-xl font-black text-white mt-1">
+                      {unpaidCount + partialCount} Dossiers en Retard
+                    </h3>
+                  </div>
+                  <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/15">
+                    <ShieldAlert className="w-5 h-5 text-amber-300" />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                  Envoyez un rappel automatique WhatsApp aux parents d'élèves en retard ou imprimez les relevés de compte.
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBatchReminderModalOpen(true)}
+                  className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Relancer par WhatsApp ({unpaidCount + partialCount})</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Filters Bar */}
           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
@@ -893,45 +1249,62 @@ export const PaymentsModule: React.FC = () => {
               </div>
             </div>
 
-            {/* Status Filter Pills */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-50">
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mr-2">Statut :</span>
-              <button
-                onClick={() => setStatusFilter('ALL')}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  statusFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Tous ({studentsFinancials.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter('A_JOUR')}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  statusFilter === 'A_JOUR' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                }`}
-              >
-                À Jour ({upToDateCount})
-              </button>
-              <button
-                onClick={() => setStatusFilter('PARTIEL')}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  statusFilter === 'PARTIEL' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
-                }`}
-              >
-                Partiel ({partialCount})
-              </button>
-              <button
-                onClick={() => setStatusFilter('UNPAID')}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  statusFilter === 'UNPAID' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
-                }`}
-              >
-                Non Payé ({unpaidCount})
-              </button>
+            {/* Status & Sort Filter Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-50">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider mr-1">Statut :</span>
+                <button
+                  onClick={() => setStatusFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    statusFilter === 'ALL' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Tous ({studentsFinancials.length})
+                </button>
+                <button
+                  onClick={() => setStatusFilter('UNPAID')}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                    statusFilter === 'UNPAID' ? 'bg-rose-600 text-white shadow-xs' : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping inline-block" />
+                  <span>🚨 Retard Critique ({unpaidCount})</span>
+                </button>
+                <button
+                  onClick={() => setStatusFilter('PARTIEL')}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                    statusFilter === 'PARTIEL' ? 'bg-amber-500 text-white shadow-xs' : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                  }`}
+                >
+                  <span>⏳ Solde Partiel ({partialCount})</span>
+                </button>
+                <button
+                  onClick={() => setStatusFilter('A_JOUR')}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                    statusFilter === 'A_JOUR' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  ✅ À Jour ({upToDateCount})
+                </button>
+              </div>
+
+              {/* Sort Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Trier :</span>
+                <select
+                  value={financialSort}
+                  onChange={(e) => setFinancialSort(e.target.value as any)}
+                  className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[11px] font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+                >
+                  <option value="REMAINING_DESC">🚨 Plus gros impayés d'abord</option>
+                  <option value="NAME_ASC">Nom Élève (A-Z)</option>
+                  <option value="CLASS_ASC">Classe</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Students Financial Table */}
+          {/* Students Financial Table with Visual Notifications */}
           <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -941,7 +1314,7 @@ export const PaymentsModule: React.FC = () => {
                     <th className="py-4 px-4">Classe</th>
                     <th className="py-4 px-4">Total Payé (FCFA)</th>
                     <th className="py-4 px-4">Reste Dû (FCFA)</th>
-                    <th className="py-4 px-4">Statut Scolarité</th>
+                    <th className="py-4 px-4">Statut & Échéance</th>
                     <th className="py-4 px-4">Parent Contact</th>
                     <th className="py-4 px-8 text-right">Actions</th>
                   </tr>
@@ -954,92 +1327,166 @@ export const PaymentsModule: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredStudentsFinancials.map(item => (
-                      <tr key={item.student.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                        <td className="py-4 px-8">
-                          <div 
-                            onClick={() => setSelectedStudentForDetails(item.student)}
-                            className="flex items-center gap-3 cursor-pointer group"
-                            title="Cliquer pour ouvrir la fiche financière détaillée"
-                          >
-                            <div className="w-9 h-9 rounded-full bg-blue-100 group-hover:bg-blue-900 group-hover:text-white text-blue-900 font-black text-xs flex items-center justify-center uppercase transition-colors">
-                              {item.student.firstName[0]}{item.student.lastName[0]}
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-900 group-hover:text-blue-900 transition-colors">
-                                {item.student.lastName.toUpperCase()} {item.student.firstName}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-mono">
-                                Mat: {item.student.matricule}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 font-bold text-slate-800">
-                          <div>{item.clsName}</div>
-                          <div className="text-[10px] font-bold text-slate-400">
-                            {item.evalCount} mensualité{item.evalCount > 1 ? 's' : ''} ({formatFCFA(item.annualFee)})
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 font-black text-emerald-700">
-                          {formatFCFA(item.totalPaid)}
-                        </td>
-                        <td className="py-4 px-4 font-black text-rose-600">
-                          {formatFCFA(item.remaining)}
-                        </td>
-                        <td className="py-4 px-4">
-                          {item.status === 'A_JOUR' && (
-                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
-                              À Jour
-                            </span>
-                          )}
-                          {item.status === 'PARTIEL' && (
-                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-200">
-                              Solde Partiel
-                            </span>
-                          )}
-                          {item.status === 'UNPAID' && (
-                            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
-                              Non Payé
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 px-4 text-xs font-mono text-slate-500">
-                          {item.student.parent.fatherPhone || item.student.parent.motherPhone || 'Non renseigné'}
-                        </td>
-                        <td className="py-4 px-8 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
+                    filteredStudentsFinancials.map(item => {
+                      const isCriticalUnpaid = item.status === 'UNPAID';
+                      const isPartial = item.status === 'PARTIEL';
+                      const isUpToDate = item.status === 'A_JOUR';
+
+                      return (
+                        <tr 
+                          key={item.student.id} 
+                          className={`border-b transition-colors ${
+                            isCriticalUnpaid 
+                              ? 'border-b-rose-100 bg-rose-50/20 hover:bg-rose-50/40 border-l-4 border-l-rose-500' 
+                              : isPartial 
+                              ? 'border-b-amber-100 bg-amber-50/15 hover:bg-amber-50/30 border-l-4 border-l-amber-500' 
+                              : 'border-b-slate-50 hover:bg-slate-50/50 border-l-4 border-l-emerald-500'
+                          }`}
+                        >
+                          <td className="py-4 px-8">
+                            <div 
                               onClick={() => setSelectedStudentForDetails(item.student)}
-                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1"
-                              title="Consulter l'historique complet des paiements et la fiche financière de l'élève"
+                              className="flex items-center gap-3 cursor-pointer group"
+                              title="Cliquer pour ouvrir la fiche financière détaillée"
                             >
-                              <Eye className="w-3.5 h-3.5 text-blue-900" />
-                              <span>Fiche</span>
-                            </button>
+                              <div className={`w-9 h-9 rounded-full font-black text-xs flex items-center justify-center uppercase transition-colors shrink-0 ${
+                                isCriticalUnpaid
+                                  ? 'bg-rose-100 text-rose-700 ring-2 ring-rose-500 animate-pulse'
+                                  : isPartial
+                                  ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400/60'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {item.student.firstName[0]}{item.student.lastName[0]}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-bold text-slate-900 group-hover:text-blue-900 transition-colors">
+                                    {item.student.lastName.toUpperCase()} {item.student.firstName}
+                                  </p>
+                                  {isCriticalUnpaid && (
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white animate-pulse flex items-center gap-1 shadow-xs">
+                                      <AlertTriangle className="w-2.5 h-2.5" />
+                                      <span>0 FCFA Versé</span>
+                                    </span>
+                                  )}
+                                  {isPartial && (
+                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                                      <Clock className="w-2.5 h-2.5 text-amber-700" />
+                                      <span>Solde Dû</span>
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  Mat: {item.student.matricule}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
 
-                            {item.remaining > 0 && (
-                              <button
-                                onClick={() => handleOpenUnpaidReminder(item)}
-                                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1"
-                                title="Envoyer une relance WhatsApp d'impayé au parent"
-                              >
-                                <MessageCircle className="w-3.5 h-3.5 text-amber-600" />
-                                <span>Relancer</span>
-                              </button>
+                          <td className="py-4 px-4 font-bold text-slate-800">
+                            <div>{item.clsName}</div>
+                            <div className="text-[10px] font-bold text-slate-400">
+                              {item.evalCount} mensualité{item.evalCount > 1 ? 's' : ''} ({formatFCFA(item.annualFee)})
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-4 font-black text-emerald-700">
+                            <div className="flex items-center justify-between text-xs">
+                              <span>{formatFCFA(item.totalPaid)}</span>
+                              <span className="text-[10px] text-slate-400 font-bold">{item.percentPaid}%</span>
+                            </div>
+                            <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden mt-1">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-300 ${isUpToDate ? 'bg-emerald-500' : isPartial ? 'bg-amber-500' : 'bg-rose-500'}`}
+                                style={{ width: `${item.percentPaid}%` }}
+                              />
+                            </div>
+                          </td>
+
+                          <td className="py-4 px-4">
+                            <span className={`font-black font-mono text-sm block ${
+                              isCriticalUnpaid ? 'text-rose-600 font-black' : isPartial ? 'text-amber-700' : 'text-slate-400'
+                            }`}>
+                              {formatFCFA(item.remaining)}
+                            </span>
+                            {isCriticalUnpaid && (
+                              <span className="text-[9px] font-extrabold text-rose-600 flex items-center gap-1 uppercase tracking-tight">
+                                <AlertTriangle className="w-3 h-3 text-rose-500 shrink-0" />
+                                Totalité Impayée
+                              </span>
                             )}
+                            {isPartial && (
+                              <span className="text-[9px] font-bold text-amber-700 flex items-center gap-1 uppercase tracking-tight">
+                                Reste à verser
+                              </span>
+                            )}
+                          </td>
 
-                            <button
-                              onClick={() => handleOpenAddForStudent(item.student)}
-                              className="px-4 py-1.5 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-wider rounded-full shadow-md transition-all cursor-pointer flex items-center gap-1"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Encaisser</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                          <td className="py-4 px-4">
+                            {isUpToDate && (
+                              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" />
+                                À Jour (100%)
+                              </span>
+                            )}
+                            {isPartial && (
+                              <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 inline-flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                <span>Solde Partiel ({item.percentPaid}%)</span>
+                              </span>
+                            )}
+                            {isCriticalUnpaid && (
+                              <span className="px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white shadow-sm inline-flex items-center gap-1.5 animate-pulse">
+                                <AlertCircle className="w-3.5 h-3.5 text-white" />
+                                <span>Retard Critique</span>
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-4 px-4 text-xs font-mono text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Smartphone className="w-3 h-3 text-slate-400 shrink-0" />
+                              {item.student.parent.fatherPhone || item.student.parent.motherPhone || 'Non renseigné'}
+                            </span>
+                          </td>
+
+                          <td className="py-4 px-8 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {item.remaining > 0 && (
+                                <button
+                                  onClick={() => handleOpenAddForStudent(item.student)}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                                  title="Encaisser un versement pour cet élève"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Encaisser</span>
+                                </button>
+                              )}
+
+                              {item.remaining > 0 && (
+                                <button
+                                  onClick={() => handleOpenUnpaidReminder(item)}
+                                  className="px-3.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                                  title="Générer automatiquement un message type pour WhatsApp ou SMS rappelant le solde restant à régler"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5 text-amber-800" />
+                                  <span>Relancer</span>
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => setSelectedStudentForDetails(item.student)}
+                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1"
+                                title="Consulter l'historique complet des paiements et la fiche financière de l'élève"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-blue-900" />
+                                <span>Fiche</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1084,7 +1531,15 @@ export const PaymentsModule: React.FC = () => {
                 <tbody className="text-sm font-bold text-slate-700">
                   {filteredPayments.map(p => (
                     <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="py-4 px-8 font-mono font-black text-blue-900">{p.receiptNumber}</td>
+                      <td className="py-4 px-8 font-mono font-black text-blue-900">
+                        <div className="flex items-center gap-2">
+                          <span>{p.receiptNumber}</span>
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200" title="Synchronisé en direct avec le Cloud Firebase">
+                            <Cloud className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>Cloud</span>
+                          </span>
+                        </div>
+                      </td>
                       <td className="py-4 px-4">
                         <p className="font-bold text-slate-900">{p.studentName}</p>
                         <p className="text-[10px] text-slate-400 font-mono">{p.studentMatricule} ({p.className})</p>
@@ -2068,75 +2523,7 @@ export const PaymentsModule: React.FC = () => {
         </div>
       )}
 
-      {/* WhatsApp Modal - Relance Impayé */}
-      {unpaidReminderStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl p-8 space-y-6 border border-slate-100">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-2xl flex items-center justify-center">
-                  <BellRing className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 uppercase">
-                    Relance Scolarité Impayée
-                  </h2>
-                  <p className="text-xs text-slate-400 font-bold">
-                    Rappel courtois sur WhatsApp
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setUnpaidReminderStudent(null)}
-                className="p-2 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="space-y-4 text-xs font-bold">
-              <div>
-                <label className="text-slate-700 uppercase tracking-wider text-[10px] font-black">
-                  Numéro WhatsApp Destinataire *
-                </label>
-                <div className="relative mt-1.5">
-                  <Smartphone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={unpaidReminderStudent.phone}
-                    onChange={e => setUnpaidReminderStudent({ ...unpaidReminderStudent, phone: e.target.value })}
-                    placeholder="Ex: +223 76 00 00 00"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 font-mono text-sm text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 space-y-2 text-amber-950">
-                <p className="font-black uppercase text-[10px] tracking-wider text-amber-900">Aperçu de la Relance :</p>
-                <p className="text-xs font-bold">Élève: {unpaidReminderStudent.studentName}</p>
-                <p className="text-xs">Classe: {unpaidReminderStudent.className}</p>
-                <p className="text-xs">Solde Dû Restant: <span className="font-black text-rose-600 text-sm">{formatFCFA(unpaidReminderStudent.remainingFee)}</span></p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setUnpaidReminderStudent(null)}
-                className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer transition-all"
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSendUnpaidReminderWhatsApp}
-                className="flex-1 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer shadow-lg shadow-amber-600/30 flex items-center justify-center gap-2 transition-all"
-              >
-                <Send className="w-4 h-4" />
-                <span>Envoyer Relance WhatsApp</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal - Visual Preview of Tuition Invoice */}
       {selectedInvoiceForModal && (
@@ -2568,10 +2955,11 @@ export const PaymentsModule: React.FC = () => {
                         const stdFinancial = studentsFinancials.find(f => f.student.id === std.id);
                         if (stdFinancial) handleOpenUnpaidReminder(stdFinancial);
                       }}
-                      className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer shadow-md flex items-center gap-2 transition-all"
+                      className="px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer shadow-md flex items-center gap-2 transition-all active:scale-95"
+                      title="Générer automatiquement un message type pour WhatsApp ou SMS rappelant le solde restant à régler"
                     >
                       <MessageCircle className="w-4 h-4" />
-                      <span>Relancer WhatsApp</span>
+                      <span>Relancer (WhatsApp / SMS)</span>
                     </button>
                   )}
                 </div>
@@ -2746,6 +3134,241 @@ export const PaymentsModule: React.FC = () => {
         title="Supprimer Tout le Journal des Dépenses"
         itemCount={expenses.length}
         description="Attention ! Cette action supprimera définitivement TOUTES les dépenses enregistrées dans le journal de caisse."
+      />
+
+      {/* MODAL DE RELANCE IMPAYÉ (WHATSAPP & SMS) */}
+      {unpaidReminderModalData && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-2xl shadow-2xl p-6 sm:p-8 space-y-6 border border-slate-100 my-8 max-h-[92vh] overflow-y-auto custom-scrollbar">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-amber-100 text-amber-900 rounded-2xl flex items-center justify-center shrink-0 border border-amber-200">
+                  <BellRing className="w-6 h-6 text-amber-700 animate-bounce" />
+                </div>
+                <div>
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 rounded-full font-black text-[10px] uppercase tracking-wider inline-block mb-1">
+                    Relance Scolarité & Solde Impayé
+                  </span>
+                  <h3 className="text-xl font-black text-slate-900 uppercase">
+                    Rappel de Solde Restant Dû
+                  </h3>
+                  <p className="text-xs text-slate-500 font-bold">
+                    Élève : <strong className="text-blue-950">{unpaidReminderModalData.studentName}</strong> • Classe : <strong className="text-blue-950">{unpaidReminderModalData.className}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setUnpaidReminderModalData(null)}
+                className="p-2 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Financial Summary Card */}
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-50 to-amber-50 border border-rose-200/80 space-y-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-black uppercase text-rose-700 tracking-wider">
+                    Solde Restant à Régler
+                  </p>
+                  <p className="text-2xl font-black text-rose-700 font-mono">
+                    {formatFCFA(unpaidReminderModalData.remainingFee)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-xs ${
+                    unpaidReminderModalData.status === 'UNPAID'
+                      ? 'bg-rose-600 text-white animate-pulse'
+                      : 'bg-amber-500 text-white'
+                  }`}>
+                    {unpaidReminderModalData.status === 'UNPAID' ? '🚨 0 FCFA Versé (Retard Total)' : `⏳ Partiel (${unpaidReminderModalData.percentPaid}% versé)`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-rose-200/50 text-xs">
+                <div>
+                  <span className="text-slate-500 font-bold block text-[10px] uppercase">Frais Scolaires Annuels</span>
+                  <span className="font-black text-slate-800 font-mono">{formatFCFA(unpaidReminderModalData.annualFee)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-bold block text-[10px] uppercase">Déjà Encaissé</span>
+                  <span className="font-black text-emerald-700 font-mono">{formatFCFA(unpaidReminderModalData.totalPaid)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Recipient Selection (Father / Mother / Custom) */}
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
+                Destinataire de la relance (Parent / Tuteur)
+              </label>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Père */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const phone = unpaidReminderModalData.fatherPhone || '';
+                    setUnpaidReminderModalData(prev => prev ? ({ ...prev, parentType: 'FATHER', phone }) : null);
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    unpaidReminderModalData.parentType === 'FATHER'
+                      ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-600/30'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase text-blue-900">👨 Père : {unpaidReminderModalData.fatherName || 'Père'}</span>
+                  <span className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">
+                    {unpaidReminderModalData.fatherPhone || 'Non renseigné'}
+                  </span>
+                </button>
+
+                {/* Mère */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const phone = unpaidReminderModalData.motherPhone || '';
+                    setUnpaidReminderModalData(prev => prev ? ({ ...prev, parentType: 'MOTHER', phone }) : null);
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    unpaidReminderModalData.parentType === 'MOTHER'
+                      ? 'bg-purple-50 border-purple-600 ring-2 ring-purple-600/30'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase text-purple-900">👩 Mère : {unpaidReminderModalData.motherName || 'Mère'}</span>
+                  <span className="text-xs font-mono font-bold text-slate-700 mt-1 truncate">
+                    {unpaidReminderModalData.motherPhone || 'Non renseigné'}
+                  </span>
+                </button>
+
+                {/* Personnalisé */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUnpaidReminderModalData(prev => prev ? ({ ...prev, parentType: 'CUSTOM' }) : null);
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    unpaidReminderModalData.parentType === 'CUSTOM'
+                      ? 'bg-slate-900 border-slate-900 text-white ring-2 ring-slate-900/30'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-800'
+                  }`}
+                >
+                  <span className="text-[10px] font-black uppercase">✏️ Autre Numéro</span>
+                  <span className="text-xs font-mono font-bold mt-1">Numéro libre</span>
+                </button>
+              </div>
+
+              {/* Input for Phone Number */}
+              <div className="relative">
+                <Smartphone className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={unpaidReminderModalData.phone}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setUnpaidReminderModalData(prev => prev ? ({ ...prev, phone: val }) : null);
+                  }}
+                  placeholder="Numéro de téléphone (Ex: +223 76 00 00 00)"
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-900"
+                />
+              </div>
+            </div>
+
+            {/* Generated Message Text Preview & Customization */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Message Type Rappelant le Solde Restant (Modifiable)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const fresh = generateUnpaidReminderMessage(
+                      unpaidReminderModalData.studentName,
+                      unpaidReminderModalData.matricule,
+                      unpaidReminderModalData.className,
+                      unpaidReminderModalData.remainingFee,
+                      unpaidReminderModalData.totalPaid,
+                      unpaidReminderModalData.annualFee
+                    );
+                    setUnpaidReminderModalData(prev => prev ? ({ ...prev, messageText: fresh }) : null);
+                  }}
+                  className="text-[10px] font-black uppercase text-blue-900 hover:text-blue-700 cursor-pointer flex items-center gap-1"
+                  title="Réinitialiser le texte par défaut"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Rétablir message type</span>
+                </button>
+              </div>
+
+              <textarea
+                rows={9}
+                value={unpaidReminderModalData.messageText}
+                onChange={e => {
+                  const val = e.target.value;
+                  setUnpaidReminderModalData(prev => prev ? ({ ...prev, messageText: val }) : null);
+                }}
+                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-medium text-slate-800 leading-relaxed outline-none focus:ring-2 focus:ring-blue-900 resize-y"
+              />
+              <p className="text-[11px] text-slate-400 font-medium">
+                💡 Vous pouvez ajouter les comptes de paiement Orange Money, Moov Money ou une date limite avant d'envoyer.
+              </p>
+            </div>
+
+            {/* Action Buttons: WhatsApp, SMS, Copier, Fermer */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-100">
+              {/* WhatsApp Button */}
+              <button
+                type="button"
+                onClick={handleSendReminderViaWhatsApp}
+                className="w-full sm:flex-1 py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Envoyer par WhatsApp</span>
+              </button>
+
+              {/* SMS Button */}
+              <button
+                type="button"
+                onClick={handleSendReminderViaSMS}
+                className="w-full sm:flex-1 py-3.5 px-5 bg-blue-900 hover:bg-blue-800 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-blue-900/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Envoyer par SMS</span>
+              </button>
+
+              {/* Copy Message */}
+              <button
+                type="button"
+                onClick={handleCopyReminderMessage}
+                className="w-full sm:w-auto py-3.5 px-4 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-black text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                title="Copier le texte dans le presse-papier"
+              >
+                {reminderCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                <span>{reminderCopied ? 'Copié !' : 'Copier'}</span>
+              </button>
+
+              {/* Fermer */}
+              <button
+                type="button"
+                onClick={() => setUnpaidReminderModalData(null)}
+                className="w-full sm:w-auto py-3.5 px-5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black text-xs uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud School Switcher Modal */}
+      <CloudSchoolSwitcherModal
+        isOpen={showCloudModal}
+        onClose={() => setShowCloudModal(false)}
       />
     </div>
   );
