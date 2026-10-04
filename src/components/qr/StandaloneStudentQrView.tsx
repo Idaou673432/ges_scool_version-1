@@ -54,6 +54,7 @@ import { Student, AttendanceRecord } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
 import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation } from '../../constants/maliEducation';
 import { StudentQrScannerModal } from './StudentQrScannerModal';
+import { ScanHistoryService } from '../../services/scanHistoryService';
 
 interface StandaloneStudentQrViewProps {
   initialRawData?: string;

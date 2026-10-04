@@ -26,8 +26,11 @@ import { StudentQrScannerModal } from './components/qr/StudentQrScannerModal';
 import { StudentQrProfileModal } from './components/qr/StudentQrProfileModal';
 import { StandaloneStudentQrView } from './components/qr/StandaloneStudentQrView';
 import { Student } from './types';
+import { useSchool } from './contexts/SchoolContext';
+import { ScanHistoryService } from './services/scanHistoryService';
 
 export function AppContent() {
+  const { classes } = useSchool();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [isGlobalQrScannerOpen, setIsGlobalQrScannerOpen] = useState(false);
   const [globalScannedStudent, setGlobalScannedStudent] = useState<Student | null>(null);
@@ -142,7 +145,13 @@ export function AppContent() {
         />
 
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 pb-24 lg:pb-6 custom-scrollbar">
-          {activeTab === 'dashboard' && <DashboardModule onNavigate={setActiveTab} />}
+          {activeTab === 'dashboard' && (
+            <DashboardModule 
+              onNavigate={setActiveTab} 
+              onOpenQrScanner={() => setIsGlobalQrScannerOpen(true)}
+              onViewStudentProfile={(student) => setGlobalScannedStudent(student)}
+            />
+          )}
           {activeTab === 'students' && <StudentsModule />}
           {activeTab === 'classes' && <ClassesModule />}
           {activeTab === 'subjects' && <SubjectsModule />}
@@ -171,6 +180,8 @@ export function AppContent() {
         onClose={() => setIsGlobalQrScannerOpen(false)}
         onStudentFound={(student) => {
           setIsGlobalQrScannerOpen(false);
+          const cls = classes.find(c => c.id === student.classId);
+          ScanHistoryService.recordScan(student, cls?.name);
           setGlobalScannedStudent(student);
         }}
       />

@@ -2,7 +2,7 @@
  * SomaSikolo - Dashboard Executive Overview Module
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Users, 
   GraduationCap, 
@@ -21,7 +21,10 @@ import {
   Printer,
   ArrowUpRight,
   BookOpen,
-  Briefcase
+  Briefcase,
+  History,
+  X,
+  Sparkles
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { useSchool } from '../../contexts/SchoolContext';
@@ -29,13 +32,42 @@ import { formatFCFA, getMaliScoreAppreciation } from '../../constants/maliEducat
 import { NavTab } from '../../components/layout/Sidebar';
 import { PdfService } from '../../services/pdfService';
 import { AcademicSuccessCharts } from '../../components/dashboard/AcademicSuccessCharts';
+import { ScanHistoryPanel } from '../../components/dashboard/ScanHistoryPanel';
+import { ScanHistoryService } from '../../services/scanHistoryService';
+import { StudentQrProfileModal } from '../../components/qr/StudentQrProfileModal';
+import { Student } from '../../types';
 
 interface DashboardProps {
   onNavigate: (tab: NavTab) => void;
+  onOpenQrScanner?: () => void;
+  onViewStudentProfile?: (student: Student) => void;
 }
 
-export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
+export const DashboardModule: React.FC<DashboardProps> = ({ 
+  onNavigate,
+  onOpenQrScanner,
+  onViewStudentProfile
+}) => {
   const { stats, students, classes, payments, settings, generateReportCard } = useSchool();
+  const [isScanHistoryDrawerOpen, setIsScanHistoryDrawerOpen] = useState(false);
+  const [historyCount, setHistoryCount] = useState<number>(0);
+  const [localViewingStudent, setLocalViewingStudent] = useState<Student | null>(null);
+
+  useEffect(() => {
+    setHistoryCount(ScanHistoryService.getHistory().length);
+    const unsubscribe = ScanHistoryService.subscribe((updated) => {
+      setHistoryCount(updated.length);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleSelectStudent = (student: Student) => {
+    if (onViewStudentProfile) {
+      onViewStudentProfile(student);
+    } else {
+      setLocalViewingStudent(student);
+    }
+  };
 
   // Active students breakdown
   const activeStudents = useMemo(() => students.filter(s => s.status === 'ACTIF'), [students]);
@@ -124,6 +156,32 @@ export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
             <Printer className="w-3.5 h-3.5" />
             <span>Rapport MEN</span>
           </button>
+
+          {onOpenQrScanner && (
+            <button
+              type="button"
+              onClick={onOpenQrScanner}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
+              title="Scanner le QR Code d'un élève (Caméra)"
+            >
+              <QrCode className="w-3.5 h-3.5 text-amber-300" />
+              <span>Scanner QR</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsScanHistoryDrawerOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 hover:bg-amber-100/90 text-amber-950 font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer border border-amber-200/80"
+            title="Consulter les 10 derniers profils d'élèves scannés"
+          >
+            <History className="w-3.5 h-3.5 text-amber-600" />
+            <span>Historique Scans</span>
+            <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+              {historyCount}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => onNavigate('students')}
@@ -243,6 +301,15 @@ export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* Volet Historique des Scans QR (10 derniers profils scannés) */}
+      <section id="section-scan-history" className="scroll-mt-6">
+        <ScanHistoryPanel 
+          onViewStudentProfile={handleSelectStudent}
+          onOpenQrScanner={onOpenQrScanner}
+          onNavigateToCards={() => onNavigate('cards')}
+        />
+      </section>
 
       {/* Academic Success Visualization Module */}
       <AcademicSuccessCharts onNavigateToGrades={() => onNavigate('grades')} />
@@ -391,6 +458,48 @@ export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
           </table>
         </div>
       </div>
+
+      {/* Slide-over Drawer: Volet Latéral 'Historique des Scans' */}
+      {isScanHistoryDrawerOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <ScanHistoryPanel 
+              isDrawer
+              className="rounded-none border-0 h-full"
+              onCloseDrawer={() => setIsScanHistoryDrawerOpen(false)}
+              onViewStudentProfile={(student) => {
+                setIsScanHistoryDrawerOpen(false);
+                handleSelectStudent(student);
+              }}
+              onOpenQrScanner={() => {
+                setIsScanHistoryDrawerOpen(false);
+                if (onOpenQrScanner) onOpenQrScanner();
+              }}
+              onNavigateToCards={(student) => {
+                setIsScanHistoryDrawerOpen(false);
+                onNavigate('cards');
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Local fallback profile modal if not handled by root App */}
+      {localViewingStudent && !onViewStudentProfile && (
+        <StudentQrProfileModal 
+          student={localViewingStudent}
+          isOpen={Boolean(localViewingStudent)}
+          onClose={() => setLocalViewingStudent(null)}
+          onNavigateToBulletin={() => {
+            setLocalViewingStudent(null);
+            onNavigate('bulletins');
+          }}
+          onNavigateToPayments={() => {
+            setLocalViewingStudent(null);
+            onNavigate('payments');
+          }}
+        />
+      )}
     </div>
   );
 };

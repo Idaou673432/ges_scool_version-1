@@ -9,8 +9,7 @@ import {
   Users, 
   ClipboardList, 
   CreditCard, 
-  Menu,
-  QrCode
+  Menu
 } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
@@ -66,21 +65,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
           </button>
         );
       })}
-
-      {/* Central Raised QR Scanner Button */}
-      {onOpenQrScanner && (
-        <button
-          type="button"
-          onClick={onOpenQrScanner}
-          className="-mt-5 flex flex-col items-center justify-center w-13 h-13 rounded-2xl bg-gradient-to-tr from-blue-950 via-slate-900 to-blue-900 text-white shadow-lg shadow-blue-950/35 border-2 border-white active:scale-95 transition-all cursor-pointer shrink-0"
-          title="Scanner le QR Code d'un élève (Caméra)"
-        >
-          <QrCode className="w-6 h-6 text-amber-300" />
-          <span className="text-[8px] font-black uppercase tracking-wider text-amber-300 -mt-0.5">
-            Scan
-          </span>
-        </button>
-      )}
 
       {rightItems.map((item) => {
         const Icon = item.icon;

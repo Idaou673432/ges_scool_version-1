@@ -26,6 +26,7 @@ import {
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Student } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
+import { ScanHistoryService } from '../../services/scanHistoryService';
 
 interface StudentQrScannerModalProps {
   isOpen: boolean;
@@ -113,6 +114,8 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
     if (matched) {
       playScanBeep();
       stopScanner();
+      const cls = classes.find(c => c.id === matched.classId);
+      ScanHistoryService.recordScan(matched, cls?.name, 'CAMERA');
       onStudentFound(matched);
       return true;
     } else if (parsed && (parsed.matricule || parsed.m || parsed.name || parsed.firstName || parsed.fn)) {
@@ -147,6 +150,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
           guardianAddress: parsed.address || ''
         }
       };
+      ScanHistoryService.recordScan(syntheticStudent, parsed.className, 'JSON');
       onStudentFound(syntheticStudent);
       return true;
     } else {
@@ -647,6 +651,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
                         type="button"
                         onClick={() => {
                           playScanBeep();
+                          ScanHistoryService.recordScan(std, cls?.name, 'MANUEL');
                           onStudentFound(std);
                         }}
                         className="w-full p-3 hover:bg-blue-50/60 flex items-center justify-between text-left transition-colors cursor-pointer group"
