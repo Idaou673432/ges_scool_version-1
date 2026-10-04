@@ -1,13 +1,16 @@
 /**
  * SomaSikolo - Cartes Scolaires QR & Badges Module (Amélioré)
  */import React, { useState, useEffect } from 'react';
-import { QrCode, Printer, Building2, CheckSquare, Square, Search, RefreshCw, ShieldCheck, Phone, MapPin, Sparkles, Filter, CreditCard, Download } from 'lucide-react';
+import { QrCode, Printer, Building2, CheckSquare, Square, Search, RefreshCw, ShieldCheck, Phone, MapPin, Sparkles, Filter, CreditCard, Download, Camera, Droplet } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { PdfService } from '../../services/pdfService';
 import { Student } from '../../types';
+import { getAnnualTuitionFee } from '../../constants/maliEducation';
+import { StudentQrScannerModal } from '../../components/qr/StudentQrScannerModal';
+import { StudentQrProfileModal } from '../../components/qr/StudentQrProfileModal';
 
 export const CardsModule: React.FC = () => {
-  const { students, classes, settings } = useSchool();
+  const { students, classes, settings, generateReportCard, attendanceRecords, payments } = useSchool();
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [cardFaceMode, setCardFaceMode] = useState<'RECTO' | 'VERSO' | 'BOTH'>('RECTO');
@@ -15,6 +18,8 @@ export const CardsModule: React.FC = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [studentQrs, setStudentQrs] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
 
   // Filter active students based on class & search
   const filteredStudents = students.filter(s => {
@@ -51,7 +56,24 @@ export const CardsModule: React.FC = () => {
       setIsGenerating(true);
       const map: Record<string, string> = {};
       for (const std of filteredStudents) {
-        map[std.id] = await PdfService.generateStudentCardQr(std);
+        const cls = classes.find(c => c.id === std.classId);
+        const card = generateReportCard ? generateReportCard(std.id, settings.activeTerm) : null;
+        const studentPayments = payments ? payments.filter(p => p.studentId === std.id) : [];
+        const totalPaid = studentPayments.reduce((acc, p) => acc + p.amountPaid, 0);
+        const annualFee = getAnnualTuitionFee(cls, settings.evaluationCount);
+        const remaining = Math.max(0, annualFee - totalPaid);
+        const absences = attendanceRecords ? attendanceRecords.filter(r => r.studentId === std.id && (r.status === 'ABSENT_JUSTIFIED' || r.status === 'ABSENT_UNJUSTIFIED')).length : 0;
+
+        map[std.id] = await PdfService.generateStudentCardQr(std, {
+          className: cls?.name,
+          average: card?.generalAverage,
+          rank: card?.rankInClass,
+          totalAbsences: absences,
+          annualFee,
+          totalPaid,
+          remainingAmount: remaining,
+          schoolName: settings.schoolName
+        });
       }
       setStudentQrs(map);
       setIsGenerating(false);
@@ -59,7 +81,7 @@ export const CardsModule: React.FC = () => {
     if (filteredStudents.length > 0) {
       generateQrs();
     }
-  }, [selectedClassId, searchQuery, students]);
+  }, [selectedClassId, searchQuery, students, classes, settings, attendanceRecords, payments]);
 
   const handlePrint = () => {
     window.print();
@@ -151,40 +173,40 @@ export const CardsModule: React.FC = () => {
       `}</style>
 
       {/* Header Banner - Screen Only */}
-      <div className="no-print flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+      <div className="no-print flex flex-col xl:flex-row items-start xl:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
             <CreditCard className="w-7 h-7 text-blue-900" />
-            <span>Impression des Cartes Scolaires Officielles</span>
+            <span>Impression des Cartes Scolaires & Badges</span>
           </h1>
-          <p className="text-xs font-bold text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 font-medium mt-1">
             Génération HD • Format Badge Élargi Officiel (Recto / Verso) • QR Code de Sécurité
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
           {/* Card Face Mode Toggle */}
-          <div className="flex bg-slate-100 p-1 rounded-full text-xs font-black uppercase tracking-widest">
+          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
             <button
               onClick={() => setCardFaceMode('RECTO')}
-              className={`px-4 py-2 rounded-full transition-all cursor-pointer ${
-                cardFaceMode === 'RECTO' ? 'bg-blue-900 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                cardFaceMode === 'RECTO' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Recto
             </button>
             <button
               onClick={() => setCardFaceMode('VERSO')}
-              className={`px-4 py-2 rounded-full transition-all cursor-pointer ${
-                cardFaceMode === 'VERSO' ? 'bg-blue-900 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                cardFaceMode === 'VERSO' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Verso
             </button>
             <button
               onClick={() => setCardFaceMode('BOTH')}
-              className={`px-4 py-2 rounded-full transition-all cursor-pointer ${
-                cardFaceMode === 'BOTH' ? 'bg-blue-900 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                cardFaceMode === 'BOTH' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Recto + Verso
@@ -192,36 +214,45 @@ export const CardsModule: React.FC = () => {
           </div>
 
           <button
+            onClick={() => setIsScannerOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            title="Scanner le QR Code d'un badge ou d'une carte scolaire avec votre caméra"
+          >
+            <Camera className="w-4 h-4 text-emerald-200" />
+            <span>Scanner QR</span>
+          </button>
+
+          <button
             onClick={() => PdfService.generateStudentCardsBatchPdf(studentsToPrint, classes, settings)}
             disabled={studentsToPrint.length === 0}
-            className="flex items-center gap-2 px-5 py-3.5 bg-amber-400 hover:bg-amber-500 disabled:bg-slate-300 text-slate-950 font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
             title="Télécharger directement un document PDF A4 prêt à imprimer"
           >
             <Download className="w-4 h-4" />
-            <span>Télécharger PDF A4 ({studentsToPrint.length})</span>
+            <span>PDF A4 ({studentsToPrint.length})</span>
           </button>
 
           <button
             onClick={handlePrint}
             disabled={studentsToPrint.length === 0}
-            className="flex items-center gap-2 px-6 py-3.5 bg-blue-900 hover:bg-blue-950 disabled:bg-slate-300 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Printer className="w-4 h-4" />
-            <span>Imprimer Direct ({studentsToPrint.length})</span>
+            <Printer className="w-4 h-4 text-amber-400" />
+            <span>Imprimer ({studentsToPrint.length})</span>
           </button>
         </div>
       </div>
 
       {/* Toolbar & Filters - Screen Only */}
-      <div className="no-print bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="no-print bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Select All Button */}
           <button
             onClick={toggleSelectAll}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-full text-xs font-bold text-slate-700 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
           >
             {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
-              <CheckSquare className="w-4 h-4 text-blue-900" />
+              <CheckSquare className="w-4 h-4 text-slate-900" />
             ) : (
               <Square className="w-4 h-4 text-slate-400" />
             )}
@@ -232,7 +263,7 @@ export const CardsModule: React.FC = () => {
           <select
             value={selectedClassId}
             onChange={e => setSelectedClassId(e.target.value)}
-            className="py-2.5 px-4 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+            className="py-2 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
           >
             <option value="ALL">Toutes les classes</option>
             {classes.map(c => (
@@ -242,39 +273,39 @@ export const CardsModule: React.FC = () => {
 
           {/* Theme Switcher */}
           <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest mr-1">Couleur:</span>
+            <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider mr-1">Couleur:</span>
             <button
               onClick={() => setCardTheme('MALI_GOLD')}
-              className={`w-7 h-7 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-rose-600 border-2 cursor-pointer transition-all ${
-                cardTheme === 'MALI_GOLD' ? 'border-amber-400 scale-110 shadow-md ring-2 ring-amber-400/50' : 'border-transparent opacity-80'
+              className={`w-6 h-6 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-rose-600 border-2 cursor-pointer transition-all ${
+                cardTheme === 'MALI_GOLD' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-amber-400/50' : 'border-transparent opacity-80'
               }`}
               title="Thème National Mali & Or"
             />
             <button
               onClick={() => setCardTheme('ROYAL_AZUR')}
-              className={`w-7 h-7 rounded-full bg-gradient-to-r from-blue-900 to-indigo-900 border-2 cursor-pointer transition-all ${
-                cardTheme === 'ROYAL_AZUR' ? 'border-amber-400 scale-110 shadow-md ring-2 ring-blue-400/50' : 'border-transparent opacity-80'
+              className={`w-6 h-6 rounded-full bg-gradient-to-r from-blue-900 to-indigo-900 border-2 cursor-pointer transition-all ${
+                cardTheme === 'ROYAL_AZUR' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-blue-400/50' : 'border-transparent opacity-80'
               }`}
               title="Thème Azur Royal & Or"
             />
             <button
               onClick={() => setCardTheme('EMERALD_PRESTIGE')}
-              className={`w-7 h-7 rounded-full bg-gradient-to-r from-emerald-900 to-teal-800 border-2 cursor-pointer transition-all ${
-                cardTheme === 'EMERALD_PRESTIGE' ? 'border-emerald-400 scale-110 shadow-md ring-2 ring-emerald-400/50' : 'border-transparent opacity-80'
+              className={`w-6 h-6 rounded-full bg-gradient-to-r from-emerald-900 to-teal-800 border-2 cursor-pointer transition-all ${
+                cardTheme === 'EMERALD_PRESTIGE' ? 'border-emerald-400 scale-110 shadow-xs ring-2 ring-emerald-400/50' : 'border-transparent opacity-80'
               }`}
               title="Thème Émeraude Prestige"
             />
             <button
               onClick={() => setCardTheme('BURGUNDY_GOLD')}
-              className={`w-7 h-7 rounded-full bg-gradient-to-r from-rose-950 to-amber-900 border-2 cursor-pointer transition-all ${
-                cardTheme === 'BURGUNDY_GOLD' ? 'border-amber-400 scale-110 shadow-md ring-2 ring-rose-400/50' : 'border-transparent opacity-80'
+              className={`w-6 h-6 rounded-full bg-gradient-to-r from-rose-950 to-amber-900 border-2 cursor-pointer transition-all ${
+                cardTheme === 'BURGUNDY_GOLD' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-rose-400/50' : 'border-transparent opacity-80'
               }`}
               title="Thème Pourpre & Or"
             />
             <button
               onClick={() => setCardTheme('OBSIDIAN_GOLD')}
-              className={`w-7 h-7 rounded-full bg-gradient-to-r from-slate-950 to-amber-500 border-2 cursor-pointer transition-all ${
-                cardTheme === 'OBSIDIAN_GOLD' ? 'border-amber-400 scale-110 shadow-md ring-2 ring-amber-400/50' : 'border-transparent opacity-80'
+              className={`w-6 h-6 rounded-full bg-gradient-to-r from-slate-950 to-amber-500 border-2 cursor-pointer transition-all ${
+                cardTheme === 'OBSIDIAN_GOLD' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-amber-400/50' : 'border-transparent opacity-80'
               }`}
               title="Thème Obsidienne & Or Luxe"
             />
@@ -282,14 +313,14 @@ export const CardsModule: React.FC = () => {
         </div>
 
         {/* Search Field */}
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-4 top-3 text-slate-400" />
+        <div className="relative w-full md:w-64">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Rechercher élève ou matricule..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
           />
         </div>
       </div>
@@ -379,21 +410,36 @@ export const CardsModule: React.FC = () => {
                         </div>
 
                         <div>
-                          <p className={`text-[9px] font-black uppercase tracking-widest ${themeStyles.accentText}`}>MATRICULE MLE</p>
-                          <p className="font-mono font-black text-sm text-amber-300 tracking-wider">{std.matricule}</p>
+                          <p className={`text-[9px] font-black uppercase tracking-widest ${themeStyles.accentText}`}>MATRICULE & GROUPE SANGUIN</p>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-black text-sm text-amber-300 tracking-wider">{std.matricule}</span>
+                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black font-mono bg-rose-600/80 text-white border border-rose-400/50">
+                              🩸 {std.bloodType || 'O+'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
                       {/* QR Code */}
                       <div className="col-span-3 flex flex-col items-center justify-center">
-                        <div className="w-20 h-20 bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg">
+                        <div 
+                          onClick={() => setSelectedStudentForProfile(std)}
+                          className="w-20 h-20 bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg cursor-pointer hover:scale-105 transition-transform"
+                          title="Cliquer pour afficher la fiche complète QR de cet élève"
+                        >
                           {qrUrl ? (
                             <img src={qrUrl} alt="QR Code" className="w-full h-full object-contain" />
                           ) : (
                             <QrCode className="w-10 h-10 text-slate-400" />
                           )}
                         </div>
-                        <span className="text-[8px] font-mono font-bold text-white/60 mt-1 uppercase">SomaQR</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentForProfile(std)}
+                          className="text-[8px] font-mono font-bold text-amber-300 hover:text-white mt-1 uppercase cursor-pointer underline"
+                        >
+                          Fiche QR
+                        </button>
                       </div>
                     </div>
 
@@ -435,6 +481,15 @@ export const CardsModule: React.FC = () => {
                         </p>
                         <p className="text-white/80 font-mono text-[11px] mt-0.5">Tél: {settings.phone} | Décision N°: {settings.registrationNumber}</p>
                       </div>
+                      <div className="bg-white/5 p-3 rounded-2xl border border-white/10 flex items-center justify-between">
+                        <div>
+                          <p className={`text-[8px] font-black uppercase tracking-widest ${themeStyles.accentText}`}>DONNÉES MÉDICALES D'URGENCE</p>
+                          <p className="text-white text-xs font-bold mt-0.5">
+                            Groupe Sanguin : <span className="text-amber-300 font-mono font-black">{std.bloodType || 'O+'}</span>
+                          </p>
+                          <p className="text-white/60 text-[9px] truncate">{std.allergies || 'Aucune allergie connue'}</p>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Stamp & Signature Placeholder */}
@@ -457,6 +512,29 @@ export const CardsModule: React.FC = () => {
           );
         })}
       </div>
+
+      {/* QR Scanner Modal */}
+      <StudentQrScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onStudentFound={(student) => {
+          setIsScannerOpen(false);
+          setSelectedStudentForProfile(student);
+        }}
+      />
+
+      {/* Student QR Profile Detailed Dossier Modal */}
+      {selectedStudentForProfile && (
+        <StudentQrProfileModal
+          student={selectedStudentForProfile}
+          isOpen={Boolean(selectedStudentForProfile)}
+          onClose={() => setSelectedStudentForProfile(null)}
+          onScanAnother={() => {
+            setSelectedStudentForProfile(null);
+            setIsScannerOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -195,6 +195,9 @@ const INITIAL_STUDENTS: Student[] = [
     status: 'ACTIF',
     academicYear: '2025-2026',
     admissionDate: '2025-09-15',
+    bloodType: 'O+',
+    allergies: 'Aucune allergie connue',
+    emergencyContact: '+223 76 00 44 11 (Père - Adama COULIBALY)',
     parent: {
       fatherName: 'M. Adama COULIBALY',
       fatherPhone: '+223 76 00 44 11',
@@ -220,6 +223,9 @@ const INITIAL_STUDENTS: Student[] = [
     status: 'ACTIF',
     academicYear: '2025-2026',
     admissionDate: '2025-09-15',
+    bloodType: 'A+',
+    allergies: 'Intolérance légère au lactose',
+    emergencyContact: '+223 78 99 00 11 (Père - Nouhoum DIABATÉ)',
     parent: {
       fatherName: 'M. Nouhoum DIABATÉ',
       fatherPhone: '+223 78 99 00 11',
@@ -244,6 +250,9 @@ const INITIAL_STUDENTS: Student[] = [
     status: 'ACTIF',
     academicYear: '2025-2026',
     admissionDate: '2025-09-15',
+    bloodType: 'B+',
+    allergies: 'Aucune allergie connue',
+    emergencyContact: '+223 76 55 44 33 (Dr. Cheick Oumar TOURE)',
     parent: {
       fatherName: 'Dr. Cheick Oumar TOURE',
       fatherPhone: '+223 76 55 44 33',
@@ -266,6 +275,9 @@ const INITIAL_STUDENTS: Student[] = [
     status: 'ACTIF',
     academicYear: '2025-2026',
     admissionDate: '2025-09-15',
+    bloodType: 'AB+',
+    allergies: 'Sensibilité poussière / asthme modéré',
+    emergencyContact: '+223 72 33 44 55 (Père - Brehima SISSOKO)',
     parent: {
       fatherName: 'M. Brehima SISSOKO',
       fatherPhone: '+223 72 33 44 55',
@@ -287,6 +299,9 @@ const INITIAL_STUDENTS: Student[] = [
     status: 'ACTIF',
     academicYear: '2025-2026',
     admissionDate: '2025-09-15',
+    bloodType: 'O-',
+    allergies: 'Aucune allergie connue',
+    emergencyContact: '+223 75 12 34 56 (Père - Salif KONATÉ)',
     parent: {
       fatherName: 'M. Salif KONATÉ',
       fatherPhone: '+223 75 12 34 56',
@@ -576,17 +591,31 @@ class StorageService {
   public getStudents(): Student[] {
     const students = this.getItem(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
     const seen = new Set<string>();
-    let hasDuplicates = false;
+    let hasChanges = false;
+    const defaultBloodTypes: Array<'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-'> = [
+      'O+', 'A+', 'B+', 'O+', 'AB+', 'O-', 'A-', 'B+'
+    ];
+
     const sanitized = students.map((s, idx) => {
-      if (!s.id || seen.has(s.id)) {
-        hasDuplicates = true;
-        const newId = `std-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`;
-        return { ...s, id: newId };
+      let modified = false;
+      let studentObj = { ...s };
+
+      if (!studentObj.id || seen.has(studentObj.id)) {
+        hasChanges = true;
+        studentObj.id = `std-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`;
       }
-      seen.add(s.id);
-      return s;
+      seen.add(studentObj.id);
+
+      if (!studentObj.bloodType) {
+        hasChanges = true;
+        studentObj.bloodType = defaultBloodTypes[idx % defaultBloodTypes.length];
+        studentObj.allergies = studentObj.allergies || 'Aucune allergie connue';
+      }
+
+      return studentObj;
     });
-    if (hasDuplicates) {
+
+    if (hasChanges) {
       this.setItem(STORAGE_KEYS.STUDENTS, sanitized);
     }
     return sanitized;

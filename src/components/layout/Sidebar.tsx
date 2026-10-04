@@ -63,18 +63,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { settings } = useSchool();
   const [showPwaModal, setShowPwaModal] = useState(false);
 
-  const navItems = [
-    { id: 'dashboard' as NavTab, label: 'Tableau de bord', icon: LayoutDashboard, perm: 'dashboard:view' },
-    { id: 'students' as NavTab, label: 'Gestion Élèves', icon: Users, perm: 'students:view' },
-    { id: 'classes' as NavTab, label: 'Classes & Niveaux', icon: GraduationCap, perm: 'classes:view' },
-    { id: 'subjects' as NavTab, label: 'Matières & Coefs', icon: BookOpen, perm: 'subjects:view' },
-    { id: 'teachers' as NavTab, label: 'Corps Enseignant', icon: Briefcase, perm: 'teachers:view' },
-    { id: 'grades' as NavTab, label: 'Notes & Évaluations', icon: ClipboardList, perm: 'grades:view' },
-    { id: 'attendance' as NavTab, label: 'Suivi Présences', icon: CalendarCheck, perm: 'students:view' },
-    { id: 'bulletins' as NavTab, label: 'Bulletins Officiels', icon: FileText, perm: 'bulletins:generate' },
-    { id: 'cards' as NavTab, label: 'Cartes Scolaires QR', icon: QrCode, perm: 'cards:generate' },
-    { id: 'payments' as NavTab, label: 'Comptabilité FCFA', icon: CreditCard, perm: 'payments:view' },
-    { id: 'settings' as NavTab, label: 'Fiche Établissement', icon: Settings, perm: 'settings:view' },
+  const navSections = [
+    {
+      title: 'Principal',
+      items: [
+        { id: 'dashboard' as NavTab, label: 'Tableau de bord', icon: LayoutDashboard, perm: 'dashboard:view' },
+      ]
+    },
+    {
+      title: 'Pédagogie & Élèves',
+      items: [
+        { id: 'students' as NavTab, label: 'Gestion Élèves', icon: Users, perm: 'students:view' },
+        { id: 'classes' as NavTab, label: 'Classes & Niveaux', icon: GraduationCap, perm: 'classes:view' },
+        { id: 'subjects' as NavTab, label: 'Matières & Coefs', icon: BookOpen, perm: 'subjects:view' },
+        { id: 'teachers' as NavTab, label: 'Corps Enseignant', icon: Briefcase, perm: 'teachers:view' },
+      ]
+    },
+    {
+      title: 'Vie Scolaire & Résultats',
+      items: [
+        { id: 'grades' as NavTab, label: 'Notes & Devoirs', icon: ClipboardList, perm: 'grades:view' },
+        { id: 'attendance' as NavTab, label: 'Suivi Présences', icon: CalendarCheck, perm: 'students:view' },
+        { id: 'bulletins' as NavTab, label: 'Bulletins Officiels', icon: FileText, perm: 'bulletins:generate' },
+        { id: 'cards' as NavTab, label: 'Cartes Scolaires QR', icon: QrCode, perm: 'cards:generate' },
+      ]
+    },
+    {
+      title: 'Finance & Administration',
+      items: [
+        { id: 'payments' as NavTab, label: 'Comptabilité FCFA', icon: CreditCard, perm: 'payments:view' },
+        { id: 'settings' as NavTab, label: 'Fiche Établissement', icon: Settings, perm: 'settings:view' },
+      ]
+    }
   ];
 
   const handleSelectTab = (tab: NavTab) => {
@@ -157,68 +177,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 overflow-y-auto px-3 space-y-1.5 custom-scrollbar py-3">
-          {!isCollapsed && (
-            <div className="px-3 pb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-              Navigation Principale
-            </div>
-          )}
+        <nav className="flex-1 overflow-y-auto px-3 space-y-4 custom-scrollbar py-3">
+          {navSections.map((sec, secIdx) => (
+            <div key={sec.title || secIdx} className="space-y-1">
+              {!isCollapsed && sec.title && (
+                <div className="px-3 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {sec.title}
+                </div>
+              )}
+              {isCollapsed && secIdx > 0 && (
+                <div className="my-2 border-t border-slate-100 mx-2" />
+              )}
+              <div className="space-y-1">
+                {sec.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <div key={item.id} className="relative group">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab(item.id)}
+                        className={`w-full flex items-center rounded-xl text-xs transition-all cursor-pointer ${
+                          isCollapsed 
+                            ? 'justify-center p-2.5' 
+                            : 'gap-3 px-3 py-2.5'
+                        } ${
+                          isActive
+                            ? 'bg-slate-900 text-white shadow-sm font-bold'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-medium'
+                        }`}
+                      >
+                        <div className="relative shrink-0 flex items-center justify-center">
+                          <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-800'}`} />
+                          {isActive && isCollapsed && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-white" />
+                          )}
+                        </div>
 
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <div key={item.id} className="relative group">
-                <button
-                  type="button"
-                  onClick={() => handleSelectTab(item.id)}
-                  className={`w-full flex items-center rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isCollapsed 
-                      ? 'justify-center p-3' 
-                      : 'gap-3 px-3.5 py-2.5'
-                  } ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-800 border border-blue-200/80 shadow-xs font-black'
-                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="relative shrink-0 flex items-center justify-center">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-blue-900' : 'text-slate-400 group-hover:text-slate-700'}`} />
-                    {isActive && isCollapsed && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-600 ring-2 ring-white" />
-                    )}
-                  </div>
+                        {/* Label (hidden in collapsed desktop mode) */}
+                        <span className={`truncate tracking-tight ${isCollapsed ? 'lg:hidden' : 'block'}`}>
+                          {item.label}
+                        </span>
 
-                  {/* Label (hidden in collapsed desktop mode) */}
-                  <span className={`truncate tracking-tight ${isCollapsed ? 'lg:hidden' : 'block'}`}>
-                    {item.label}
-                  </span>
+                        {/* Active subtle badge indicator when expanded */}
+                        {isActive && !isCollapsed && (
+                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                        )}
+                      </button>
 
-                  {/* Active dot indicator when expanded */}
-                  {isActive && !isCollapsed && (
-                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0" />
-                  )}
-                </button>
-
-                {/* Floating Tooltip in Collapsed Desktop Mode */}
-                {isCollapsed && (
-                  <div className="hidden lg:group-hover:flex absolute left-full top-1/2 -translate-y-1/2 ml-3.5 z-50 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl shadow-xl whitespace-nowrap items-center gap-1.5 pointer-events-none animate-in fade-in duration-150">
-                    <span>{item.label}</span>
-                    <ChevronRight className="w-3 h-3 text-slate-400" />
-                  </div>
-                )}
+                      {/* Floating Tooltip in Collapsed Desktop Mode */}
+                      {isCollapsed && (
+                        <div className="hidden lg:group-hover:flex absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-lg whitespace-nowrap items-center gap-1.5 pointer-events-none animate-in fade-in duration-150">
+                          <span>{item.label}</span>
+                          <ChevronRight className="w-3 h-3 text-slate-400" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </nav>
 
         {/* Bottom Section: Active User Footer & Role Switcher */}
-        <div className={`p-3 border-t border-slate-100 bg-slate-50/80 ${isCollapsed ? 'lg:p-2' : 'm-3 rounded-2xl border border-slate-200/80'}`}>
+        <div className={`border-t border-slate-100 ${isCollapsed ? 'p-2' : 'm-2.5 p-3 rounded-xl bg-slate-50/70 border border-slate-200/80'}`}>
           {isCollapsed ? (
             /* Collapsed Desktop View for User Profile */
             <div className="hidden lg:flex flex-col items-center gap-2 py-1">
               <div 
-                className="w-10 h-10 rounded-full bg-blue-900 text-white font-black text-xs flex items-center justify-center shadow-sm cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-2xs cursor-pointer"
                 title={`${currentUser?.fullName} (${AuthService.getRoleLabel(currentUser?.role || 'ADMIN')})`}
               >
                 {currentUser?.fullName.charAt(0)}
@@ -226,7 +254,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCollapsed(false)}
-                className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
                 title="Agrandir le menu pour accéder aux options"
               >
                 <PanelLeftOpen className="w-4 h-4" />
@@ -236,29 +264,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* Expanded View for User Profile */
             <>
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-blue-900 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
                   {currentUser?.fullName.charAt(0)}
                 </div>
                 <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-xs font-black text-slate-900 truncate">
+                  <span className="text-xs font-bold text-slate-900 truncate">
                     {currentUser?.fullName}
                   </span>
-                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-widest truncate">
+                  <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider truncate">
                     {AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}
                   </span>
                 </div>
               </div>
 
               {/* Role Switcher */}
-              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] font-bold text-slate-500">
-                <span className="uppercase tracking-widest text-[9px] flex items-center gap-1">
+              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] font-medium text-slate-500">
+                <span className="uppercase tracking-wider text-[9px] flex items-center gap-1">
                   <Shield className="w-3 h-3 text-slate-400" />
-                  <span>Rôle Test:</span>
+                  <span>Rôle:</span>
                 </span>
                 <select
                   value={currentUser?.role}
                   onChange={(e) => switchRoleSimulated(e.target.value as any)}
-                  className="bg-white text-slate-800 text-[10px] font-bold rounded-lg px-2 py-1 border border-slate-200 outline-none focus:border-blue-600 cursor-pointer shadow-2xs"
+                  className="bg-white text-slate-800 text-[10px] font-semibold rounded-md px-2 py-0.5 border border-slate-200 outline-none focus:border-slate-800 cursor-pointer shadow-2xs"
                 >
                   <option value="ADMIN">Admin</option>
                   <option value="DIRECTEUR">Directeur</option>

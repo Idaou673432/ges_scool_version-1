@@ -403,27 +403,27 @@ export const BulletinsModule: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* ----------------- SCREEN ONLY HEADER & CONTROLS ----------------- */}
-      <div className="no-print space-y-6">
+      <div className="no-print space-y-5">
         {/* Header Banner */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-900 text-[10px] font-black uppercase tracking-widest mb-3 border border-blue-100">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider mb-2.5 border border-slate-200">
               <Sparkles className="w-3.5 h-3.5 text-blue-700" />
-              <span>Saisie Directe & Impression Officielle MEN Mali</span>
+              <span>Conforme MEN Mali • Année {settings.academicYear}</span>
             </div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase flex items-center gap-3">
-              <FileText className="w-8 h-8 text-blue-900 shrink-0" />
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+              <FileText className="w-7 h-7 text-blue-900 shrink-0" />
               <span>Bulletins de Notes Trimestriels</span>
             </h1>
-            <p className="text-xs font-bold text-slate-400 mt-1">
-              Modifiez les notes directement dans la grille ci-dessous • Calcul automatique des moyennes & rangs • Impression A4
+            <p className="text-xs text-slate-500 font-medium mt-1">
+              Modifiez les notes en direct dans la grille • Calcul automatique des moyennes & rangs • Impression A4 normalisée
             </p>
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={() => {
                 setShowBatchModal(true);
@@ -432,57 +432,57 @@ export const BulletinsModule: React.FC = () => {
                   if (classSubj.length > 0) setBatchSubjectId(classSubj[0].id);
                 }
               }}
-              className="flex items-center gap-2 px-5 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer border border-amber-500/30"
+              className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
               title="Saisir directement les notes de classe et de composition pour tous les élèves de la classe"
             >
-              <Edit3 className="w-4 h-4 text-amber-200" />
+              <Edit3 className="w-4 h-4 text-amber-100" />
               <span>Saisie Rapide Classe</span>
             </button>
 
             <button
               onClick={handlePrintSingle}
               disabled={!activeReportCard}
-              className="flex items-center gap-2 px-5 py-3.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
               title="Imprimer ce bulletin directement sur imprimante A4"
             >
-              <Printer className="w-4 h-4 text-amber-400" />
+              <Printer className="w-4 h-4 text-slate-300" />
               <span>Imprimer</span>
             </button>
 
             <button
               onClick={handlePrintClass}
               disabled={allClassReportCards.length === 0}
-              className="flex items-center gap-2 px-5 py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
               title="Imprimer tous les bulletins de la classe"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-4 h-4 text-amber-400" />
               <span>Imprimer Classe ({allClassReportCards.length})</span>
             </button>
 
             <button
               onClick={handleDownloadPdf}
               disabled={!activeReportCard}
-              className="flex items-center gap-2 px-6 py-3.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-emerald-900/20 transition-all cursor-pointer border border-emerald-500/30"
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
               title="Exporter le bulletin actif au format PDF officiel"
             >
-              <Download className="w-4 h-4 text-amber-300" />
+              <Download className="w-4 h-4 text-emerald-200" />
               <span>Exporter en PDF</span>
             </button>
 
             <button
               onClick={handleDownloadAllClassPdfs}
               disabled={allClassReportCards.length === 0}
-              className="flex items-center gap-2 px-5 py-3.5 bg-blue-900 hover:bg-blue-950 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
               title="Exporter tous les bulletins de la classe en 1 seul fichier PDF multi-pages"
             >
-              <Download className="w-4 h-4 text-blue-300" />
-              <span>Exporter Classe (PDF)</span>
+              <Download className="w-4 h-4 text-blue-200" />
+              <span>PDF Classe</span>
             </button>
 
             <button
               onClick={handleExportClassCsv}
               disabled={allClassReportCards.length === 0}
-              className="flex items-center gap-2 px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[10px] uppercase tracking-widest rounded-full border border-slate-200 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
               title="Exporter le récapitulatif des résultats en fichier CSV / Excel"
             >
               <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -493,18 +493,18 @@ export const BulletinsModule: React.FC = () => {
 
         {/* Saved Toast Notification */}
         {savedNotice && (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 shadow-xs animate-fadeIn">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{savedNotice} — Re-calcul automatique effectué.</span>
           </div>
         )}
 
         {/* Class, Term and Quick Search Selector Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
-          <div className="sm:col-span-4">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-blue-900" />
-              <span>1. Filtrer par Classe *</span>
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="sm:col-span-5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>1. Classe *</span>
             </label>
             <select
               value={selectedClassId}
@@ -512,7 +512,7 @@ export const BulletinsModule: React.FC = () => {
                 setSelectedClassId(e.target.value);
                 setActiveStudentId('');
               }}
-              className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
             >
               {classes.map(c => (
                 <option key={c.id} value={c.id}>
@@ -522,15 +522,15 @@ export const BulletinsModule: React.FC = () => {
             </select>
           </div>
 
-          <div className="sm:col-span-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-blue-900" />
+          <div className="sm:col-span-4">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-slate-500" />
               <span>2. Période / Évaluation *</span>
             </label>
             <select
               value={selectedTerm}
               onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
-              className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
             >
               <optgroup label="Évaluations Mensuelles (1er Cycle & Devoirs)">
                 {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
@@ -557,45 +557,34 @@ export const BulletinsModule: React.FC = () => {
           </div>
 
           <div className="sm:col-span-3">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5 text-blue-900" />
-              <span>3. Recherche Rapide Élève</span>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5 text-slate-500" />
+              <span>3. Recherche Élève</span>
             </label>
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Nom, prénom, matricule..."
-                className="w-full pl-9 pr-9 py-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full bg-slate-200 hover:bg-slate-300 transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-md bg-slate-200 hover:bg-slate-300 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
             </div>
           </div>
-
-          <div className="sm:col-span-2 flex items-end">
-            <button
-              onClick={handleDownloadAllClassPdfs}
-              className="w-full py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[10px] uppercase tracking-widest rounded-full transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
-              title="Télécharger tous les PDF de la classe sélectionnée"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-600" />
-              <span>PDF Classe</span>
-            </button>
-          </div>
         </div>
 
         {/* Class Performance Summary Banner */}
         {classStats.total > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 rounded-[2rem] shadow-md border border-slate-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900 text-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-800">
             <div className="flex items-center gap-3">
               <div className="p-3 bg-white/10 rounded-2xl border border-white/10 shrink-0">
                 <UserCheck className="w-5 h-5 text-emerald-400" />
@@ -647,17 +636,17 @@ export const BulletinsModule: React.FC = () => {
         )}
 
         {/* Main Interactive Screen Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Student List Sidebar */}
-          <div className="lg:col-span-4 bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm space-y-4">
+          <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-blue-900" />
-                <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                <Users className="w-4 h-4 text-slate-500" />
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Élèves ({classStudents.length}/{totalClassStudents.length})
                 </h2>
               </div>
-              <span className="text-[10px] font-mono font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+              <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                 {currentClass?.name}
               </span>
             </div>
@@ -670,12 +659,12 @@ export const BulletinsModule: React.FC = () => {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Rechercher nom, prénom..."
-                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full bg-slate-200 hover:bg-slate-300 transition-colors"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-md bg-slate-200 hover:bg-slate-300 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -686,7 +675,7 @@ export const BulletinsModule: React.FC = () => {
             <div className="flex items-center gap-1.5 pb-1">
               <button
                 onClick={() => setScoreFilter('ALL')}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   scoreFilter === 'ALL'
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -696,7 +685,7 @@ export const BulletinsModule: React.FC = () => {
               </button>
               <button
                 onClick={() => setScoreFilter('PASSING')}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   scoreFilter === 'PASSING'
                     ? 'bg-emerald-800 text-white'
                     : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
@@ -706,7 +695,7 @@ export const BulletinsModule: React.FC = () => {
               </button>
               <button
                 onClick={() => setScoreFilter('FAILING')}
-                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                   scoreFilter === 'FAILING'
                     ? 'bg-rose-800 text-white'
                     : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
@@ -717,7 +706,7 @@ export const BulletinsModule: React.FC = () => {
             </div>
 
             {/* Student list */}
-            <div className="space-y-2 max-h-[580px] overflow-y-auto pr-1 custom-scrollbar">
+            <div className="space-y-1.5 max-h-[580px] overflow-y-auto pr-1 custom-scrollbar">
               {classStudents.map(std => {
                 const isSelected = activeStudent?.id === std.id;
                 const card = generateReportCard(std.id, selectedTerm);
@@ -730,43 +719,43 @@ export const BulletinsModule: React.FC = () => {
                   <button
                     key={std.id}
                     onClick={() => setActiveStudentId(std.id)}
-                    className={`w-full text-left p-3.5 rounded-2xl text-xs transition-all flex items-center justify-between cursor-pointer border ${
+                    className={`w-full text-left p-2.5 sm:p-3 rounded-xl text-xs transition-all flex items-center justify-between cursor-pointer border ${
                       isSelected
-                        ? 'bg-blue-900 text-white border-blue-900 shadow-md font-black'
-                        : 'bg-slate-50 text-slate-800 border-slate-100 hover:bg-slate-100 font-bold'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm font-bold'
+                        : 'bg-slate-50/70 text-slate-800 border-slate-200/70 hover:bg-slate-100 font-medium'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       {std.photoUrl ? (
                         <img
                           src={std.photoUrl}
                           alt={std.firstName}
-                          className="w-9 h-9 rounded-full object-cover border-2 border-white/20 shrink-0"
+                          className="w-8 h-8 rounded-lg object-cover border border-white/20 shrink-0"
                         />
                       ) : (
                         <div
-                          className={`w-9 h-9 rounded-full font-black flex items-center justify-center text-xs shrink-0 ${
-                            isSelected ? 'bg-blue-800 text-white' : 'bg-blue-100 text-blue-900'
+                          className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center text-[11px] shrink-0 ${
+                            isSelected ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'
                           }`}
                         >
                           {std.firstName.charAt(0)}{std.lastName.charAt(0)}
                         </div>
                       )}
                       <div className="min-w-0">
-                        <p className="truncate uppercase text-xs">{std.lastName} {std.firstName}</p>
-                        <p className={`text-[10px] ${isSelected ? 'text-blue-200' : 'text-slate-400'} font-mono`}>
+                        <p className="truncate font-semibold text-xs">{std.lastName} {std.firstName}</p>
+                        <p className={`text-[10px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} font-mono`}>
                           {std.matricule}
                         </p>
                       </div>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black font-mono ${
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold font-mono ${
                         isSelected ? 'bg-white/20 text-white' : avg >= passThreshold ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
                         {avg.toFixed(2)} / {cardMax}
                       </span>
-                      <p className={`text-[9px] font-bold ${isSelected ? 'text-blue-200' : 'text-slate-400'} mt-0.5`}>
+                      <p className={`text-[9px] font-medium ${isSelected ? 'text-slate-300' : 'text-slate-400'} mt-0.5`}>
                         {rank}{rank === 1 ? 'er' : 'e'} rang
                       </p>
                     </div>
@@ -783,7 +772,7 @@ export const BulletinsModule: React.FC = () => {
                         setSearchQuery('');
                         setScoreFilter('ALL');
                       }}
-                      className="text-[10px] font-black uppercase text-blue-900 underline hover:text-blue-950"
+                      className="text-[10px] font-bold uppercase text-slate-700 underline hover:text-slate-900"
                     >
                       Réinitialiser la recherche
                     </button>
@@ -794,70 +783,70 @@ export const BulletinsModule: React.FC = () => {
           </div>
 
           {/* Right: Interactive Bulletin Card View & Direct Grade Inputs */}
-          <div className="lg:col-span-8 bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm">
+          <div className="lg:col-span-8 bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs">
             {!activeReportCard || !activeStudent ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-20 space-y-3">
-                <FileText className="w-16 h-16 text-slate-300 stroke-1" />
-                <p className="font-bold">Sélectionnez un élève dans la liste à gauche pour saisir ses notes et afficher son bulletin.</p>
+                <FileText className="w-14 h-14 text-slate-300 stroke-1" />
+                <p className="font-medium">Sélectionnez un élève dans la liste à gauche pour saisir ses notes et afficher son bulletin.</p>
               </div>
             ) : (
               <div className="space-y-6">
                 {/* Bulletin Header Badge */}
-                <div className="bg-slate-900 text-white p-6 rounded-[2rem] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+                <div className="bg-slate-900 text-white p-5 sm:p-6 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm border border-slate-800">
                   <div className="space-y-1">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-amber-300 bg-amber-400/20 px-3 py-1 rounded-full border border-amber-400/30">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2.5 py-0.5 rounded-md border border-amber-400/30">
                       RÉPUBLIQUE DU MALI • MEN
                     </span>
-                    <h2 className="text-xl font-black uppercase tracking-tight text-white mt-1">
+                    <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white mt-1">
                       {activeReportCard.studentName}
                     </h2>
-                    <p className="text-xs text-slate-300 font-mono font-bold">
+                    <p className="text-xs text-slate-300 font-mono font-medium">
                       MLE: {activeReportCard.studentMatricule} • Classe: {activeReportCard.className}
                     </p>
                   </div>
 
-                  <div className="flex flex-col sm:items-end gap-3 shrink-0">
-                    <div className="text-left sm:text-right bg-white/10 p-4 rounded-2xl border border-white/10">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-blue-200 block">
+                  <div className="flex flex-col sm:items-end gap-2.5 shrink-0">
+                    <div className="text-left sm:text-right bg-white/10 p-3.5 rounded-xl border border-white/10">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300 block">
                         Moyenne Générale
                       </span>
-                      <span className="text-3xl font-black text-amber-300">
+                      <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
                         {activeReportCard.generalAverage.toFixed(2)}
-                        <span className="text-xs text-white/60"> / {activeReportCard.maxScore || 20}</span>
+                        <span className="text-xs text-white/60 font-sans"> / {activeReportCard.maxScore || 20}</span>
                       </span>
-                      <p className="text-[10px] font-bold text-emerald-300 mt-0.5">
+                      <p className="text-[10px] font-semibold text-emerald-300 mt-0.5">
                         Rang: {activeReportCard.rankInClass}e sur {activeReportCard.totalClassStudents} élèves
                       </p>
                     </div>
 
                     <button
                       onClick={handleDownloadPdf}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm cursor-pointer border border-emerald-400/40 w-full sm:w-auto"
+                      className="flex items-center justify-center gap-2 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-colors shadow-xs cursor-pointer w-full sm:w-auto"
                       title="Enregistrer et télécharger le bulletin au format PDF"
                     >
-                      <Download className="w-3.5 h-3.5 text-amber-300" />
+                      <Download className="w-3.5 h-3.5 text-emerald-200" />
                       <span>Exporter en PDF</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Summary Metrics Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block">Total Points</span>
-                    <p className="font-mono font-black text-slate-900 text-sm">{activeReportCard.totalPoints.toFixed(2)} pts</p>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Total Points</span>
+                    <p className="font-mono font-bold text-slate-900 text-sm">{activeReportCard.totalPoints.toFixed(2)} pts</p>
                   </div>
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block">Total Coefs</span>
-                    <p className="font-mono font-black text-slate-900 text-sm">{activeReportCard.totalCoefficients}</p>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Total Coefs</span>
+                    <p className="font-mono font-bold text-slate-900 text-sm">{activeReportCard.totalCoefficients}</p>
                   </div>
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block">Moyenne Classe</span>
-                    <p className="font-mono font-black text-blue-900 text-sm">{activeReportCard.classOverallAverage.toFixed(2)} / {activeReportCard.maxScore || 20}</p>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Moyenne Classe</span>
+                    <p className="font-mono font-bold text-slate-900 text-sm">{activeReportCard.classOverallAverage.toFixed(2)} / {activeReportCard.maxScore || 20}</p>
                   </div>
                   <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block">Mention / Décision</span>
-                    <p className="font-black text-emerald-700 text-xs truncate mt-0.5">{activeReportCard.directorDecision}</p>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Mention / Décision</span>
+                    <p className="font-bold text-emerald-700 text-xs truncate mt-0.5">{activeReportCard.directorDecision}</p>
                   </div>
                 </div>
 

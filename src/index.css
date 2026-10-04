@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@layer base {
+  * {
+    border-color: #e2e8f0;
+  }
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
@@ -12,6 +23,14 @@
     background: #cbd5e1;
     border-radius: 9999px;
   }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  
+  /* Tabular numbers for clean financial & code alignments */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
   
   /* Touch smooth scrolling for mobile devices */
   .touch-pan-scroll {
@@ -19,7 +38,7 @@
   }
 }
 
-/* Base mobile improvements */
+/* Base mobile & touch interaction improvements */
 html, body {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;

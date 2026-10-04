@@ -112,94 +112,94 @@ export const SettingsModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
             <Settings className="w-7 h-7 text-blue-900" />
             <span>Paramètres Établissement</span>
           </h1>
-          <p className="text-xs font-bold text-slate-400 mt-1">
-            Académie, CAP & agrément • Logo officiel et sécurité de l'application
+          <p className="text-xs text-slate-500 font-medium mt-1">
+            Académie, CAP & agrément • Logo officiel, sécurité et synchronisation
           </p>
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex bg-slate-100 p-1.5 rounded-full text-xs font-black uppercase tracking-widest flex-wrap gap-1">
+        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold flex-wrap gap-1">
           <button
             onClick={() => setActiveTab('INFO')}
-            className={`px-5 py-2.5 rounded-full transition-all cursor-pointer ${
-              activeTab === 'INFO' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+              activeTab === 'INFO' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             Fiche École
           </button>
           <button
             onClick={() => setActiveTab('LOGO_SECURITY')}
-            className={`px-5 py-2.5 rounded-full transition-all cursor-pointer ${
-              activeTab === 'LOGO_SECURITY' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+              activeTab === 'LOGO_SECURITY' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Logo & Mot de Passe
+            Logo & Sécurité
           </button>
           <button
             onClick={() => setActiveTab('EVALUATION_CALENDAR')}
-            className={`px-5 py-2.5 rounded-full transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'EVALUATION_CALENDAR' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'EVALUATION_CALENDAR' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Calendar className="w-3.5 h-3.5" />
-            <span>Mois d'Évaluation</span>
+            <span>Évaluations</span>
           </button>
           <button
             onClick={() => setActiveTab('CALCULATION_FORMULA')}
-            className={`px-5 py-2.5 rounded-full transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'CALCULATION_FORMULA' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'CALCULATION_FORMULA' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Calculator className="w-3.5 h-3.5" />
-            <span>Formules de Calcul</span>
+            <span>Formules</span>
           </button>
           <button
             onClick={() => setActiveTab('CLOUD_SYNC')}
-            className={`px-5 py-2.5 rounded-full transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === 'CLOUD_SYNC' ? 'bg-blue-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-900'
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'CLOUD_SYNC' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <Cloud className="w-3.5 h-3.5" />
-            <span>Cloud & Multi-Appareils</span>
+            <span>Cloud & Sync</span>
           </button>
         </div>
       </div>
 
       {savedSuccess && (
-        <div className="p-4 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>Paramètres mis à jour avec succès.</span>
         </div>
       )}
 
       {activeTab === 'INFO' && (
-        <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nom Officiel de l'Établissement *</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Nom Officiel de l'Établissement *</label>
               <input
                 type="text"
                 required
                 value={formData.schoolName}
                 onChange={e => setFormData({ ...formData, schoolName: e.target.value })}
-                className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Académie d'Enseignement *</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Académie d'Enseignement *</label>
               <select
                 value={formData.academyName}
                 onChange={e => setFormData({ ...formData, academyName: e.target.value })}
-                className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
               >
                 {MALI_ACADEMIES.map(ac => (
                   <option key={ac} value={ac}>{ac}</option>
@@ -208,56 +208,56 @@ export const SettingsModule: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Centre d'Animation Pédagogique (CAP) *</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Centre d'Animation Pédagogique (CAP) *</label>
               <input
                 type="text"
                 required
                 value={formData.capName}
                 onChange={e => setFormData({ ...formData, capName: e.target.value })}
-                className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">N° Agrément / Autorisation MEN *</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">N° Agrément / Autorisation MEN *</label>
               <input
                 type="text"
                 required
                 value={formData.registrationNumber}
                 onChange={e => setFormData({ ...formData, registrationNumber: e.target.value })}
-                className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Nom du Directeur / Proviseur *</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Nom du Directeur / Proviseur *</label>
               <input
                 type="text"
                 required
                 value={formData.directorName}
                 onChange={e => setFormData({ ...formData, directorName: e.target.value })}
-                className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Année Académique Active *</label>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Année Académique Active *</label>
               <input
                 type="text"
                 required
                 value={formData.currentAcademicYear}
                 onChange={e => setFormData({ ...formData, currentAcademicYear: e.target.value })}
-                className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
             </div>
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-2">
             <button
               type="submit"
-              className="flex items-center gap-2 px-8 py-4 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 text-amber-400" />
               <span>Sauvegarder les Modifications</span>
             </button>
           </div>

@@ -25,16 +25,22 @@ import {
   Sparkles,
   PhoneCall,
   Calendar as CalendarIcon,
-  Trash2
+  Trash2,
+  Camera,
+  QrCode
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { AttendanceStatus, AttendanceRecord, Student } from '../../types';
 import { PdfService } from '../../services/pdfService';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
+import { StudentQrScannerModal } from '../../components/qr/StudentQrScannerModal';
+import { StudentQrProfileModal } from '../../components/qr/StudentQrProfileModal';
 
 export const AttendanceModule: React.FC = () => {
   const { students, classes, attendanceRecords, saveAttendanceBatch, deleteAllAttendanceRecords, settings } = useSchool();
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
 
   // Active Tab: 'CALL' = Saisie de l'Appel | 'REGISTER' = Registre & Rapports
   const [activeTab, setActiveTab] = useState<'CALL' | 'REGISTER'>('CALL');
@@ -307,120 +313,132 @@ export const AttendanceModule: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Module Header & Action Tabs */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 bg-blue-50 text-blue-900 rounded-2xl">
-              <CalendarCheck className="w-6 h-6" />
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 bg-slate-100 text-slate-900 rounded-xl">
+              <CalendarCheck className="w-5 h-5" />
             </span>
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                 Suivi des Présences & Assiduité
               </h1>
               <p className="text-xs text-slate-500 font-medium">
-                Saisie quotidienne des appels, contrôle des absents, relances WhatsApp & registre trimestriel
+                Appels quotidiens, alertes parents WhatsApp & registre d'assiduité officiel
               </p>
             </div>
           </div>
         </div>
 
         {/* Tab Switcher & Actions */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
+            title="Scanner le QR Code d'un élève pour pointer sa présence ou consulter sa fiche"
+          >
+            <Camera className="w-3.5 h-3.5 text-amber-300" />
+            <span>Scanner QR Élève</span>
+          </button>
+
           {attendanceRecords.length > 0 && (
             <button
+              type="button"
               onClick={() => setShowDeleteAllModal(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl shadow-lg shadow-rose-600/20 transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-all cursor-pointer"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
               <span>Supprimer Tout ({attendanceRecords.length})</span>
             </button>
           )}
 
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
+              type="button"
               onClick={() => setActiveTab('CALL')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'CALL'
-                  ? 'bg-white text-blue-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <CheckSquareIcon className="w-4 h-4" />
               <span>Appel Quotidien</span>
             </button>
             <button
+              type="button"
               onClick={() => setActiveTab('REGISTER')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'REGISTER'
-                  ? 'bg-white text-blue-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Registre & Rapports</span>
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Registre</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Main Filter Toolbar */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">
-              1. Sélectionner la Classe *
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+              Classe *
             </label>
             <select
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+              className="w-full py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
             >
               {classes.map(cls => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.name} ({cls.level}) — {cls.academicYear}
+                  {cls.name} ({cls.level})
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5 flex items-center gap-1">
-              <CalendarIcon className="w-3.5 h-3.5 text-blue-900" />
-              <span>2. Date de l'Appel *</span>
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1 flex items-center gap-1">
+              <CalendarIcon className="w-3 h-3 text-slate-400" />
+              <span>Date de l'Appel *</span>
             </label>
             <input
               type="date"
               value={selectedDate}
               onChange={e => setSelectedDate(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+              className="w-full py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
             />
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">
-              3. Enseignant / Agent Responsable
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+              Responsable d'Appel
             </label>
             <input
               type="text"
               value={markedByTeacher}
               onChange={e => setMarkedByTeacher(e.target.value)}
-              placeholder="Nom du professeur ou surveillant"
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+              placeholder="Professeur ou surveillant"
+              className="w-full py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white transition-all"
             />
           </div>
 
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1.5">
-              4. Rechercher un Élève
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+              Rechercher un Élève
             </label>
             <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Nom, prénom ou matricule..."
-                className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                placeholder="Nom, matricule..."
+                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white transition-all"
               />
             </div>
           </div>
@@ -522,7 +540,7 @@ export const AttendanceModule: React.FC = () => {
           </div>
 
           {/* Student List for Attendance Marking */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
             {filteredStudents.length === 0 ? (
               <div className="p-12 text-center text-slate-400 space-y-3">
                 <User className="w-12 h-12 mx-auto stroke-1 text-slate-300" />
@@ -886,6 +904,29 @@ export const AttendanceModule: React.FC = () => {
         itemCount={attendanceRecords.length}
         description="Attention ! Cette action supprimera définitivement TOUTES les fiches de présence et le registre d'assiduité."
       />
+
+      {/* QR Scanner Modal */}
+      <StudentQrScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onStudentFound={(student) => {
+          setIsScannerOpen(false);
+          setSelectedStudentForProfile(student);
+        }}
+      />
+
+      {/* Student QR Profile Detailed Dossier Modal */}
+      {selectedStudentForProfile && (
+        <StudentQrProfileModal
+          student={selectedStudentForProfile}
+          isOpen={Boolean(selectedStudentForProfile)}
+          onClose={() => setSelectedStudentForProfile(null)}
+          onScanAnother={() => {
+            setSelectedStudentForProfile(null);
+            setIsScannerOpen(true);
+          }}
+        />
+      )}
     </div>
   );
 };

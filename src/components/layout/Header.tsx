@@ -18,7 +18,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   X,
-  Share2
+  Share2,
+  QrCode
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,6 +30,7 @@ import { CloudSchoolSwitcherModal } from '../common/CloudSchoolSwitcherModal';
 interface HeaderProps {
   onSearchQuery?: (q: string) => void;
   onLock?: () => void;
+  onOpenQrScanner?: () => void;
   isSidebarCollapsed: boolean;
   onToggleSidebarCollapse: () => void;
   onOpenMobileMenu: () => void;
@@ -37,6 +39,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ 
   onSearchQuery, 
   onLock,
+  onOpenQrScanner,
   isSidebarCollapsed,
   onToggleSidebarCollapse,
   onOpenMobileMenu
@@ -58,36 +61,36 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="no-print h-16 sm:h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 px-3 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 z-20 transition-all">
+    <header className="no-print h-16 sm:h-18 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 z-20 transition-all">
       {/* Left Section: Menu Toggles & School Branding */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
         {/* Mobile Hamburger Button */}
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="lg:hidden p-2 -ml-1 text-slate-700 hover:text-blue-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+          className="lg:hidden p-2 -ml-1 text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
           title="Ouvrir le menu"
           aria-label="Ouvrir le menu de navigation"
         >
-          <Menu className="w-6 h-6" />
+          <Menu className="w-5 h-5" />
         </button>
 
         {/* Desktop Sidebar Collapse Toggle Button */}
         <button
           type="button"
           onClick={onToggleSidebarCollapse}
-          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-slate-600 hover:text-blue-900 hover:bg-blue-50 border border-slate-200/80 rounded-xl transition-all cursor-pointer text-xs font-bold"
-          title={isSidebarCollapsed ? "Agrandir le menu latéral" : "Masquer / Réduire le menu pour plus d'espace"}
+          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 rounded-xl transition-all cursor-pointer text-xs font-semibold"
+          title={isSidebarCollapsed ? "Agrandir le menu latéral" : "Réduire le menu"}
         >
           {isSidebarCollapsed ? (
             <>
-              <PanelLeftOpen className="w-4 h-4 text-blue-900" />
-              <span className="text-[11px] text-blue-900 font-black">Menu</span>
+              <PanelLeftOpen className="w-4 h-4 text-slate-700" />
+              <span className="text-[11px] text-slate-700 font-bold">Menu</span>
             </>
           ) : (
             <>
               <PanelLeftClose className="w-4 h-4 text-slate-500" />
-              <span className="text-[11px] text-slate-600">Masquer</span>
+              <span className="text-[11px] text-slate-600">Réduire</span>
             </>
           )}
         </button>
@@ -97,48 +100,50 @@ export const Header: React.FC<HeaderProps> = ({
           <img
             src={settings.logoUrl}
             alt="Logo Établissement"
-            className="w-8 h-8 sm:w-11 sm:h-11 object-contain rounded-xl border border-slate-200 p-0.5 bg-white shrink-0 shadow-2xs"
+            className="w-8 h-8 sm:w-10 sm:h-10 object-contain rounded-xl border border-slate-200/80 p-0.5 bg-white shrink-0 shadow-2xs"
           />
         )}
 
         {/* School Info */}
-        <div className="flex flex-col min-w-0 max-w-[140px] sm:max-w-[200px] md:max-w-xs lg:max-w-md">
-          <h1 className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">
-            {settings.academyName || 'Académie'} • {settings.capName || 'CAP'}
-          </h1>
-          <p className="text-xs sm:text-base lg:text-lg font-black text-slate-900 tracking-tight truncate leading-tight">
+        <div className="flex flex-col min-w-0 max-w-[150px] sm:max-w-[220px] md:max-w-xs lg:max-w-md">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+            <span>{settings.academyName || 'Académie'}</span>
+            <span aria-hidden="true" className="text-slate-300">·</span>
+            <span>{settings.capName || 'CAP'}</span>
+          </div>
+          <p className="text-xs sm:text-sm lg:text-base font-bold text-slate-900 tracking-tight truncate leading-tight">
             {settings.schoolName || 'KalanGest Mali'}
           </p>
         </div>
       </div>
 
       {/* Global Search & Indicators */}
-      <div className="flex items-center gap-2 sm:gap-4 lg:gap-5">
+      <div className="flex items-center gap-2 sm:gap-3.5">
         {/* Cloud Multi-Device Sync Button */}
         <button
           type="button"
           onClick={() => setShowCloudModal(true)}
-          className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-[11px] font-black tracking-wider transition-all cursor-pointer border ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold tracking-wide transition-all cursor-pointer border ${
             syncStatus === 'CONNECTED' 
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100 shadow-2xs'
+              ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 shadow-2xs'
               : 'bg-indigo-50 border-indigo-200 text-indigo-900 hover:bg-indigo-100'
           }`}
           title="Gérer la synchronisation Cloud multi-écoles et multi-appareils"
         >
           <Cloud className={`w-3.5 h-3.5 ${syncStatus === 'SYNCING' ? 'animate-bounce text-amber-600' : 'text-emerald-600'}`} />
-          <span className="truncate max-w-[90px] sm:max-w-[130px] font-mono">{cloudSchoolCode}</span>
-          <span className="hidden md:inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="truncate max-w-[85px] sm:max-w-[120px] font-mono text-[10px] font-bold">{cloudSchoolCode}</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
         </button>
 
         {/* Desktop / Tablet Search Input */}
-        <div className="hidden md:flex items-center relative w-36 lg:w-60 xl:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="hidden md:flex items-center relative w-40 lg:w-56 xl:w-64">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={handleSearchChange}
-            placeholder="Rechercher..."
-            className="w-full pl-9 pr-4 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent transition-all"
+            placeholder="Rechercher élève, classe..."
+            className="w-full pl-8 pr-4 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"
           />
         </div>
 
@@ -152,23 +157,35 @@ export const Header: React.FC<HeaderProps> = ({
           <Search className="w-5 h-5" />
         </button>
 
-        {/* System Badges (Desktop Only) */}
-        <div className="hidden xl:flex items-center gap-2">
+        {/* Global QR Scanner Button */}
+        {onOpenQrScanner && (
           <button
             type="button"
-            onClick={() => setShowPwaModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-full text-[11px] font-black uppercase tracking-wider shadow-2xs transition-all cursor-pointer border border-amber-400/50"
-            title="Installer KalanGest sur votre téléphone ou PC"
+            onClick={onOpenQrScanner}
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-xl text-xs font-semibold tracking-wide shadow-2xs transition-all cursor-pointer"
+            title="Scanner le QR Code d'un badge ou d'une carte scolaire"
           >
-            <Download className="w-3.5 h-3.5 text-slate-950" />
-            <span>Installer l'App</span>
+            <QrCode className="w-4 h-4 text-amber-300" />
+            <span className="hidden sm:inline">Scanner QR</span>
           </button>
+        )}
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-100 text-blue-900 rounded-full text-[10px] font-black uppercase tracking-wider">
-            <Calendar className="w-3.5 h-3.5 text-blue-700" />
-            <span>{settings.currentAcademicYear}</span>
-          </div>
+        {/* Academic Year Tag (Desktop Only) */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 border border-slate-200/60 text-slate-700 rounded-xl text-[10px] font-bold">
+          <Calendar className="w-3 h-3 text-slate-500" />
+          <span>{settings.currentAcademicYear}</span>
         </div>
+
+        {/* PWA App Install Button (Desktop Only) */}
+        <button
+          type="button"
+          onClick={() => setShowPwaModal(true)}
+          className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80 rounded-xl text-[10px] font-bold transition-all cursor-pointer"
+          title="Installer KalanGest sur votre PC ou tablette"
+        >
+          <Download className="w-3 h-3 text-slate-500" />
+          <span>Installer</span>
+        </button>
 
         {/* Notifications Popover Button */}
         <div className="relative">
@@ -178,19 +195,19 @@ export const Header: React.FC<HeaderProps> = ({
             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl relative transition-all cursor-pointer"
             title="Alertes & Notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4.5 h-4.5" />
             {pendingPayments.length > 0 && (
-              <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
             )}
           </button>
 
           {showNotifications && (
             <div className="absolute right-0 mt-3 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl py-3 z-50 text-xs animate-in fade-in zoom-in-95">
               <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                <span className="font-black text-slate-900 uppercase tracking-wide text-[11px]">
+                <span className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
                   Alertes & Retards
                 </span>
-                <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-black text-[10px]">
+                <span className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-bold text-[10px]">
                   {pendingPayments.length} retard(s)
                 </span>
               </div>
@@ -199,12 +216,12 @@ export const Header: React.FC<HeaderProps> = ({
                 {pendingPayments.slice(0, 5).map((p) => (
                   <div key={p.id} className="p-3 hover:bg-slate-50 flex items-start gap-2.5">
                     <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-bold text-slate-900">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 truncate">
                         {p.studentName} ({p.className})
                       </p>
                       <p className="text-slate-500 text-[11px]">
-                        Reste dû : <strong className="text-rose-600">{p.remainingAmount.toLocaleString()} FCFA</strong>
+                        Reste dû : <strong className="text-rose-600 font-mono">{p.remainingAmount.toLocaleString()} FCFA</strong>
                       </p>
                     </div>
                   </div>
@@ -213,11 +230,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="p-3 hover:bg-slate-50 flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-bold text-slate-900">
-                      Synchronisation Cloud Live Activée
+                    <p className="font-semibold text-slate-900">
+                      Synchronisation Cloud Live
                     </p>
                     <p className="text-slate-500 text-[11px]">
-                      Vos données sont répliquées en direct sur le Cloud.
+                      Données répliquées en continu avec Firestore.
                     </p>
                   </div>
                 </div>

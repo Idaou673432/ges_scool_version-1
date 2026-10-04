@@ -22,10 +22,32 @@ import { BulletinsModule } from './modules/bulletins/BulletinsModule';
 import { CardsModule } from './modules/cards/CardsModule';
 import { PaymentsModule } from './modules/payments/PaymentsModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
+import { StudentQrScannerModal } from './components/qr/StudentQrScannerModal';
+import { StudentQrProfileModal } from './components/qr/StudentQrProfileModal';
+import { StandaloneStudentQrView } from './components/qr/StandaloneStudentQrView';
+import { Student } from './types';
 
 export function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [isGlobalQrScannerOpen, setIsGlobalQrScannerOpen] = useState(false);
+  const [globalScannedStudent, setGlobalScannedStudent] = useState<Student | null>(null);
   
+  // External scan detection (phone camera / browser opened outside the application)
+  const [externalQrData, setExternalQrData] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramData = urlParams.get('student_qr') || urlParams.get('verify_qr') || urlParams.get('json') || urlParams.get('scan') || urlParams.get('data');
+      if (paramData) return decodeURIComponent(paramData);
+      if (window.location.hash.includes('student_qr=')) {
+        return decodeURIComponent(window.location.hash.split('student_qr=')[1]);
+      }
+      if (urlParams.has('qr_view')) {
+        return '';
+      }
+    }
+    return null;
+  });
+
   // Persisted desktop sidebar collapsed state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -55,12 +77,28 @@ export function AppContent() {
     setIsUnlocked(false);
   };
 
+  // If opened via external phone camera scan (QR code outside the application),
+  // render the dedicated high-definition student presentation view directly!
+  if (externalQrData !== null) {
+    return (
+      <StandaloneStudentQrView
+        initialRawData={externalQrData}
+        onExitToApp={() => {
+          if (typeof window !== 'undefined' && window.history) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          setExternalQrData(null);
+        }}
+      />
+    );
+  }
+
   if (!isUnlocked) {
     return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
   }
 
   return (
-    <div className="flex h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#f8fafc] text-slate-900 overflow-hidden font-sans">
       {/* Sidebar Navigation (Desktop Collapsible + Mobile Slide-In Drawer) */}
       <Sidebar 
         activeTab={activeTab} 
@@ -75,6 +113,7 @@ export function AppContent() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <Header 
           onLock={handleLockApp}
+          onOpenQrScanner={() => setIsGlobalQrScannerOpen(true)}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
@@ -100,8 +139,38 @@ export function AppContent() {
           activeTab={activeTab} 
           setActiveTab={setActiveTab}
           onOpenFullMenu={() => setIsMobileMenuOpen(true)}
+          onOpenQrScanner={() => setIsGlobalQrScannerOpen(true)}
         />
       </div>
+
+      {/* Global Student QR Scanner Modal */}
+      <StudentQrScannerModal
+        isOpen={isGlobalQrScannerOpen}
+        onClose={() => setIsGlobalQrScannerOpen(false)}
+        onStudentFound={(student) => {
+          setIsGlobalQrScannerOpen(false);
+          setGlobalScannedStudent(student);
+        }}
+      />
+
+      {/* Global Student QR Profile Detailed Dossier Modal */}
+      {globalScannedStudent && (
+        <StudentQrProfileModal
+          student={globalScannedStudent}
+          isOpen={Boolean(globalScannedStudent)}
+          onClose={() => setGlobalScannedStudent(null)}
+          onScanAnother={() => {
+            setGlobalScannedStudent(null);
+            setIsGlobalQrScannerOpen(true);
+          }}
+          onNavigateToBulletin={() => {
+            setActiveTab('bulletins');
+          }}
+          onNavigateToPayments={() => {
+            setActiveTab('payments');
+          }}
+        />
+      )}
     </div>
   );
 }

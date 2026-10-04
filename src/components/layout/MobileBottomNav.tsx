@@ -9,7 +9,8 @@ import {
   Users, 
   ClipboardList, 
   CreditCard, 
-  Menu
+  Menu,
+  QrCode
 } from 'lucide-react';
 import { NavTab } from './Sidebar';
 
@@ -17,16 +18,21 @@ interface MobileBottomNavProps {
   activeTab: NavTab;
   setActiveTab: (tab: NavTab) => void;
   onOpenFullMenu: () => void;
+  onOpenQrScanner?: () => void;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   setActiveTab,
   onOpenFullMenu,
+  onOpenQrScanner,
 }) => {
-  const quickItems = [
+  const leftItems = [
     { id: 'dashboard' as NavTab, label: 'Accueil', icon: LayoutDashboard },
     { id: 'students' as NavTab, label: 'Élèves', icon: Users },
+  ];
+
+  const rightItems = [
     { id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList },
     { id: 'payments' as NavTab, label: 'Caisse', icon: CreditCard },
   ];
@@ -37,7 +43,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       className="no-print lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-lg border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 flex items-center justify-around select-none"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6px)' }}
     >
-      {quickItems.map((item) => {
+      {leftItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
         return (
@@ -45,7 +51,46 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             key={item.id}
             type="button"
             onClick={() => setActiveTab(item.id)}
-            className={`flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center justify-center min-w-[54px] py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
+              isActive
+                ? 'text-blue-900 font-black'
+                : 'text-slate-500 hover:text-slate-900 font-semibold'
+            }`}
+          >
+            <div className={`p-1 rounded-lg transition-transform ${isActive ? 'bg-blue-100/70 scale-110' : ''}`}>
+              <Icon className={`w-5 h-5 ${isActive ? 'text-blue-900' : 'text-slate-500'}`} />
+            </div>
+            <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? 'font-black text-blue-950' : 'text-slate-500'}`}>
+              {item.label}
+            </span>
+          </button>
+        );
+      })}
+
+      {/* Central Raised QR Scanner Button */}
+      {onOpenQrScanner && (
+        <button
+          type="button"
+          onClick={onOpenQrScanner}
+          className="-mt-5 flex flex-col items-center justify-center w-13 h-13 rounded-2xl bg-gradient-to-tr from-blue-950 via-slate-900 to-blue-900 text-white shadow-lg shadow-blue-950/35 border-2 border-white active:scale-95 transition-all cursor-pointer shrink-0"
+          title="Scanner le QR Code d'un élève (Caméra)"
+        >
+          <QrCode className="w-6 h-6 text-amber-300" />
+          <span className="text-[8px] font-black uppercase tracking-wider text-amber-300 -mt-0.5">
+            Scan
+          </span>
+        </button>
+      )}
+
+      {rightItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = activeTab === item.id;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setActiveTab(item.id)}
+            className={`flex flex-col items-center justify-center min-w-[54px] py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
               isActive
                 ? 'text-blue-900 font-black'
                 : 'text-slate-500 hover:text-slate-900 font-semibold'
@@ -65,14 +110,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <button
         type="button"
         onClick={onOpenFullMenu}
-        className="flex flex-col items-center justify-center min-w-[60px] py-1 px-2 rounded-xl transition-all text-slate-600 hover:text-blue-950 font-semibold cursor-pointer"
+        className="flex flex-col items-center justify-center min-w-[54px] py-1 px-1.5 rounded-xl transition-all text-slate-600 hover:text-blue-950 font-semibold cursor-pointer"
         title="Ouvrir tout le menu"
       >
         <div className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors">
           <Menu className="w-5 h-5 text-slate-700" />
         </div>
         <span className="text-[10px] tracking-tight mt-0.5 text-slate-600 font-bold">
-          Menu (11)
+          Menu
         </span>
       </button>
     </nav>

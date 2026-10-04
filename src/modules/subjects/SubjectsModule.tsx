@@ -56,45 +56,45 @@ export const SubjectsModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+    <div className="space-y-6 pb-12">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
             <BookOpen className="w-7 h-7 text-blue-900" />
             <span>Matières, Coefficients & Programme</span>
           </h1>
-          <p className="text-xs font-bold text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 font-medium mt-1">
             Définition des coefficients d'évaluation par cycle d'enseignement au Mali
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {subjects.length > 0 && (
             <button
               onClick={() => setShowDeleteAllModal(true)}
-              className="flex items-center gap-2 px-5 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-rose-600/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors cursor-pointer"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-4 h-4 text-rose-600" />
               <span>Supprimer Tout ({subjects.length})</span>
             </button>
           )}
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-6 py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-amber-400" />
             <span>Ajouter une Matière</span>
           </button>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSelectedCategory('ALL')}
-            className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-              selectedCategory === 'ALL' ? 'bg-blue-900 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              selectedCategory === 'ALL' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/80'
             }`}
           >
             Tous les Cycles ({subjects.length})
@@ -103,8 +103,8 @@ export const SubjectsModule: React.FC = () => {
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all cursor-pointer ${
-                selectedCategory === cat.id ? 'bg-blue-900 text-white shadow-md' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedCategory === cat.id ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/80'
               }`}
             >
               {cat.label}
@@ -113,109 +113,111 @@ export const SubjectsModule: React.FC = () => {
         </div>
 
         <div className="relative w-full md:w-64">
-          <Search className="w-4 h-4 absolute left-4 top-3.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Rechercher matière..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
           />
         </div>
       </div>
 
-      <div className="bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-sm">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-50 font-black text-[10px] uppercase tracking-widest text-slate-400 border-b border-slate-50">
-            <tr>
-              <th className="py-4 px-8">Code</th>
-              <th className="py-4 px-4">Intitulé de la Matière</th>
-              <th className="py-4 px-4">Coefficient</th>
-              <th className="py-4 px-4">Cycle Appliqué</th>
-              <th className="py-4 px-8 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="text-xs font-bold text-slate-700 divide-y divide-slate-50">
-            {filteredSubjects.length === 0 ? (
+      <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50/80 font-bold text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200/80">
               <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-400 font-bold">
-                  Aucune matière trouvée.
-                </td>
+                <th className="py-3.5 px-6">Code</th>
+                <th className="py-3.5 px-4">Intitulé de la Matière</th>
+                <th className="py-3.5 px-4">Coefficient</th>
+                <th className="py-3.5 px-4">Cycle Appliqué</th>
+                <th className="py-3.5 px-6 text-right">Actions</th>
               </tr>
-            ) : (
-              filteredSubjects.map((sub) => (
-                <tr key={sub.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-4 px-8 font-mono font-black text-blue-900">{sub.code}</td>
-                  <td className="py-4 px-4 font-bold text-slate-900">{sub.name}</td>
-                  <td className="py-4 px-4 font-black text-slate-800">Coef {sub.coefficient}</td>
-                  <td className="py-4 px-4 text-slate-500 font-bold">
-                    <span className="bg-blue-50 text-blue-900 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-100">
-                      {sub.classCategory.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="py-4 px-8 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedSubj(sub);
-                          setFormData(sub);
-                          setIsModalOpen(true);
-                        }}
-                        className="p-2 text-slate-400 hover:text-blue-900 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
-                        title="Modifier"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setDeletingSubjId(sub.id)}
-                        className="p-2 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition-all cursor-pointer"
-                        title="Supprimer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+            </thead>
+            <tbody className="text-xs font-medium text-slate-700 divide-y divide-slate-100">
+              {filteredSubjects.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-slate-400 font-medium">
+                    Aucune matière trouvée.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredSubjects.map((sub) => (
+                  <tr key={sub.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-6 font-mono font-bold text-slate-900">{sub.code}</td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-900">{sub.name}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-800 font-mono">Coef {sub.coefficient}</td>
+                    <td className="py-3.5 px-4 text-slate-500">
+                      <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-md text-[10px] font-semibold border border-slate-200">
+                        {sub.classCategory.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-6 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedSubj(sub);
+                            setFormData(sub);
+                            setIsModalOpen(true);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                          title="Modifier"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingSubjId(sub.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4 text-rose-500" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modal: Add/Edit Subject */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl space-y-6">
-            <h2 className="text-xl font-black text-slate-900 uppercase">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 w-full max-w-md shadow-2xl space-y-5 border border-slate-200">
+            <h2 className="text-base font-bold text-slate-900">
               {selectedSubj ? 'Modifier la Matière' : 'Nouvelle Matière'}
             </h2>
 
-            <form onSubmit={handleSubmit} className="space-y-4 text-xs font-bold">
+            <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Code (Ex: MATH, FRAN) *</label>
+                <label className="font-semibold text-slate-700">Code (Ex: MATH, FRAN) *</label>
                 <input
                   type="text"
                   required
                   value={formData.code}
                   onChange={e => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full font-mono font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-900"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intitulé Complet *</label>
+                <label className="font-semibold text-slate-700">Intitulé Complet *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={e => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-900"
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Coefficient *</label>
+                  <label className="font-semibold text-slate-700">Coefficient *</label>
                   <input
                     type="number"
                     required
@@ -223,16 +225,16 @@ export const SubjectsModule: React.FC = () => {
                     max={10}
                     value={formData.coefficient}
                     onChange={e => setFormData({ ...formData, coefficient: Number(e.target.value) })}
-                    className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full font-black text-slate-900 outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-slate-900 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cycle *</label>
+                  <label className="font-semibold text-slate-700">Cycle *</label>
                   <select
                     value={formData.classCategory}
                     onChange={e => setFormData({ ...formData, classCategory: e.target.value as SchoolLevelCategory })}
-                    className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-full text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
                   >
                     {MALI_SCHOOL_LEVEL_CATEGORIES.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.label}</option>
@@ -241,17 +243,17 @@ export const SubjectsModule: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex justify-end gap-2.5 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-full transition-all cursor-pointer"
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold cursor-pointer transition-colors"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-xs cursor-pointer transition-colors"
                 >
                   Enregistrer
                 </button>
@@ -263,29 +265,29 @@ export const SubjectsModule: React.FC = () => {
 
       {/* Modal: Delete Confirmation */}
       {deletingSubjId && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl space-y-6 text-center">
-            <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
-              <Trash2 className="w-7 h-7" />
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 sm:p-7 max-w-sm w-full shadow-2xl space-y-5 text-center border border-slate-200">
+            <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-900 uppercase">Supprimer cette Matière ?</h2>
-              <p className="text-xs text-slate-500 mt-2 font-semibold">
+              <h2 className="text-lg font-bold text-slate-900">Supprimer cette Matière ?</h2>
+              <p className="text-xs text-slate-500 mt-1.5 font-medium">
                 Cette action supprimera définitivement cette matière du programme scolaire.
               </p>
             </div>
-            <div className="flex justify-center gap-3 pt-2">
+            <div className="flex justify-center gap-2.5 pt-1">
               <button
                 onClick={() => setDeletingSubjId(null)}
-                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-full transition-all cursor-pointer"
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
               >
                 Annuler
               </button>
               <button
                 onClick={() => handleDeleteConfirm(deletingSubjId)}
-                className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
               >
-                Confirmer Suppression
+                Supprimer
               </button>
             </div>
           </div>

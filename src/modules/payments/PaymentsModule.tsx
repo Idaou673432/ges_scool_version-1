@@ -8,7 +8,7 @@ import {
   Printer, FileText, Smartphone, X, Users, Filter, AlertCircle, XCircle, Clock, UserCheck, ArrowRight,
   FileSpreadsheet, TrendingUp, TrendingDown, PieChart, Wallet, MinusCircle, ArrowUpRight, ArrowDownRight,
   ShieldAlert, BellRing, FileCheck, Calendar, AlertTriangle, SendHorizontal, Sparkles, RefreshCw, Eye, Trash2, Edit3, Lock, Key, Save,
-  Cloud, Laptop, Share2, Copy, Check, Phone, MessageSquare
+  Cloud, Laptop, Share2, Copy, Check, Phone, MessageSquare, ChevronDown, ChevronUp, EyeOff
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { Payment, PaymentCategory, PaymentMethod, Student, Expense, ExpenseCategory, TuitionInvoice, InvoiceStatus } from '../../types';
@@ -170,6 +170,27 @@ export const PaymentsModule: React.FC = () => {
     messageText: string;
   } | null>(null);
   const [reminderCopied, setReminderCopied] = useState(false);
+
+  // User toggle for financial alert summary cards ("Masquer cette partie")
+  const [showFinancialAlertCards, setShowFinancialAlertCards] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('kalangest_show_financial_alert_cards') === 'true';
+    } catch {
+      return false; // Hidden by default so user sees the whole table immediately
+    }
+  });
+
+  const toggleShowFinancialAlertCards = () => {
+    setShowFinancialAlertCards(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('kalangest_show_financial_alert_cards', String(next));
+      } catch (e) {
+        console.warn(e);
+      }
+      return next;
+    });
+  };
 
   const openWhatsAppModal = (p: Payment) => {
     const student = students.find(s => s.id === p.studentId);
@@ -769,41 +790,41 @@ export const PaymentsModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase flex items-center gap-3">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
             <CreditCard className="w-7 h-7 text-blue-900" />
-            <span>Gestion Financière, Caisse & Scolarités FCFA</span>
+            <span>Gestion Financière, Caisse & Scolarités</span>
           </h1>
-          <p className="text-xs font-bold text-slate-400 mt-1">
-            Suivi des encaissements • Reçus officiels • Journal des Dépenses • Bilans financiers & Relances WhatsApp
+          <p className="text-xs text-slate-500 font-medium mt-1">
+            Suivi des encaissements en FCFA • Reçus officiels • Dépenses • Bilans & Relances directes
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {payments.length > 0 && (
             <button
               onClick={() => setShowDeleteAllModal(true)}
-              className="flex items-center gap-2 px-5 py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-rose-600/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors cursor-pointer"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-4 h-4 text-rose-600" />
               <span>Supprimer Tout ({payments.length})</span>
             </button>
           )}
 
           <button
             onClick={() => handleOpenAddForStudent()}
-            className="flex items-center gap-2 px-6 py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-amber-400" />
             <span>Nouveau Règlement</span>
           </button>
           
           <button
             onClick={() => setIsExpenseModalOpen(true)}
-            className="flex items-center gap-2 px-5 py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-800 font-black text-[10px] uppercase tracking-widest rounded-full border border-rose-200 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
           >
             <MinusCircle className="w-4 h-4 text-rose-600" />
             <span>Enregistrer Dépense</span>
@@ -813,9 +834,9 @@ export const PaymentsModule: React.FC = () => {
 
       {/* Sync Toast Feedback */}
       {syncToast && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-black flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fadeIn">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{syncToast}</span>
           </div>
           <button onClick={() => setSyncToast(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
@@ -827,40 +848,40 @@ export const PaymentsModule: React.FC = () => {
       {/* Financial Balance & KPI Overview Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Recettes Total */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black shrink-0">
-              <ArrowUpRight className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-100">
+              <ArrowUpRight className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Recettes Encaissées</p>
-              <p className="text-lg font-black text-emerald-800 mt-0.5">{formatFCFA(totalCollected)}</p>
+              <p className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Recettes Encaissées</p>
+              <p className="text-lg font-black text-slate-900 font-mono mt-0.5">{formatFCFA(totalCollected)}</p>
             </div>
           </div>
         </div>
 
         {/* Dépenses Total */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-black shrink-0">
-              <ArrowDownRight className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0 border border-rose-100">
+              <ArrowDownRight className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Dépenses</p>
-              <p className="text-lg font-black text-rose-700 mt-0.5">{formatFCFA(totalExpenses)}</p>
+              <p className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Total Dépenses</p>
+              <p className="text-lg font-black text-rose-700 font-mono mt-0.5">{formatFCFA(totalExpenses)}</p>
             </div>
           </div>
         </div>
 
         {/* Solde Net de Caisse */}
-        <div className="bg-gradient-to-r from-slate-900 to-blue-950 p-6 rounded-[2rem] text-white shadow-md flex items-center justify-between">
+        <div className="bg-slate-900 p-5 sm:p-6 rounded-2xl text-white shadow-sm flex items-center justify-between border border-slate-800">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 text-emerald-400 flex items-center justify-center font-black shrink-0 border border-white/10">
-              <Wallet className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-xl bg-white/10 text-emerald-400 flex items-center justify-center shrink-0 border border-white/10">
+              <Wallet className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-300 tracking-wider">Solde Net en Caisse</p>
-              <p className={`text-xl font-black mt-0.5 font-mono ${netBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <p className="text-[11px] font-bold uppercase text-slate-300 tracking-wider">Solde Net en Caisse</p>
+              <p className={`text-lg font-black mt-0.5 font-mono ${netBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                 {formatFCFA(netBalance)}
               </p>
             </div>
@@ -868,24 +889,24 @@ export const PaymentsModule: React.FC = () => {
         </div>
 
         {/* Reste à Recouvrer & Progress Bar */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between space-y-2">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-2">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Reste à Recouvrer</p>
-              <p className="text-lg font-black text-amber-600 mt-0.5">{formatFCFA(totalRemainingToCollect)}</p>
+              <p className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">Reste à Recouvrer</p>
+              <p className="text-lg font-black text-amber-700 font-mono mt-0.5">{formatFCFA(totalRemainingToCollect)}</p>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-black text-xs shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center font-bold text-xs shrink-0 font-mono">
               {recoveryRate}%
             </div>
           </div>
           <div>
-            <div className="flex justify-between text-[9px] font-bold text-slate-400 mb-1">
-              <span>Taux de Recouvrement Global</span>
-              <span>{totalStudentsCount - unpaidCount}/{totalStudentsCount} Régularisés</span>
+            <div className="flex justify-between text-[10px] font-semibold text-slate-400 mb-1">
+              <span>Recouvrement Global</span>
+              <span>{totalStudentsCount - unpaidCount}/{totalStudentsCount} régularisés</span>
             </div>
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-amber-500 to-emerald-500 rounded-full transition-all duration-500"
+                className="h-full bg-slate-900 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, recoveryRate)}%` }}
               />
             </div>
@@ -893,147 +914,65 @@ export const PaymentsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Visual Notification System for Overdue & Unpaid Students */}
-      {(unpaidCount + partialCount) > 0 && (
-        <div className="bg-gradient-to-r from-rose-950 via-slate-900 to-amber-950 p-6 rounded-[2.2rem] text-white shadow-xl border border-rose-500/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 animate-in fade-in slide-in-from-top-3">
-          <div className="flex items-start sm:items-center gap-4">
-            <div className="w-13 h-13 rounded-2xl bg-rose-600/30 border border-rose-400/50 flex items-center justify-center shrink-0 relative">
-              <span className="relative flex h-6 w-6">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                <AlertTriangle className="relative inline-flex w-6 h-6 text-rose-300" />
-              </span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-3 py-0.5 bg-rose-600 text-white font-black text-[9px] uppercase tracking-widest rounded-full shadow-xs animate-pulse">
-                  🚨 Système d'Alerte Immédiate Impayés
-                </span>
-                <span className="text-xs font-bold text-rose-200">
-                  {unpaidCount + partialCount} élève(s) en retard ou avec solde dû
-                </span>
-              </div>
-              <p className="text-sm font-black text-white mt-1.5 leading-snug">
-                Reste total à recouvrer : <strong className="text-amber-300 font-mono text-base">{formatFCFA(unpaidTotal + partialTotal)}</strong>
-                {' • '}
-                <span className="text-rose-200 font-normal">
-                  <strong className="text-white font-black">{unpaidCount}</strong> élève(s) à 0 FCFA versé et{' '}
-                  <strong className="text-white font-black">{partialCount}</strong> avec mensualités partielles.
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap self-stretch sm:self-end lg:self-center">
-            {unpaidCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('STUDENTS_FINANCES');
-                  setStatusFilter(statusFilter === 'UNPAID' ? 'ALL' : 'UNPAID');
-                }}
-                className={`px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-md ${
-                  statusFilter === 'UNPAID' && activeTab === 'STUDENTS_FINANCES'
-                    ? 'bg-white text-rose-950 ring-2 ring-rose-300'
-                    : 'bg-rose-600 hover:bg-rose-500 text-white'
-                }`}
-                title="Filtrer immédiatement les élèves en retard critique (0 FCFA versé)"
-              >
-                <AlertCircle className="w-3.5 h-3.5 text-white" />
-                <span>{unpaidCount} Retard{unpaidCount > 1 ? 's' : ''} Critique (0 FCFA)</span>
-              </button>
-            )}
-
-            {partialCount > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('STUDENTS_FINANCES');
-                  setStatusFilter(statusFilter === 'PARTIEL' ? 'ALL' : 'PARTIEL');
-                }}
-                className={`px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-md ${
-                  statusFilter === 'PARTIEL' && activeTab === 'STUDENTS_FINANCES'
-                    ? 'bg-white text-amber-950 ring-2 ring-amber-300'
-                    : 'bg-amber-600 hover:bg-amber-500 text-white'
-                }`}
-                title="Filtrer immédiatement les élèves ayant un solde partiel restant"
-              >
-                <Clock className="w-3.5 h-3.5 text-white" />
-                <span>{partialCount} Solde{partialCount > 1 ? 's' : ''} Partiel</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsBatchReminderModalOpen(true)}
-              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-full shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-              title="Envoyer des rappels automatiques WhatsApp aux parents concernés"
-            >
-              <MessageCircle className="w-3.5 h-3.5 text-slate-950" />
-              <span>Relance WhatsApp</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Tabs Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-2">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveTab('STUDENTS_FINANCES')}
-            className={`px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'STUDENTS_FINANCES'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Situation Financière des Élèves ({students.length})</span>
+            <span>Situation Financière ({students.length})</span>
             {(unpaidCount + partialCount) > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black flex items-center gap-1 shadow-xs ${
-                activeTab === 'STUDENTS_FINANCES' ? 'bg-rose-500 text-white animate-pulse' : 'bg-rose-100 text-rose-700'
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 ${
+                activeTab === 'STUDENTS_FINANCES' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-700'
               }`}>
                 <AlertTriangle className="w-3 h-3" />
-                <span>{unpaidCount + partialCount} Impayés</span>
+                <span>{unpaidCount + partialCount}</span>
               </span>
             )}
           </button>
 
           <button
             onClick={() => setActiveTab('TRANSACTIONS')}
-            className={`px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'TRANSACTIONS'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
             <Receipt className="w-4 h-4" />
-            <span>Journal de Caisse - Encaissements ({payments.length})</span>
+            <span>Journal de Caisse ({payments.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('EXPENSES')}
-            className={`px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'EXPENSES'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
             <MinusCircle className="w-4 h-4" />
-            <span>Journal des Dépenses ({expenses.length})</span>
+            <span>Dépenses ({expenses.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('INVOICES')}
-            className={`px-6 py-3 rounded-full text-xs font-black uppercase tracking-widest transition-all cursor-pointer flex items-center gap-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === 'INVOICES'
-                ? 'bg-blue-900 text-white shadow-md'
-                : 'bg-white text-slate-500 hover:bg-slate-100 border border-slate-100'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200/80'
             }`}
           >
             <FileText className="w-4 h-4" />
-            <span>Factures & Échéances ({invoices.length})</span>
+            <span>Factures ({invoices.length})</span>
             {overdueInvoicesCount > 0 && (
-              <span className="px-2 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full animate-pulse">
+              <span className="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-md">
                 {overdueInvoicesCount}
               </span>
             )}
@@ -1044,29 +983,29 @@ export const PaymentsModule: React.FC = () => {
         {activeTab === 'STUDENTS_FINANCES' && (
           <button
             onClick={handleExportStudentsCsv}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[10px] uppercase tracking-widest rounded-full border border-slate-200 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
             title="Exporter la situation financière de tous les élèves en CSV Excel"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Exporter Scolarités (CSV)</span>
+            <span>Export Scolarités (CSV)</span>
           </button>
         )}
 
         {activeTab === 'INVOICES' && (
           <button
             onClick={handleExportInvoicesCsv}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[10px] uppercase tracking-widest rounded-full border border-slate-200 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
             title="Exporter le registre des factures de scolarité en CSV"
           >
             <FileSpreadsheet className="w-4 h-4 text-blue-600" />
-            <span>Exporter Factures (CSV)</span>
+            <span>Export Factures (CSV)</span>
           </button>
         )}
 
         {activeTab === 'TRANSACTIONS' && (
           <button
             onClick={handleExportTransactionsCsv}
-            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-black text-[10px] uppercase tracking-widest rounded-full border border-slate-200 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
             title="Exporter l'historique des reçus de caisse en CSV"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
@@ -1099,116 +1038,169 @@ export const PaymentsModule: React.FC = () => {
 
       {/* TAB 1: Situation Financière de TOUS les Élèves */}
       {activeTab === 'STUDENTS_FINANCES' && (
-        <div className="space-y-6">
-          {/* Centre de Notifications Visuelles pour Retards & Impayés */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Carte 1: Alerte Critique - 0 FCFA Versé */}
-            <div 
-              onClick={() => setStatusFilter(statusFilter === 'UNPAID' ? 'ALL' : 'UNPAID')}
-              className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
-                statusFilter === 'UNPAID'
-                  ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-500 shadow-md'
-                  : 'bg-white border-rose-100 hover:border-rose-300 hover:shadow-sm'
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
-                      <span className="relative flex h-4 w-4">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-600"></span>
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Alerte Retard Critique</span>
-                      <h3 className="text-2xl font-black text-rose-950 mt-0.5">{unpaidCount} Élève{unpaidCount > 1 ? 's' : ''}</h3>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 bg-rose-600 text-white text-[9px] font-black rounded-full uppercase tracking-wider shadow-xs animate-pulse">
-                    0 FCFA Versé
-                  </span>
-                </div>
-                <p className="text-xs text-rose-800 font-bold mt-3">
-                  Élèves n'ayant encore effectué aucun paiement pour l'année scolaire en cours.
-                </p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-rose-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-bold">Total découvert impayé :</span>
-                <span className="font-black text-rose-700 font-mono text-sm">{formatFCFA(unpaidTotal)}</span>
-              </div>
+        <div className="space-y-4">
+          {/* Quick Header & Toggle Bar for Impayés ("Masquer cette partie") */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200/80 px-5 py-3 rounded-2xl shadow-xs">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                Impayés & Retards :
+              </span>
+              <span className="px-2.5 py-1 bg-rose-100 text-rose-800 text-[10px] font-black rounded-full flex items-center gap-1 shadow-2xs">
+                <AlertCircle className="w-3 h-3 text-rose-600" />
+                <span>{unpaidCount} Retard(s) Critique(s) (0 FCFA)</span>
+              </span>
+              <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-[10px] font-black rounded-full flex items-center gap-1">
+                <Clock className="w-3 h-3 text-amber-600" />
+                <span>{partialCount} Solde(s) Partiel(s)</span>
+              </span>
+              <span className="text-xs font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                Reste dû : {formatFCFA(unpaidTotal + partialTotal)}
+              </span>
             </div>
 
-            {/* Carte 2: Attention - Soldes Partiels Incomplets */}
-            <div 
-              onClick={() => setStatusFilter(statusFilter === 'PARTIEL' ? 'ALL' : 'PARTIEL')}
-              className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
-                statusFilter === 'PARTIEL'
-                  ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-500 shadow-md'
-                  : 'bg-white border-amber-100 hover:border-amber-300 hover:shadow-sm'
-              }`}
-            >
-              <div>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
-                      <Clock className="w-6 h-6 text-amber-600" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-amber-600 tracking-wider">Soldes Partiels en Attente</span>
-                      <h3 className="text-2xl font-black text-amber-950 mt-0.5">{partialCount} Élève{partialCount > 1 ? 's' : ''}</h3>
-                    </div>
-                  </div>
-                  <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black rounded-full uppercase tracking-wider">
-                    Solde Dû
-                  </span>
-                </div>
-                <p className="text-xs text-amber-800 font-bold mt-3">
-                  Élèves ayant versé un acompte mais avec des mensualités en souffrance.
-                </p>
-              </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleShowFinancialAlertCards}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                title={showFinancialAlertCards ? "Masquer cette partie pour libérer tout l'espace d'affichage" : "Afficher les 3 cartes de synthèse des impayés"}
+              >
+                {showFinancialAlertCards ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Masquer cette partie</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 text-blue-900" />
+                    <span>Afficher la synthèse</span>
+                  </>
+                )}
+              </button>
 
-              <div className="mt-4 pt-3 border-t border-amber-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500 font-bold">Reste à recouvrer :</span>
-                <span className="font-black text-amber-700 font-mono text-sm">{formatFCFA(partialTotal)}</span>
-              </div>
-            </div>
-
-            {/* Carte 3: Actions Express & Relances Directes */}
-            <div className="p-6 rounded-[2rem] border border-blue-900 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white flex flex-col justify-between shadow-md">
-              <div>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-sky-300 tracking-wider flex items-center gap-1.5">
-                      <BellRing className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
-                      Actions de Recouvrement
-                    </span>
-                    <h3 className="text-xl font-black text-white mt-1">
-                      {unpaidCount + partialCount} Dossiers en Retard
-                    </h3>
-                  </div>
-                  <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/15">
-                    <ShieldAlert className="w-5 h-5 text-amber-300" />
-                  </div>
-                </div>
-                <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-                  Envoyez un rappel automatique WhatsApp aux parents d'élèves en retard ou imprimez les relevés de compte.
-                </p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsBatchReminderModalOpen(true)}
-                  className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Relancer par WhatsApp ({unpaidCount + partialCount})</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsBatchReminderModalOpen(true)}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                title="Relancer en lot les parents par WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Relance WhatsApp ({unpaidCount + partialCount})</span>
+              </button>
             </div>
           </div>
+
+          {/* Centre de Notifications Visuelles pour Retards & Impayés (Affichage facultatif / masquable) */}
+          {showFinancialAlertCards && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
+              {/* Carte 1: Alerte Critique - 0 FCFA Versé */}
+              <div 
+                onClick={() => setStatusFilter(statusFilter === 'UNPAID' ? 'ALL' : 'UNPAID')}
+                className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                  statusFilter === 'UNPAID'
+                    ? 'bg-rose-50 border-rose-400 ring-2 ring-rose-500 shadow-md'
+                    : 'bg-white border-rose-100 hover:border-rose-300 hover:shadow-sm'
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 border border-rose-200">
+                        <span className="relative flex h-4 w-4">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-600"></span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Alerte Retard Critique</span>
+                        <h3 className="text-2xl font-black text-rose-950 mt-0.5">{unpaidCount} Élève{unpaidCount > 1 ? 's' : ''}</h3>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-rose-600 text-white text-[9px] font-black rounded-full uppercase tracking-wider shadow-xs animate-pulse">
+                      0 FCFA Versé
+                    </span>
+                  </div>
+                  <p className="text-xs text-rose-800 font-bold mt-3">
+                    Élèves n'ayant encore effectué aucun paiement pour l'année scolaire en cours.
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-rose-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-bold">Total découvert impayé :</span>
+                  <span className="font-black text-rose-700 font-mono text-sm">{formatFCFA(unpaidTotal)}</span>
+                </div>
+              </div>
+
+              {/* Carte 2: Attention - Soldes Partiels Incomplets */}
+              <div 
+                onClick={() => setStatusFilter(statusFilter === 'PARTIEL' ? 'ALL' : 'PARTIEL')}
+                className={`p-6 rounded-[2rem] border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                  statusFilter === 'PARTIEL'
+                    ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-500 shadow-md'
+                    : 'bg-white border-amber-100 hover:border-amber-300 hover:shadow-sm'
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200">
+                        <Clock className="w-6 h-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-amber-600 tracking-wider">Soldes Partiels en Attente</span>
+                        <h3 className="text-2xl font-black text-amber-950 mt-0.5">{partialCount} Élève{partialCount > 1 ? 's' : ''}</h3>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-black rounded-full uppercase tracking-wider">
+                      Solde Dû
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-800 font-bold mt-3">
+                    Élèves ayant versé un acompte mais avec des mensualités en souffrance.
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-amber-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-bold">Reste à recouvrer :</span>
+                  <span className="font-black text-amber-700 font-mono text-sm">{formatFCFA(partialTotal)}</span>
+                </div>
+              </div>
+
+              {/* Carte 3: Actions Express & Relances Directes */}
+              <div className="p-6 rounded-[2rem] border border-blue-900 bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 text-white flex flex-col justify-between shadow-md">
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-sky-300 tracking-wider flex items-center gap-1.5">
+                        <BellRing className="w-3.5 h-3.5 text-amber-400 animate-bounce" />
+                        Actions de Recouvrement
+                      </span>
+                      <h3 className="text-xl font-black text-white mt-1">
+                        {unpaidCount + partialCount} Dossiers en Retard
+                      </h3>
+                    </div>
+                    <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/15">
+                      <ShieldAlert className="w-5 h-5 text-amber-300" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                    Envoyez un rappel automatique WhatsApp aux parents d'élèves en retard ou imprimez les relevés de compte.
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-white/10 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsBatchReminderModalOpen(true)}
+                    className="w-full py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Relancer par WhatsApp ({unpaidCount + partialCount})</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Filters Bar */}
           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
@@ -1306,17 +1298,17 @@ export const PaymentsModule: React.FC = () => {
 
           {/* Students Financial Table with Visual Notifications */}
           <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50/50">
-                  <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50">
-                    <th className="py-4 px-8">Élève & Matricule</th>
-                    <th className="py-4 px-4">Classe</th>
-                    <th className="py-4 px-4">Total Payé (FCFA)</th>
-                    <th className="py-4 px-4">Reste Dû (FCFA)</th>
-                    <th className="py-4 px-4">Statut & Échéance</th>
-                    <th className="py-4 px-4">Parent Contact</th>
-                    <th className="py-4 px-8 text-right">Actions</th>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[960px]">
+                <thead className="bg-slate-50/80 sticky top-0 z-10 backdrop-blur-xs">
+                  <tr className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-200">
+                    <th className="py-3.5 px-6">Élève & Matricule</th>
+                    <th className="py-3.5 px-3">Classe</th>
+                    <th className="py-3.5 px-3">Total Payé (FCFA)</th>
+                    <th className="py-3.5 px-3">Reste Dû (FCFA)</th>
+                    <th className="py-3.5 px-3">Statut & Échéance</th>
+                    <th className="py-3.5 px-3">Parent Contact</th>
+                    <th className="py-3.5 px-6 text-right sticky right-0 bg-slate-50/95 backdrop-blur-xs z-20 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="text-sm font-bold text-slate-700">
@@ -1343,7 +1335,7 @@ export const PaymentsModule: React.FC = () => {
                               : 'border-b-slate-50 hover:bg-slate-50/50 border-l-4 border-l-emerald-500'
                           }`}
                         >
-                          <td className="py-4 px-8">
+                          <td className="py-3.5 px-6">
                             <div 
                               onClick={() => setSelectedStudentForDetails(item.student)}
                               className="flex items-center gap-3 cursor-pointer group"
@@ -1383,14 +1375,14 @@ export const PaymentsModule: React.FC = () => {
                             </div>
                           </td>
 
-                          <td className="py-4 px-4 font-bold text-slate-800">
+                          <td className="py-3.5 px-3 font-bold text-slate-800">
                             <div>{item.clsName}</div>
                             <div className="text-[10px] font-bold text-slate-400">
                               {item.evalCount} mensualité{item.evalCount > 1 ? 's' : ''} ({formatFCFA(item.annualFee)})
                             </div>
                           </td>
 
-                          <td className="py-4 px-4 font-black text-emerald-700">
+                          <td className="py-3.5 px-3 font-black text-emerald-700">
                             <div className="flex items-center justify-between text-xs">
                               <span>{formatFCFA(item.totalPaid)}</span>
                               <span className="text-[10px] text-slate-400 font-bold">{item.percentPaid}%</span>
@@ -1403,7 +1395,7 @@ export const PaymentsModule: React.FC = () => {
                             </div>
                           </td>
 
-                          <td className="py-4 px-4">
+                          <td className="py-3.5 px-3">
                             <span className={`font-black font-mono text-sm block ${
                               isCriticalUnpaid ? 'text-rose-600 font-black' : isPartial ? 'text-amber-700' : 'text-slate-400'
                             }`}>
@@ -1422,7 +1414,7 @@ export const PaymentsModule: React.FC = () => {
                             )}
                           </td>
 
-                          <td className="py-4 px-4">
+                          <td className="py-3.5 px-3">
                             {isUpToDate && (
                               <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
                                 <CheckCircle2 className="w-3 h-3" />
@@ -1443,19 +1435,19 @@ export const PaymentsModule: React.FC = () => {
                             )}
                           </td>
 
-                          <td className="py-4 px-4 text-xs font-mono text-slate-500">
+                          <td className="py-3.5 px-3 text-xs font-mono text-slate-500">
                             <span className="flex items-center gap-1">
                               <Smartphone className="w-3 h-3 text-slate-400 shrink-0" />
                               {item.student.parent.fatherPhone || item.student.parent.motherPhone || 'Non renseigné'}
                             </span>
                           </td>
 
-                          <td className="py-4 px-8 text-right">
-                            <div className="flex items-center justify-end gap-2">
+                          <td className="py-3.5 px-6 text-right sticky right-0 bg-white/95 backdrop-blur-xs z-10 border-l border-slate-200/80 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.04)]">
+                            <div className="flex items-center justify-end gap-1.5 flex-nowrap">
                               {item.remaining > 0 && (
                                 <button
                                   onClick={() => handleOpenAddForStudent(item.student)}
-                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-xs shrink-0"
                                   title="Encaisser un versement pour cet élève"
                                 >
                                   <Plus className="w-3.5 h-3.5" />
@@ -1466,7 +1458,7 @@ export const PaymentsModule: React.FC = () => {
                               {item.remaining > 0 && (
                                 <button
                                   onClick={() => handleOpenUnpaidReminder(item)}
-                                  className="px-3.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
+                                  className="px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 font-black text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-xs active:scale-95 shrink-0"
                                   title="Générer automatiquement un message type pour WhatsApp ou SMS rappelant le solde restant à régler"
                                 >
                                   <MessageCircle className="w-3.5 h-3.5 text-amber-800" />
@@ -1476,7 +1468,7 @@ export const PaymentsModule: React.FC = () => {
 
                               <button
                                 onClick={() => setSelectedStudentForDetails(item.student)}
-                                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-black text-[10px] uppercase tracking-wider rounded-full transition-all cursor-pointer flex items-center gap-1"
+                                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-black text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer flex items-center gap-1 shrink-0"
                                 title="Consulter l'historique complet des paiements et la fiche financière de l'élève"
                               >
                                 <Eye className="w-3.5 h-3.5 text-blue-900" />
@@ -3306,26 +3298,26 @@ export const PaymentsModule: React.FC = () => {
               </div>
 
               <textarea
-                rows={9}
+                rows={5}
                 value={unpaidReminderModalData.messageText}
                 onChange={e => {
                   const val = e.target.value;
                   setUnpaidReminderModalData(prev => prev ? ({ ...prev, messageText: val }) : null);
                 }}
-                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-medium text-slate-800 leading-relaxed outline-none focus:ring-2 focus:ring-blue-900 resize-y"
+                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-medium text-slate-800 leading-relaxed outline-none focus:ring-2 focus:ring-blue-900 resize-y"
               />
               <p className="text-[11px] text-slate-400 font-medium">
                 💡 Vous pouvez ajouter les comptes de paiement Orange Money, Moov Money ou une date limite avant d'envoyer.
               </p>
             </div>
 
-            {/* Action Buttons: WhatsApp, SMS, Copier, Fermer */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-slate-100">
+            {/* Action Buttons: WhatsApp, SMS, Copier, Fermer (Sticky bottom so always fully visible) */}
+            <div className="sticky bottom-0 bg-white/95 backdrop-blur-xs pt-3 pb-1 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-2.5 z-10">
               {/* WhatsApp Button */}
               <button
                 type="button"
                 onClick={handleSendReminderViaWhatsApp}
-                className="w-full sm:flex-1 py-3.5 px-5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full sm:flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>Envoyer par WhatsApp</span>
@@ -3335,7 +3327,7 @@ export const PaymentsModule: React.FC = () => {
               <button
                 type="button"
                 onClick={handleSendReminderViaSMS}
-                className="w-full sm:flex-1 py-3.5 px-5 bg-blue-900 hover:bg-blue-800 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg shadow-blue-900/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full sm:flex-1 py-3 px-4 bg-blue-900 hover:bg-blue-800 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md shadow-blue-900/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>Envoyer par SMS</span>
@@ -3345,10 +3337,10 @@ export const PaymentsModule: React.FC = () => {
               <button
                 type="button"
                 onClick={handleCopyReminderMessage}
-                className="w-full sm:w-auto py-3.5 px-4 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-black text-xs rounded-2xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                className="w-full sm:w-auto py-3 px-4 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-black text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
                 title="Copier le texte dans le presse-papier"
               >
-                {reminderCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                {reminderCopied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-600" />}
                 <span>{reminderCopied ? 'Copié !' : 'Copier'}</span>
               </button>
 
@@ -3356,7 +3348,7 @@ export const PaymentsModule: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setUnpaidReminderModalData(null)}
-                className="w-full sm:w-auto py-3.5 px-5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black text-xs uppercase tracking-wider rounded-2xl transition-all cursor-pointer"
+                className="w-full sm:w-auto py-3 px-4 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer"
               >
                 Fermer
               </button>

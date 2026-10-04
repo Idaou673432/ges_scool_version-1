@@ -1169,16 +1169,63 @@ export class PdfService {
   }
 
   /**
-   * Génère la Carte Scolaire Numérique
+   * Génère la Carte Scolaire Numérique (Compatible Scanner Mobile Externe & URL Directe)
    */
-  public static async generateStudentCardQr(student: Student): Promise<string> {
-    const payload = JSON.stringify({
+  public static async generateStudentCardQr(
+    student: Student,
+    extra?: {
+      className?: string;
+      average?: number;
+      rank?: number | string;
+      totalAbsences?: number;
+      annualFee?: number;
+      totalPaid?: number;
+      remainingAmount?: number;
+      schoolName?: string;
+    }
+  ): Promise<string> {
+    const origin = typeof window !== 'undefined' && window.location?.origin
+      ? `${window.location.origin}${window.location.pathname}`
+      : '';
+
+    const payload = {
+      id: student.id,
       matricule: student.matricule,
-      name: `${student.firstName} ${student.lastName}`,
+      name: `${student.lastName.toUpperCase()} ${student.firstName}`,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      classId: student.classId,
+      className: extra?.className || '',
       status: student.status,
-      year: student.academicYear
+      academicYear: student.academicYear,
+      bloodType: student.bloodType || 'O+',
+      emergencyContact: student.emergencyContact || student.parent?.fatherPhone || student.parent?.motherPhone || '',
+      allergies: student.allergies || 'Aucune allergie connue',
+      average: extra?.average,
+      rank: extra?.rank,
+      totalAbsences: extra?.totalAbsences,
+      annualFee: extra?.annualFee,
+      totalPaid: extra?.totalPaid,
+      remainingAmount: extra?.remainingAmount,
+      fatherName: student.parent?.fatherName,
+      fatherPhone: student.parent?.fatherPhone,
+      motherName: student.parent?.motherName,
+      motherPhone: student.parent?.motherPhone,
+      address: student.address || student.parent?.guardianAddress,
+      schoolName: extra?.schoolName
+    };
+
+    const jsonString = JSON.stringify(payload);
+    // Encode as web URL so mobile phones outside the app open the classy card view directly in their browser
+    const qrValue = origin 
+      ? `${origin}?student_qr=${encodeURIComponent(jsonString)}`
+      : jsonString;
+
+    return QRCode.toDataURL(qrValue, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 256
     });
-    return QRCode.toDataURL(payload);
   }
 
   /**

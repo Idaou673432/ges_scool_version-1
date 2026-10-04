@@ -66,6 +66,9 @@ export interface Student {
   admissionDate: string;
   academicYear: string; // Ex: '2025-2026'
   reductionPercent?: number; // Réduction exceptionnelle scolarité
+  bloodType?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+  allergies?: string;
+  emergencyContact?: string;
 }
 
 export type SchoolLevelCategory = 

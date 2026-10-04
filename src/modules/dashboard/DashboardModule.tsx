@@ -2,7 +2,7 @@
  * SomaSikolo - Dashboard Executive Overview Module
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   Users, 
   GraduationCap, 
@@ -18,11 +18,14 @@ import {
   CheckCircle2,
   PieChart as PieIcon,
   BarChart3,
-  Printer
+  Printer,
+  ArrowUpRight,
+  BookOpen,
+  Briefcase
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { useSchool } from '../../contexts/SchoolContext';
-import { formatFCFA } from '../../constants/maliEducation';
+import { formatFCFA, getMaliScoreAppreciation } from '../../constants/maliEducation';
 import { NavTab } from '../../components/layout/Sidebar';
 import { PdfService } from '../../services/pdfService';
 import { AcademicSuccessCharts } from '../../components/dashboard/AcademicSuccessCharts';
@@ -32,13 +35,53 @@ interface DashboardProps {
 }
 
 export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { stats, students, classes, payments, settings } = useSchool();
+  const { stats, students, classes, payments, settings, generateReportCard } = useSchool();
 
-  // Gender breakdown
-  const femaleCount = students.filter(s => s.gender === 'F' && s.status === 'ACTIF').length;
-  const maleCount = students.filter(s => s.gender === 'M' && s.status === 'ACTIF').length;
+  // Active students breakdown
+  const activeStudents = useMemo(() => students.filter(s => s.status === 'ACTIF'), [students]);
+  const femaleCount = useMemo(() => activeStudents.filter(s => s.gender === 'F').length, [activeStudents]);
+  const maleCount = useMemo(() => activeStudents.filter(s => s.gender === 'M').length, [activeStudents]);
 
-  // Chart data: Monthly revenue vs expenses
+  // Overall school average computed dynamically from active report cards
+  const schoolAverage = useMemo(() => {
+    let sum = 0;
+    let counted = 0;
+    activeStudents.forEach(s => {
+      const rep = generateReportCard(s.id, settings.activeTerm);
+      if (rep && rep.generalAverage > 0) {
+        sum += rep.generalAverage;
+        counted++;
+      }
+    });
+    return counted > 0 ? (sum / counted).toFixed(2) : '14.50';
+  }, [activeStudents, generateReportCard, settings.activeTerm]);
+
+  // Cycle distribution computed live from classes and students
+  const cycleData = useMemo(() => {
+    const cycleLabels: Record<string, { name: string; color: string }> = {
+      FONDAMENTAL_1: { name: '1er Cycle (1è-6è)', color: '#059669' },
+      FONDAMENTAL_2: { name: '2è Cycle (7è-9è DEF)', color: '#0d9488' },
+      LYCEE: { name: 'Lycée Général (BAC)', color: '#1e3a8a' },
+      TECHNIQUE: { name: 'Enseignement Technique', color: '#4f46e5' },
+      PROFESSIONNEL: { name: 'Formation Pro (CAP/BT)', color: '#d97706' },
+    };
+
+    const countMap: Record<string, number> = {};
+    activeStudents.forEach(s => {
+      const cls = classes.find(c => c.id === s.classId);
+      if (cls) {
+        countMap[cls.category] = (countMap[cls.category] || 0) + 1;
+      }
+    });
+
+    return Object.entries(cycleLabels).map(([cat, info]) => ({
+      name: info.name,
+      value: countMap[cat] || 0,
+      color: info.color
+    })).filter(item => item.value > 0);
+  }, [activeStudents, classes]);
+
+  // Monthly financial receipts vs expenses
   const financialData = [
     { month: 'Sept', Recettes: 1250000, Depenses: 650000 },
     { month: 'Oct', Recettes: 2450000, Depenses: 670000 },
@@ -47,130 +90,156 @@ export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
     { month: 'Janv', Recettes: 2300000, Depenses: 670000 },
   ];
 
-  // Distribution by level
-  const pieData = [
-    { name: '1er Cycle (1è-6è)', value: 120, color: '#10b981' },
-    { name: '2è Cycle (7è-9è DEF)', value: 145, color: '#0d9488' },
-    { name: 'Lycée Général (BAC)', value: 180, color: '#0284c7' },
-    { name: 'CAP / BT Technique', value: 65, color: '#6366f1' },
-  ];
-
-  const pendingList = payments.filter(p => p.remainingAmount > 0).slice(0, 5);
+  const pendingList = useMemo(() => {
+    return payments.filter(p => p.remainingAmount > 0).slice(0, 6);
+  }, [payments]);
 
   return (
-    <div className="space-y-8 pb-12">
-      {/* Top Banner / Welcome Card */}
-      <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-        <div>
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest mb-3 border border-emerald-100">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Système Officiel • MEN Mali ({settings.currentAcademicYear})</span>
+    <div className="space-y-6 pb-12">
+      {/* Executive Welcome & Actions Header */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs flex flex-col xl:flex-row items-start xl:items-center justify-between gap-5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-emerald-700">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Système Scolaire Officiel • MEN Mali</span>
+            <span aria-hidden="true" className="text-slate-300">·</span>
+            <span className="text-slate-500 font-mono">Année {settings.currentAcademicYear}</span>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Tableau de Bord Administratif
           </h1>
-          <p className="text-xs font-bold text-slate-400 mt-1 max-w-xl">
-            {settings.schoolName} — {settings.academyName} • {settings.capName}
+          <p className="text-xs text-slate-500 font-medium">
+            {settings.schoolName} — {settings.academyName || 'Académie'} • {settings.capName || 'CAP'}
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3">
+        {/* Action Button Bar */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
+            type="button"
             onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
-            className="flex items-center space-x-2 px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
-            title="Générer le Rapport Statistique Officiel pour le MEN / Académie"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-2xs transition-all cursor-pointer border border-amber-400/50"
+            title="Générer le Rapport Statistique Officiel pour l'Académie"
           >
-            <Printer className="w-4 h-4" />
-            <span>Rapport MEN Mali</span>
+            <Printer className="w-3.5 h-3.5" />
+            <span>Rapport MEN</span>
           </button>
           <button
+            type="button"
             onClick={() => onNavigate('students')}
-            className="flex items-center space-x-2 px-5 py-3 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
           >
-            <UserPlus className="w-4 h-4" />
+            <UserPlus className="w-3.5 h-3.5 text-slate-300" />
             <span>Inscrire Élève</span>
           </button>
           <button
+            type="button"
             onClick={() => onNavigate('payments')}
-            className="flex items-center space-x-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
           >
-            <Receipt className="w-4 h-4" />
-            <span>Encaissement</span>
+            <Receipt className="w-3.5 h-3.5" />
+            <span>Encaisser</span>
           </button>
           <button
+            type="button"
             onClick={() => onNavigate('attendance')}
-            className="flex items-center space-x-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition-all cursor-pointer border border-slate-200/80"
           >
-            <Calendar className="w-4 h-4" />
-            <span>Suivi Présences</span>
+            <Calendar className="w-3.5 h-3.5 text-slate-600" />
+            <span>Présences</span>
           </button>
           <button
+            type="button"
             onClick={() => onNavigate('bulletins')}
-            className="flex items-center space-x-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-md transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition-all cursor-pointer border border-slate-200/80"
           >
-            <FileCheck className="w-4 h-4" />
+            <FileCheck className="w-3.5 h-3.5 text-slate-600" />
             <span>Bulletins</span>
           </button>
         </div>
       </div>
 
-      {/* Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 4 Metric Tiles Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {/* Total Students */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Effectif Total</p>
-            <p className="text-5xl font-black text-blue-900 tracking-tighter">{stats.totalStudents}</p>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Effectif Total</span>
+            <Users className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full tracking-wide">
-              {femaleCount} Filles
-            </span>
-            <span className="text-[10px] font-black bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full tracking-wide">
-              {maleCount} Garçons
-            </span>
+          <div>
+            <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight font-mono tabular-nums">
+              {stats.totalStudents}
+            </p>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{femaleCount} filles</span>
+              <span aria-hidden="true" className="text-slate-300">·</span>
+              <span className="font-semibold text-slate-700">{maleCount} garçons</span>
+              <span aria-hidden="true" className="text-slate-300">·</span>
+              <span className="text-emerald-700 font-medium">Inscrits</span>
+            </div>
           </div>
         </div>
 
-        {/* Classes */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Classes & Salles</p>
-            <p className="text-5xl font-black text-blue-900 tracking-tighter">{stats.totalClasses}</p>
+        {/* Classes & Teachers */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pédagogie</span>
+            <GraduationCap className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-[10px] font-black bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-full tracking-wide">
-              Fondamental & Lycée
-            </span>
+          <div>
+            <p className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight font-mono tabular-nums">
+              {stats.totalClasses}
+            </p>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{classes.length} divisions</span>
+              <span aria-hidden="true" className="text-slate-300">·</span>
+              <span className="font-semibold text-slate-700">{stats.totalTeachers} enseignants</span>
+            </div>
           </div>
         </div>
 
         {/* Revenue */}
-        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Recettes Encaissées</p>
-            <p className="text-4xl font-black text-blue-900 tracking-tighter">
-              {(stats.totalRevenueFCFA / 1000000).toFixed(1)}M <span className="text-sm font-bold text-slate-400">CFA</span>
-            </p>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-500 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Recettes Encaissées</span>
+            <CreditCard className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full tracking-wide">
-              Frais & Scolarité
-            </span>
+          <div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight font-mono tabular-nums">
+                {(stats.totalRevenueFCFA / 1000000).toFixed(2)}M
+              </span>
+              <span className="text-xs font-bold text-slate-500">FCFA</span>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="font-semibold text-emerald-700">{(stats.totalRevenueFCFA).toLocaleString()} FCFA</span>
+              <span aria-hidden="true" className="text-slate-300">·</span>
+              <span className="text-slate-400">Scolarité</span>
+            </div>
           </div>
         </div>
 
-        {/* Featured Average / Pending */}
-        <div className="bg-emerald-600 p-6 rounded-[2rem] shadow-lg shadow-emerald-600/20 text-white flex flex-col justify-between">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-white/70 mb-2">Moyenne Générale</p>
-            <p className="text-5xl font-black tracking-tighter">14.2<span className="text-2xl font-bold text-emerald-200">/20</span></p>
+        {/* Institution General Average */}
+        <div className="bg-slate-900 p-5 rounded-2xl shadow-sm text-white flex flex-col justify-between">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">Moyenne Générale</span>
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="mt-4 flex items-center gap-2">
-            <span className="text-[10px] font-black bg-white/20 text-white px-2.5 py-0.5 rounded-full tracking-wide">
-              Progression ↑ TRIM 1
-            </span>
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl sm:text-4xl font-black tracking-tight font-mono tabular-nums text-white">
+                {schoolAverage}
+              </span>
+              <span className="text-sm font-semibold text-slate-400">/ 20</span>
+            </div>
+            <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-300">
+              <span className="font-semibold text-emerald-300">
+                {getMaliScoreAppreciation(parseFloat(schoolAverage), 20).appreciation}
+              </span>
+              <span aria-hidden="true" className="text-slate-600">·</span>
+              <span className="text-slate-400">{settings.activeTerm?.replace('_', ' ') || 'Trimestre 1'}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -179,66 +248,76 @@ export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
       <AcademicSuccessCharts onNavigateToGrades={() => onNavigate('grades')} />
 
       {/* Charts & Treasury Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Financial Chart */}
-        <div className="lg:col-span-8 bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center">
+        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-3">
             <div>
-              <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">
+              <h2 className="text-base font-bold text-slate-900">
                 Évolution Financière Mensuelle
               </h2>
-              <p className="text-xs font-bold text-slate-400">Recettes Encaissées vs Charges Fixes (FCFA)</p>
+              <p className="text-xs text-slate-500">Recettes Encaissées vs Charges Fixes (FCFA)</p>
             </div>
-            <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded-full">
-              Année {settings.currentAcademicYear}
-            </span>
+            <div className="flex items-center gap-4 text-xs font-semibold">
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-2.5 h-2.5 rounded-sm bg-slate-900 inline-block" />
+                <span>Recettes</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-700">
+                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-600 inline-block" />
+                <span>Charges</span>
+              </div>
+            </div>
           </div>
 
-          <div className="h-64">
+          <div className="h-64 pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={financialData}>
+              <BarChart data={financialData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: '700' }} />
-                <YAxis tick={{ fontSize: 10, fontWeight: '700' }} tickFormatter={(val) => `${val / 1000}k`} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: '600', fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fontWeight: '600', fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val / 1000}k`} />
                 <Tooltip 
                   formatter={(val: any) => [`${formatFCFA(Number(val))}`, '']}
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}
                 />
-                <Bar dataKey="Recettes" fill="#1e3a8a" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="Depenses" fill="#059669" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Recettes" fill="#0f172a" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Depenses" fill="#059669" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Solde Trésorerie Box */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="bg-blue-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-between h-[200px] shadow-xl shadow-blue-900/30">
-            <div className="flex justify-between items-start">
-              <h2 className="text-xs font-black uppercase tracking-widest text-blue-200">Solde Trésorerie</h2>
-              <DollarSign className="w-6 h-6 text-blue-300" />
+        {/* Treasury & Cycle Distribution */}
+        <div className="lg:col-span-4 space-y-5">
+          {/* Treasury Balance Tile */}
+          <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-2xs flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Solde Caisse Réel</span>
+              <DollarSign className="w-5 h-5 text-emerald-400" />
             </div>
-            <p className="text-4xl font-black tracking-tight">
-              {(stats.totalRevenueFCFA).toLocaleString()} <span className="text-lg font-bold text-blue-300">CFA</span>
+            <p className="text-3xl font-black tracking-tight font-mono tabular-nums text-white">
+              {(stats.totalRevenueFCFA).toLocaleString()} <span className="text-sm font-semibold text-slate-400">FCFA</span>
             </p>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-wider text-blue-200">
-                <span>Objectif Annuel</span>
-                <span>85% Reach</span>
-              </div>
-              <div className="h-2 bg-blue-950 rounded-full w-full overflow-hidden">
-                <div className="h-full bg-emerald-500 w-[85%]" />
-              </div>
+            <div className="mt-4 pt-3 border-t border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+              <span>Exercice Comptable</span>
+              <span className="font-semibold text-white">{settings.currentAcademicYear}</span>
             </div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-6 shadow-sm">
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Cycles Éducatifs</h3>
-            <div className="space-y-3 text-xs font-bold">
-              {pieData.map((item) => (
+          {/* Educational Cycles Breakdown */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Cycles Éducatifs</h3>
+              <span className="text-[11px] text-slate-400 font-mono font-semibold">{activeStudents.length} élèves</span>
+            </div>
+            <div className="space-y-2.5 text-xs">
+              {cycleData.map((item) => (
                 <div key={item.name} className="flex justify-between items-center">
-                  <span className="text-slate-700">{item.name}</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] text-white" style={{ backgroundColor: item.color }}>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-slate-700 font-medium">{item.name}</span>
+                  </div>
+                  <span className="font-mono font-bold text-slate-900 tabular-nums">
                     {item.value} élève(s)
                   </span>
                 </div>
@@ -248,56 +327,66 @@ export const DashboardModule: React.FC<DashboardProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Recent Activity Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center">
+      {/* Priority Arrears & Unpaid Table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3">
           <div>
-            <h2 className="text-lg font-black tracking-tight text-slate-900 uppercase">
+            <h2 className="text-base font-bold text-slate-900">
               Relances Scolarités Dues
             </h2>
-            <p className="text-xs font-bold text-slate-400">Paiements partiels et arriérés prioritaires FCFA</p>
+            <p className="text-xs text-slate-500">Paiements partiels et arriérés prioritaires en FCFA</p>
           </div>
           <button
+            type="button"
             onClick={() => onNavigate('payments')}
-            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-full transition-all cursor-pointer"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition-all cursor-pointer"
           >
-            Gestion Comptable
+            Gestion Comptable Complète
           </button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50/50">
-              <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50">
-                <th className="px-8 py-4">N° Reçu</th>
-                <th className="px-4 py-4">Élève & Matricule</th>
-                <th className="px-4 py-4">Classe</th>
-                <th className="px-4 py-4">Versé (FCFA)</th>
-                <th className="px-4 py-4">Reste Dû</th>
-                <th className="px-8 py-4 text-right">Action</th>
+            <thead className="bg-slate-50/75 border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-6 py-3">N° Reçu</th>
+                <th className="px-4 py-3">Élève & Matricule</th>
+                <th className="px-4 py-3">Classe</th>
+                <th className="px-4 py-3">Versé</th>
+                <th className="px-4 py-3">Reste Dû</th>
+                <th className="px-6 py-3 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="text-sm font-bold text-slate-700">
-              {pendingList.map((p) => (
-                <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                  <td className="px-8 py-4 font-mono font-bold text-blue-900">{p.receiptNumber}</td>
-                  <td className="px-4 py-4">
-                    <p className="font-bold text-slate-900">{p.studentName}</p>
-                    <p className="text-[10px] text-slate-400 font-mono">{p.studentMatricule}</p>
-                  </td>
-                  <td className="px-4 py-4 text-xs">{p.className}</td>
-                  <td className="px-4 py-4 text-emerald-700">{formatFCFA(p.amountPaid)}</td>
-                  <td className="px-4 py-4 text-rose-600 font-black">{formatFCFA(p.remainingAmount)}</td>
-                  <td className="px-8 py-4 text-right">
-                    <button
-                      onClick={() => onNavigate('payments')}
-                      className="px-3 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase tracking-widest rounded-md hover:bg-emerald-200 transition-all"
-                    >
-                      Encaisser
-                    </button>
+            <tbody className="text-xs divide-y divide-slate-100 text-slate-700 font-medium">
+              {pendingList.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium">
+                    Tous les élèves sont à jour de leurs cotisations scolaires.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                pendingList.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-3 font-mono font-bold text-slate-800">{p.receiptNumber}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900">{p.studentName}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{p.studentMatricule}</p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{p.className}</td>
+                    <td className="px-4 py-3 font-mono text-emerald-700 font-semibold">{formatFCFA(p.amountPaid)}</td>
+                    <td className="px-4 py-3 font-mono text-rose-600 font-bold">{formatFCFA(p.remainingAmount)}</td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('payments')}
+                        className="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-lg transition-all cursor-pointer border border-emerald-200"
+                      >
+                        Encaisser
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
