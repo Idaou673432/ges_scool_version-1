@@ -62,17 +62,28 @@ export const CardsModule: React.FC = () => {
         const totalPaid = studentPayments.reduce((acc, p) => acc + p.amountPaid, 0);
         const annualFee = getAnnualTuitionFee(cls, settings.evaluationCount);
         const remaining = Math.max(0, annualFee - totalPaid);
-        const absences = attendanceRecords ? attendanceRecords.filter(r => r.studentId === std.id && (r.status === 'ABSENT_JUSTIFIED' || r.status === 'ABSENT_UNJUSTIFIED')).length : 0;
+        const stdRecords = attendanceRecords ? attendanceRecords.filter(r => r.studentId === std.id) : [];
+        const justifiedAbs = stdRecords.filter(r => r.status === 'ABSENT_JUSTIFIED').length;
+        const unjustifiedAbs = stdRecords.filter(r => r.status === 'ABSENT_UNJUSTIFIED').length;
+        const presents = stdRecords.filter(r => r.status === 'PRESENT').length;
+        const attRate = stdRecords.length > 0 ? Math.round((presents / stdRecords.length) * 100) : 100;
 
         map[std.id] = await PdfService.generateStudentCardQr(std, {
           className: cls?.name,
           average: card?.generalAverage,
+          maxScore: card?.maxScore || 20,
           rank: card?.rankInClass,
-          totalAbsences: absences,
+          totalClassStudents: card?.totalClassStudents || cls?.studentCount,
+          totalAbsences: justifiedAbs + unjustifiedAbs,
+          justifiedAbsences: justifiedAbs,
+          unjustifiedAbsences: unjustifiedAbs,
+          attendanceRate: attRate,
           annualFee,
           totalPaid,
           remainingAmount: remaining,
-          schoolName: settings.schoolName
+          schoolName: settings.schoolName,
+          academyName: settings.academyName,
+          directorName: settings.directorName
         });
       }
       setStudentQrs(map);
@@ -413,9 +424,15 @@ export const CardsModule: React.FC = () => {
                           <p className={`text-[9px] font-black uppercase tracking-widest ${themeStyles.accentText}`}>MATRICULE & GROUPE SANGUIN</p>
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-black text-sm text-amber-300 tracking-wider">{std.matricule}</span>
-                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black font-mono bg-rose-600/80 text-white border border-rose-400/50">
-                              🩸 {std.bloodType || 'O+'}
-                            </span>
+                            {std.bloodType ? (
+                              <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black font-mono bg-rose-600/80 text-white border border-rose-400/50">
+                                🩸 {std.bloodType}
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-medium text-slate-300 bg-white/10 border border-white/10">
+                                GS non précisé
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -485,9 +502,9 @@ export const CardsModule: React.FC = () => {
                         <div>
                           <p className={`text-[8px] font-black uppercase tracking-widest ${themeStyles.accentText}`}>DONNÉES MÉDICALES D'URGENCE</p>
                           <p className="text-white text-xs font-bold mt-0.5">
-                            Groupe Sanguin : <span className="text-amber-300 font-mono font-black">{std.bloodType || 'O+'}</span>
+                            Groupe Sanguin : <span className="text-amber-300 font-mono font-black">{std.bloodType || 'Non précisé'}</span>
                           </p>
-                          <p className="text-white/60 text-[9px] truncate">{std.allergies || 'Aucune allergie connue'}</p>
+                          <p className="text-white/60 text-[9px] truncate">{std.allergies || 'Aucune allergie particulière'}</p>
                         </div>
                       </div>
                     </div>

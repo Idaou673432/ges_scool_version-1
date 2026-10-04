@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle, Building2, ArrowRight } from 'lucide-react';
+import { Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle, Building2, ArrowRight, QrCode } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 
 interface LockScreenProps {
   onUnlock: () => void;
+  onOpenQrScanner?: () => void;
 }
 
-export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
+export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanner }) => {
   const { settings } = useSchool();
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -153,6 +154,17 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
             <span>Déverrouiller l'Application</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          {onOpenQrScanner && (
+            <button
+              type="button"
+              onClick={onOpenQrScanner}
+              className="w-full py-3.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+            >
+              <QrCode className="w-4 h-4 text-emerald-700" />
+              <span>Contrôle & Scan QR Élève (Accès Direct)</span>
+            </button>
+          )}
         </form>
 
         <div className="text-center pt-2 border-t border-slate-100">

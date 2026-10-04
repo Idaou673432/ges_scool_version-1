@@ -35,6 +35,7 @@ interface ParsedRow {
   birthPlace: string;
   className: string;
   matchedClassId: string;
+  bloodType?: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
   fatherName?: string;
   fatherPhone?: string;
   motherName?: string;
@@ -70,6 +71,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         "Genre (M/F)": "M",
         "Date de Naissance (AAAA-MM-JJ)": "2010-04-12",
         "Lieu de Naissance": "Bamako",
+        "Groupe Sanguin (Optionnel)": "O+",
         "Classe": classes[0]?.name || "9ème Année A",
         "Nom du Père / Tuteur": "Ousmane Coulibaly",
         "Téléphone Parent": "76123456",
@@ -84,6 +86,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
         "Genre (M/F)": "F",
         "Date de Naissance (AAAA-MM-JJ)": "2011-09-20",
         "Lieu de Naissance": "Sikasso",
+        "Groupe Sanguin (Optionnel)": "A+",
         "Classe": classes[0]?.name || "9ème Année A",
         "Nom du Père / Tuteur": "Ibrahima Traoré",
         "Téléphone Parent": "70998877",
@@ -156,6 +159,17 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
           const classNameInput = findVal(['classe', 'class', 'niveau']);
           const matricule = findVal(['matricule', 'id', 'code']);
 
+          // Parse Blood Type (optional)
+          const rawBlood = findVal(['groupe', 'sanguin', 'blood', 'bloodtype', 'gs']);
+          let bloodType: 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-' | undefined = undefined;
+          if (rawBlood) {
+            const cleanBlood = rawBlood.toUpperCase().replace(/\s+/g, '');
+            const validTypes: Array<'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-'> = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+            if (validTypes.includes(cleanBlood as any)) {
+              bloodType = cleanBlood as any;
+            }
+          }
+
           const fatherName = findVal(['pere', 'tuteur', 'father', 'parent']);
           const fatherPhone = findVal(['tel', 'phone', 'contact', 'telephone']);
           const motherName = findVal(['mere', 'mother']);
@@ -191,6 +205,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
             birthPlace,
             className: classNameInput,
             matchedClassId,
+            bloodType,
             fatherName,
             fatherPhone,
             motherName,
@@ -238,6 +253,7 @@ export const ExcelImportModal: React.FC<ExcelImportModalProps> = ({
       classId: row.matchedClassId || defaultClassId,
       status: 'ACTIF',
       academicYear: currentAcademicYear,
+      ...(row.bloodType ? { bloodType: row.bloodType } : {}),
       parent: {
         fatherName: row.fatherName || 'Tuteur Légal',
         fatherPhone: row.fatherPhone || '',

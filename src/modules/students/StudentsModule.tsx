@@ -57,6 +57,9 @@ export const StudentsModule: React.FC = () => {
     classId: classes[0]?.id || '',
     status: 'ACTIF',
     academicYear: settings.currentAcademicYear,
+    bloodType: undefined,
+    allergies: '',
+    emergencyContact: '',
     parent: {
       fatherName: '',
       fatherPhone: '',
@@ -93,6 +96,9 @@ export const StudentsModule: React.FC = () => {
       classId: classes[0]?.id || '',
       status: 'ACTIF',
       academicYear: settings.currentAcademicYear,
+      bloodType: undefined,
+      allergies: '',
+      emergencyContact: '',
       parent: {
         fatherName: '',
         fatherPhone: '',
@@ -242,6 +248,7 @@ export const StudentsModule: React.FC = () => {
                 <th className="py-3 px-4">Nom & Prénom</th>
                 <th className="py-3 px-4">Sexe</th>
                 <th className="py-3 px-4">Classe</th>
+                <th className="py-3 px-4">Groupe Sanguin</th>
                 <th className="py-3 px-4">Contact Tuteur</th>
                 <th className="py-3 px-4">Statut</th>
                 <th className="py-3 px-6 text-right">Actions</th>
@@ -250,7 +257,7 @@ export const StudentsModule: React.FC = () => {
             <tbody className="text-xs divide-y divide-slate-100 text-slate-700 font-medium">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={9} className="py-12 text-center text-slate-400 font-medium">
                     Aucun élève trouvé avec les critères indiqués.
                   </td>
                 </tr>
@@ -290,6 +297,17 @@ export const StudentsModule: React.FC = () => {
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-800">
                         {studentClass?.name || 'Non assigné'}
+                      </td>
+                      <td className="py-3 px-4">
+                        {std.bloodType ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono font-bold text-[10px] bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+                            🩸 {std.bloodType}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">
+                            Non précisé
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-slate-600">
                         <span className="block truncate">{std.parent.fatherName || std.parent.motherName || 'Tuteur'}</span>
@@ -464,6 +482,45 @@ export const StudentsModule: React.FC = () => {
                     className="w-full mt-1.5 px-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl outline-none focus:border-slate-800 focus:bg-white text-xs"
                   />
                 </div>
+
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-rose-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1">🩸 Groupe Sanguin</span>
+                    <span className="text-[10px] text-emerald-600 font-semibold lowercase bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">optionnel (non obligatoire)</span>
+                  </label>
+                  <select
+                    value={formData.bloodType || ''}
+                    onChange={e => setFormData({ ...formData, bloodType: (e.target.value || undefined) as any })}
+                    className="w-full mt-1.5 px-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs outline-none focus:border-slate-800 focus:bg-white cursor-pointer font-medium text-slate-800"
+                  >
+                    <option value="">Non précisé (Optionnel - non obligatoire)</option>
+                    <option value="A+">A+ (Rhésus positif)</option>
+                    <option value="A-">A- (Rhésus négatif)</option>
+                    <option value="B+">B+ (Rhésus positif)</option>
+                    <option value="B-">B- (Rhésus négatif)</option>
+                    <option value="AB+">AB+ (Rhésus positif)</option>
+                    <option value="AB-">AB- (Rhésus négatif)</option>
+                    <option value="O+">O+ (Rhésus positif)</option>
+                    <option value="O-">O- (Rhésus négatif)</option>
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1 font-normal">
+                    Peut être complété maintenant ou ultérieurement lors d'une visite médicale.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+                    <span>Allergies / Particularités</span>
+                    <span className="text-[9px] text-slate-400 font-normal lowercase">(optionnel)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Asthme, Allergie Pénicilline..."
+                    value={formData.allergies || ''}
+                    onChange={e => setFormData({ ...formData, allergies: e.target.value })}
+                    className="w-full mt-1.5 px-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl outline-none focus:border-slate-800 focus:bg-white text-xs"
+                  />
+                </div>
               </div>
 
               {/* Parent Info */}
@@ -563,9 +620,23 @@ export const StudentsModule: React.FC = () => {
             </div>
 
             <div className="space-y-2.5 text-xs text-slate-700 bg-slate-50/70 p-4 rounded-xl border border-slate-200/70">
+              <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                <div>
+                  <span className="text-slate-400 uppercase text-[10px] font-bold block">Groupe Sanguin</span>
+                  <span className="font-mono font-bold text-rose-700 text-sm">
+                    {viewingStudent.bloodType ? `🩸 ${viewingStudent.bloodType}` : 'Non précisé'}
+                  </span>
+                </div>
+                {viewingStudent.allergies && (
+                  <div className="text-right">
+                    <span className="text-slate-400 uppercase text-[10px] font-bold block">Santé / Allergies</span>
+                    <span className="font-semibold text-slate-800 text-[11px]">{viewingStudent.allergies}</span>
+                  </div>
+                )}
+              </div>
               <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Date & Lieu de Naissance:</span> {new Date(viewingStudent.birthDate).toLocaleDateString('fr-FR')} à {viewingStudent.birthPlace}</p>
               <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Père / Tuteur:</span> {viewingStudent.parent.fatherName} ({viewingStudent.parent.fatherPhone})</p>
-              <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Mère / Tuteur:</span> {viewingStudent.parent.motherName || 'Non renseigné'}</p>
+              <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Mère / Tutrice:</span> {viewingStudent.parent.motherName || 'Non renseigné'}</p>
               <p><span className="text-slate-400 uppercase text-[10px] font-bold block">Adresse Résidence:</span> {viewingStudent.address}</p>
             </div>
 

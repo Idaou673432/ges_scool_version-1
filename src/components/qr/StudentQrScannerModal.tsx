@@ -134,14 +134,14 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
         academicYear: parsed.academicYear || parsed.year || '2024-2025',
         status: parsed.status || 'ACTIF',
         photoUrl: parsed.photoUrl,
-        bloodType: parsed.bloodType || parsed.bt || 'O+',
-        allergies: parsed.allergies || parsed.al || 'Aucune',
+        bloodType: parsed.bloodType || parsed.bt || undefined,
+        allergies: parsed.allergies || parsed.al || '',
         emergencyContact: parsed.emergencyContact || parsed.em || parsed.fatherPhone || parsed.motherPhone || '',
         parent: {
-          fatherName: parsed.fatherName || parsed.parent?.fatherName || 'Père',
+          fatherName: parsed.fatherName || parsed.parent?.fatherName || '',
           fatherPhone: parsed.fatherPhone || parsed.fp || parsed.parent?.fatherPhone || '',
           fatherProfession: parsed.fatherProfession || '',
-          motherName: parsed.motherName || parsed.parent?.motherName || 'Mère',
+          motherName: parsed.motherName || parsed.parent?.motherName || '',
           motherPhone: parsed.motherPhone || parsed.mp || parsed.parent?.motherPhone || '',
           motherProfession: parsed.motherProfession || '',
           guardianAddress: parsed.address || ''
@@ -541,7 +541,7 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
                         lastName: firstStd.lastName,
                         className: cls?.name || '10ème Lettres',
                         academicYear: '2024-2025',
-                        bloodType: firstStd.bloodType || 'O+',
+                        bloodType: firstStd.bloodType,
                         status: 'INSCRIT',
                         allergies: firstStd.allergies || 'Aucune allergie connue',
                         emergencyContact: firstStd.emergencyContact || '66 00 11 22',
@@ -666,9 +666,15 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
-                            {std.bloodType || 'O+'}
-                          </span>
+                          {std.bloodType ? (
+                            <span className="text-[10px] font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
+                              {std.bloodType}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">
+                              —
+                            </span>
+                          )}
                           <span className="text-[10px] font-black text-blue-900 uppercase group-hover:translate-x-0.5 transition-transform">
                             Scanner →
                           </span>

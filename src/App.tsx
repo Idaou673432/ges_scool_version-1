@@ -36,12 +36,29 @@ export function AppContent() {
   const [externalQrData, setExternalQrData] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const paramData = urlParams.get('student_qr') || urlParams.get('verify_qr') || urlParams.get('json') || urlParams.get('scan') || urlParams.get('data');
+      const paramData = 
+        urlParams.get('student_qr') || 
+        urlParams.get('verify_qr') || 
+        urlParams.get('json') || 
+        urlParams.get('scan') || 
+        urlParams.get('data') || 
+        urlParams.get('qr') || 
+        urlParams.get('student') || 
+        urlParams.get('m') || 
+        urlParams.get('matricule') || 
+        urlParams.get('d');
+
       if (paramData) return decodeURIComponent(paramData);
       if (window.location.hash.includes('student_qr=')) {
         return decodeURIComponent(window.location.hash.split('student_qr=')[1]);
       }
-      if (urlParams.has('qr_view')) {
+      if (window.location.hash.includes('data=')) {
+        return decodeURIComponent(window.location.hash.split('data=')[1]);
+      }
+      if (window.location.hash.includes('json=')) {
+        return decodeURIComponent(window.location.hash.split('json=')[1]);
+      }
+      if (urlParams.has('qr_view') || urlParams.has('scan_mode') || urlParams.has('verify')) {
         return '';
       }
     }
@@ -94,7 +111,12 @@ export function AppContent() {
   }
 
   if (!isUnlocked) {
-    return <LockScreen onUnlock={() => setIsUnlocked(true)} />;
+    return (
+      <LockScreen 
+        onUnlock={() => setIsUnlocked(true)} 
+        onOpenQrScanner={() => setExternalQrData('')} 
+      />
+    );
   }
 
   return (

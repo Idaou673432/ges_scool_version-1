@@ -145,8 +145,8 @@ export const StudentQrProfileModal: React.FC<StudentQrProfileModalProps> = ({
     PdfService.generateStudentCardsBatchPdf([student], classes, settings);
   };
 
-  const bloodGroup = student.bloodType || 'O+';
-  const isNegativeRh = bloodGroup.includes('-');
+  const bloodGroup = student.bloodType || null;
+  const isNegativeRh = bloodGroup ? bloodGroup.includes('-') : false;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200">
@@ -287,19 +287,19 @@ export const StudentQrProfileModal: React.FC<StudentQrProfileModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Blood Type Card */}
               <div className="bg-white p-4 rounded-2xl border border-rose-200 flex items-center gap-4 shadow-2xs">
-                <div className="w-14 h-14 rounded-2xl bg-rose-600 text-white flex flex-col items-center justify-center font-black shadow-md shrink-0">
-                  <Droplet className="w-5 h-5 text-rose-200 fill-current mb-0.5" />
-                  <span className="text-lg leading-none font-mono font-black">{bloodGroup}</span>
+                <div className={`w-14 h-14 rounded-2xl ${bloodGroup ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-500'} flex flex-col items-center justify-center font-black shadow-md shrink-0`}>
+                  <Droplet className={`w-5 h-5 ${bloodGroup ? 'text-rose-200' : 'text-slate-400'} fill-current mb-0.5`} />
+                  <span className="text-base leading-none font-mono font-black">{bloodGroup || '—'}</span>
                 </div>
                 <div>
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
                     Groupe Sanguin
                   </p>
                   <p className="text-base font-black text-rose-950 font-mono mt-0.5">
-                    {bloodGroup} {isNegativeRh ? '(Rhésus Négatif)' : '(Rhésus Positif)'}
+                    {bloodGroup ? `${bloodGroup} ${isNegativeRh ? '(Rhésus Négatif)' : '(Rhésus Positif)'}` : 'Non renseigné (Optionnel)'}
                   </p>
                   <p className="text-[10px] text-slate-500 font-medium">
-                    Carte donneur / groupe certifié
+                    {bloodGroup ? 'Carte donneur / groupe certifié' : 'Information non communiquée'}
                   </p>
                 </div>
               </div>

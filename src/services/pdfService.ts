@@ -1144,6 +1144,12 @@ export class PdfService {
       doc.setFontSize(7);
       doc.text(std.matricule, x + 24, y + 33);
 
+      if (std.bloodType) {
+        doc.setTextColor(244, 63, 94); // Rose
+        doc.setFontSize(5.5);
+        doc.text(`GS: ${std.bloodType}`, x + 24, y + 38);
+      }
+
       // QR Code
       if (qrDataUrl) {
         doc.addImage(qrDataUrl, 'PNG', x + cardWidth - 21, y + 12, 17, 17);
@@ -1176,12 +1182,19 @@ export class PdfService {
     extra?: {
       className?: string;
       average?: number;
+      maxScore?: number;
       rank?: number | string;
+      totalClassStudents?: number;
       totalAbsences?: number;
+      justifiedAbsences?: number;
+      unjustifiedAbsences?: number;
+      attendanceRate?: number;
       annualFee?: number;
       totalPaid?: number;
       remainingAmount?: number;
       schoolName?: string;
+      academyName?: string;
+      directorName?: string;
     }
   ): Promise<string> {
     const origin = typeof window !== 'undefined' && window.location?.origin
@@ -1198,21 +1211,33 @@ export class PdfService {
       className: extra?.className || '',
       status: student.status,
       academicYear: student.academicYear,
-      bloodType: student.bloodType || 'O+',
+      birthDate: student.birthDate,
+      birthPlace: student.birthPlace,
+      gender: student.gender,
+      bloodType: student.bloodType || '',
       emergencyContact: student.emergencyContact || student.parent?.fatherPhone || student.parent?.motherPhone || '',
-      allergies: student.allergies || 'Aucune allergie connue',
+      allergies: student.allergies || '',
       average: extra?.average,
+      maxScore: extra?.maxScore || 20,
       rank: extra?.rank,
+      totalClassStudents: extra?.totalClassStudents,
       totalAbsences: extra?.totalAbsences,
+      justifiedAbsences: extra?.justifiedAbsences,
+      unjustifiedAbsences: extra?.unjustifiedAbsences,
+      attendanceRate: extra?.attendanceRate,
       annualFee: extra?.annualFee,
       totalPaid: extra?.totalPaid,
       remainingAmount: extra?.remainingAmount,
       fatherName: student.parent?.fatherName,
       fatherPhone: student.parent?.fatherPhone,
+      fatherProfession: student.parent?.fatherProfession,
       motherName: student.parent?.motherName,
       motherPhone: student.parent?.motherPhone,
+      motherProfession: student.parent?.motherProfession,
       address: student.address || student.parent?.guardianAddress,
-      schoolName: extra?.schoolName
+      schoolName: extra?.schoolName,
+      academyName: extra?.academyName,
+      directorName: extra?.directorName
     };
 
     const jsonString = JSON.stringify(payload);
