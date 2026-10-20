@@ -12,6 +12,7 @@ import {
   Menu
 } from 'lucide-react';
 import { NavTab } from './Sidebar';
+import { useSchool } from '../../contexts/SchoolContext';
 
 interface MobileBottomNavProps {
   activeTab: NavTab;
@@ -26,14 +27,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenFullMenu,
   onOpenQrScanner,
 }) => {
+  const { isFeatureEnabled } = useSchool();
+
   const leftItems = [
     { id: 'dashboard' as NavTab, label: 'Accueil', icon: LayoutDashboard },
-    { id: 'students' as NavTab, label: 'Élèves', icon: Users },
+    ...(isFeatureEnabled('students') ? [{ id: 'students' as NavTab, label: 'Élèves', icon: Users }] : []),
   ];
 
   const rightItems = [
-    { id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList },
-    { id: 'payments' as NavTab, label: 'Caisse', icon: CreditCard },
+    ...(isFeatureEnabled('grades') ? [{ id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList }] : []),
+    ...(isFeatureEnabled('payments') ? [{ id: 'payments' as NavTab, label: 'Caisse', icon: CreditCard }] : []),
   ];
 
   return (
@@ -56,10 +59,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                 : 'text-slate-500 hover:text-slate-900 font-semibold'
             }`}
           >
-            <div className={`p-1 rounded-lg transition-transform ${isActive ? 'bg-blue-100/70 scale-110' : ''}`}>
+            <div className={`p-1 rounded-lg transition-transform ${isActive ? 'bg-blue-100/70' : ''}`}>
               <Icon className={`w-5 h-5 ${isActive ? 'text-blue-900' : 'text-slate-500'}`} />
             </div>
-            <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? 'font-black text-blue-950' : 'text-slate-500'}`}>
+            <span className={`text-xs mt-0.5 ${isActive ? 'font-bold text-blue-900' : 'text-slate-500'}`}>
               {item.label}
             </span>
           </button>
@@ -76,14 +79,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             onClick={() => setActiveTab(item.id)}
             className={`flex flex-col items-center justify-center min-w-[54px] py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
               isActive
-                ? 'text-blue-900 font-black'
-                : 'text-slate-500 hover:text-slate-900 font-semibold'
+                ? 'text-blue-900 font-bold'
+                : 'text-slate-500 hover:text-slate-900 font-medium'
             }`}
           >
-            <div className={`p-1 rounded-lg transition-transform ${isActive ? 'bg-blue-100/70 scale-110' : ''}`}>
+            <div className={`p-1 rounded-lg transition-transform ${isActive ? 'bg-blue-100/70' : ''}`}>
               <Icon className={`w-5 h-5 ${isActive ? 'text-blue-900' : 'text-slate-500'}`} />
             </div>
-            <span className={`text-[10px] tracking-tight mt-0.5 ${isActive ? 'font-black text-blue-950' : 'text-slate-500'}`}>
+            <span className={`text-xs mt-0.5 ${isActive ? 'font-bold text-blue-900' : 'text-slate-500'}`}>
               {item.label}
             </span>
           </button>
@@ -94,13 +97,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <button
         type="button"
         onClick={onOpenFullMenu}
-        className="flex flex-col items-center justify-center min-w-[54px] py-1 px-1.5 rounded-xl transition-all text-slate-600 hover:text-blue-950 font-semibold cursor-pointer"
+        className="flex flex-col items-center justify-center min-w-[54px] py-1 px-1.5 rounded-xl transition-all text-slate-600 hover:text-blue-950 font-medium cursor-pointer"
         title="Ouvrir tout le menu"
       >
         <div className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors">
           <Menu className="w-5 h-5 text-slate-700" />
         </div>
-        <span className="text-[10px] tracking-tight mt-0.5 text-slate-600 font-bold">
+        <span className="text-xs mt-0.5 text-slate-600 font-medium">
           Menu
         </span>
       </button>

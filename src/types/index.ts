@@ -323,6 +323,7 @@ export interface SchoolSettings {
   logoUrl?: string;
   stampUrl?: string;
   adminPassword?: string; // Mot de passe / Code PIN de sécurité (par défaut '00223')
+  modulesSecurityPin?: string; // Code PIN de sécurité pour activer/désactiver les modules (par défaut '0000')
   primaryColor: string;
   enableSmsAlerts: boolean;
   evaluationMonths?: Record<string, string>; // Configuration personnalisée des mois d'évaluation (ex: EVALUATION_1 -> 'Octobre')
@@ -335,10 +336,22 @@ export interface SchoolSettings {
   calculationFormula2ndCycle?: 'MALI_OFFICIAL' | 'EQUAL_WEIGHT' | 'CLASS_ONLY' | 'COMP_ONLY' | 'CUSTOM';
   classScoreWeight1st?: number; // Poids note de classe 1er cycle (par défaut 1)
   compScoreWeight1st?: number;  // Poids comp 1er cycle (par défaut 1)
-  classScoreWeight2nd?: number; // Poids note de classe 2ème cycle/lycée (par défaut 1)
-  compScoreWeight2nd?: number;  // Poids comp 2ème cycle/lycée (par défaut 2)
   missingClassScoreBehavior?: 'USE_COMP_ONLY' | 'ZERO'; // Si pas de note de devoirs
   missingCompScoreBehavior?: 'USE_CLASS_ONLY' | 'ZERO';  // Si pas de note de composition
+  enabledFeatures?: SchoolEnabledFeatures; // Modules activés ou désactivés pour cet établissement
+}
+
+export interface SchoolEnabledFeatures {
+  students?: boolean;    // Gestion des Élèves (Inscriptions, fiches)
+  classes?: boolean;     // Classes & Niveaux scolaires
+  subjects?: boolean;    // Matières & Coefficients
+  teachers?: boolean;    // Corps Enseignant
+  grades?: boolean;      // Notes & Évaluations
+  attendance?: boolean;  // Suivi des Présences & Absences
+  bulletins?: boolean;   // Bulletins Scolaires Officiels
+  cards?: boolean;       // Cartes Scolaires & Badges
+  payments?: boolean;    // Comptabilité & Caisse FCFA
+  qrScanner?: boolean;   // Scanner QR Code & Historique
 }
 
 export interface AuditLog {

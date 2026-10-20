@@ -14,6 +14,7 @@ import {
   EvaluationTerm,
   Payment,
   SchoolSettings,
+  SchoolEnabledFeatures,
   AuditLog,
   SystemStats,
   ReportCard,
@@ -75,6 +76,10 @@ interface SchoolContextType {
   generateReportCard: (studentId: string, term: EvaluationTerm) => ReportCard | null;
   exportBackupJSON: () => string;
   restoreBackupJSON: (jsonStr: string) => boolean;
+
+  // Feature Toggles (Active / Inactive modules)
+  isFeatureEnabled: (featureKey: keyof SchoolEnabledFeatures) => boolean;
+  toggleFeature: (featureKey: keyof SchoolEnabledFeatures, enabled?: boolean) => void;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
@@ -714,6 +719,24 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return success;
   };
 
+  const isFeatureEnabled = useCallback((featureKey: keyof SchoolEnabledFeatures): boolean => {
+    if (!settings.enabledFeatures) return true;
+    return settings.enabledFeatures[featureKey] !== false;
+  }, [settings.enabledFeatures]);
+
+  const toggleFeature = useCallback((featureKey: keyof SchoolEnabledFeatures, enabled?: boolean) => {
+    const currentVal = settings.enabledFeatures?.[featureKey] !== false;
+    const nextVal = enabled !== undefined ? enabled : !currentVal;
+    const updatedFeatures: SchoolEnabledFeatures = {
+      ...(settings.enabledFeatures || {}),
+      [featureKey]: nextVal
+    };
+    handleUpdateSettings({
+      ...settings,
+      enabledFeatures: updatedFeatures
+    });
+  }, [settings]);
+
   return (
     <SchoolContext.Provider
       value={{
@@ -760,7 +783,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteAllAttendanceRecords: handleClearAllAttendanceRecords,
         generateReportCard,
         exportBackupJSON,
-        restoreBackupJSON
+        restoreBackupJSON,
+        isFeatureEnabled,
+        toggleFeature
       }}
     >
       {children}

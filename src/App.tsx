@@ -28,10 +28,29 @@ import { StandaloneStudentQrView } from './components/qr/StandaloneStudentQrView
 import { Student } from './types';
 import { useSchool } from './contexts/SchoolContext';
 import { ScanHistoryService } from './services/scanHistoryService';
+import { SchoolEnabledFeatures } from './types';
 
 export function AppContent() {
-  const { classes } = useSchool();
+  const { classes, isFeatureEnabled } = useSchool();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+
+  useEffect(() => {
+    const tabFeatureMap: Record<string, keyof SchoolEnabledFeatures | null> = {
+      students: 'students',
+      classes: 'classes',
+      subjects: 'subjects',
+      teachers: 'teachers',
+      grades: 'grades',
+      attendance: 'attendance',
+      bulletins: 'bulletins',
+      cards: 'cards',
+      payments: 'payments'
+    };
+    const reqFeature = tabFeatureMap[activeTab];
+    if (reqFeature && !isFeatureEnabled(reqFeature)) {
+      setActiveTab('dashboard');
+    }
+  }, [activeTab, isFeatureEnabled]);
   const [isGlobalQrScannerOpen, setIsGlobalQrScannerOpen] = useState(false);
   const [globalScannedStudent, setGlobalScannedStudent] = useState<Student | null>(null);
   
@@ -161,8 +180,9 @@ export function AppContent() {
           {activeTab === 'bulletins' && <BulletinsModule />}
           {activeTab === 'cards' && <CardsModule />}
           {activeTab === 'payments' && <PaymentsModule />}
-          {activeTab === 'settings' && <SettingsModule />}
-          {activeTab === 'backup' && <SettingsModule />}
+          {activeTab === 'modules' && <SettingsModule initialTab="FEATURES" />}
+          {activeTab === 'settings' && <SettingsModule initialTab="INFO" />}
+          {activeTab === 'backup' && <SettingsModule initialTab="CLOUD_SYNC" />}
         </main>
 
         {/* Mobile Quick Bottom Navigation Bar */}

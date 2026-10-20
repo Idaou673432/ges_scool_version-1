@@ -47,6 +47,7 @@ const INITIAL_SETTINGS: SchoolSettings = {
   currentAcademicYear: "2025-2026",
   activeTerm: "TRIMESTRE_1",
   adminPassword: "0022390070321",
+  modulesSecurityPin: "0000",
   primaryColor: "#059669",
   enableSmsAlerts: true,
   evaluationMonths: { ...DEFAULT_EVALUATION_MONTHS }
@@ -556,6 +557,10 @@ class StorageService {
     }
     if (!s.evaluationMonths) {
       s.evaluationMonths = { ...DEFAULT_EVALUATION_MONTHS };
+      updated = true;
+    }
+    if (!s.modulesSecurityPin) {
+      s.modulesSecurityPin = "0000";
       updated = true;
     }
 

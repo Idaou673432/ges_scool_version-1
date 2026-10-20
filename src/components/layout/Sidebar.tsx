@@ -21,7 +21,8 @@ import {
   PanelLeftOpen,
   X,
   ChevronRight,
-  Shield
+  Shield,
+  Sliders
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSchool } from '../../contexts/SchoolContext';
@@ -39,6 +40,7 @@ export type NavTab =
   | 'bulletins'
   | 'cards'
   | 'payments'
+  | 'modules'
   | 'settings'
   | 'backup';
 
@@ -60,42 +62,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsMobileOpen
 }) => {
   const { currentUser, switchRoleSimulated } = useAuth();
-  const { settings } = useSchool();
+  const { settings, isFeatureEnabled } = useSchool();
   const [showPwaModal, setShowPwaModal] = useState(false);
+
+  const featureMap: Record<NavTab, keyof import('../../types').SchoolEnabledFeatures | null> = {
+    dashboard: null,
+    students: 'students',
+    classes: 'classes',
+    subjects: 'subjects',
+    teachers: 'teachers',
+    grades: 'grades',
+    attendance: 'attendance',
+    bulletins: 'bulletins',
+    cards: 'cards',
+    payments: 'payments',
+    modules: null,
+    settings: null,
+    backup: null
+  };
 
   const navSections = [
     {
-      title: 'Principal',
+      title: 'Général',
       items: [
         { id: 'dashboard' as NavTab, label: 'Tableau de bord', icon: LayoutDashboard, perm: 'dashboard:view' },
       ]
     },
     {
-      title: 'Pédagogie & Élèves',
+      title: 'Scolarité',
       items: [
-        { id: 'students' as NavTab, label: 'Gestion Élèves', icon: Users, perm: 'students:view' },
-        { id: 'classes' as NavTab, label: 'Classes & Niveaux', icon: GraduationCap, perm: 'classes:view' },
-        { id: 'subjects' as NavTab, label: 'Matières & Coefs', icon: BookOpen, perm: 'subjects:view' },
-        { id: 'teachers' as NavTab, label: 'Corps Enseignant', icon: Briefcase, perm: 'teachers:view' },
+        { id: 'students' as NavTab, label: 'Élèves', icon: Users, perm: 'students:view' },
+        { id: 'classes' as NavTab, label: 'Classes', icon: GraduationCap, perm: 'classes:view' },
+        { id: 'subjects' as NavTab, label: 'Matières', icon: BookOpen, perm: 'subjects:view' },
+        { id: 'teachers' as NavTab, label: 'Enseignants', icon: Briefcase, perm: 'teachers:view' },
       ]
     },
     {
-      title: 'Vie Scolaire & Résultats',
+      title: 'Évaluations & Vie Scolaire',
       items: [
-        { id: 'grades' as NavTab, label: 'Notes & Devoirs', icon: ClipboardList, perm: 'grades:view' },
-        { id: 'attendance' as NavTab, label: 'Suivi Présences', icon: CalendarCheck, perm: 'students:view' },
-        { id: 'bulletins' as NavTab, label: 'Bulletins Officiels', icon: FileText, perm: 'bulletins:generate' },
-        { id: 'cards' as NavTab, label: 'Cartes Scolaires QR', icon: QrCode, perm: 'cards:generate' },
+        { id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList, perm: 'grades:view' },
+        { id: 'attendance' as NavTab, label: 'Présences', icon: CalendarCheck, perm: 'students:view' },
+        { id: 'bulletins' as NavTab, label: 'Bulletins', icon: FileText, perm: 'bulletins:generate' },
+        { id: 'cards' as NavTab, label: 'Cartes & Badges', icon: QrCode, perm: 'cards:generate' },
       ]
     },
     {
-      title: 'Finance & Administration',
+      title: 'Administration',
       items: [
-        { id: 'payments' as NavTab, label: 'Comptabilité FCFA', icon: CreditCard, perm: 'payments:view' },
-        { id: 'settings' as NavTab, label: 'Fiche Établissement', icon: Settings, perm: 'settings:view' },
+        { id: 'payments' as NavTab, label: 'Paiements & Caisse', icon: CreditCard, perm: 'payments:view' },
+        { id: 'settings' as NavTab, label: 'Paramètres', icon: Settings, perm: 'settings:view' },
       ]
     }
-  ];
+  ].map(sec => ({
+    ...sec,
+    items: sec.items.filter(item => {
+      const featKey = featureMap[item.id];
+      if (!featKey) return true;
+      return isFeatureEnabled(featKey);
+    })
+  })).filter(sec => sec.items.length > 0);
 
   const handleSelectTab = (tab: NavTab) => {
     setActiveTab(tab);
@@ -219,7 +244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           {item.label}
                         </span>
 
-                        {/* Active subtle badge indicator when expanded */}
+                        {/* Active subtle indicator when expanded */}
                         {isActive && !isCollapsed && (
                           <div className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
                         )}

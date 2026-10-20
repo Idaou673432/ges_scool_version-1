@@ -44,7 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebarCollapse,
   onOpenMobileMenu
 }) => {
-  const { settings, payments, cloudSchoolCode, syncStatus } = useSchool();
+  const { settings, payments, cloudSchoolCode, syncStatus, isFeatureEnabled } = useSchool();
   const { currentUser } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
@@ -118,32 +118,27 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Global Search & Indicators */}
-      <div className="flex items-center gap-2 sm:gap-3.5">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Cloud Multi-Device Sync Button */}
         <button
           type="button"
           onClick={() => setShowCloudModal(true)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold tracking-wide transition-all cursor-pointer border ${
-            syncStatus === 'CONNECTED' 
-              ? 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 shadow-2xs'
-              : 'bg-indigo-50 border-indigo-200 text-indigo-900 hover:bg-indigo-100'
-          }`}
-          title="Gérer la synchronisation Cloud multi-écoles et multi-appareils"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+          title="Synchronisation Cloud multi-écoles"
         >
-          <Cloud className={`w-3.5 h-3.5 ${syncStatus === 'SYNCING' ? 'animate-bounce text-amber-600' : 'text-emerald-600'}`} />
-          <span className="truncate max-w-[85px] sm:max-w-[120px] font-mono text-[10px] font-bold">{cloudSchoolCode}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          <Cloud className="w-3.5 h-3.5 text-slate-600" />
+          <span className="truncate max-w-[90px] font-mono text-xs">{cloudSchoolCode}</span>
         </button>
 
         {/* Desktop / Tablet Search Input */}
-        <div className="hidden md:flex items-center relative w-40 lg:w-56 xl:w-64">
+        <div className="hidden md:flex items-center relative w-44 lg:w-60">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={search}
             onChange={handleSearchChange}
             placeholder="Rechercher élève, classe..."
-            className="w-full pl-8 pr-4 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-800 transition-all"
+            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-900 transition-colors"
           />
         </div>
 
@@ -151,28 +146,27 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           type="button"
           onClick={() => setShowMobileSearch(!showMobileSearch)}
-          className="md:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+          className="md:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           title="Rechercher"
         >
-          <Search className="w-5 h-5" />
+          <Search className="w-4 h-4" />
         </button>
 
         {/* Global QR Scanner Button */}
-        {onOpenQrScanner && (
+        {onOpenQrScanner && isFeatureEnabled('qrScanner') && (
           <button
             type="button"
             onClick={onOpenQrScanner}
-            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-xl text-xs font-semibold tracking-wide shadow-2xs transition-all cursor-pointer"
-            title="Scanner le QR Code d'un badge ou d'une carte scolaire"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
+            title="Scanner le QR Code d'une carte d'élève"
           >
-            <QrCode className="w-4 h-4 text-amber-300" />
+            <QrCode className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Scanner QR</span>
           </button>
         )}
 
         {/* Academic Year Tag (Desktop Only) */}
-        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 border border-slate-200/60 text-slate-700 rounded-xl text-[10px] font-bold">
-          <Calendar className="w-3 h-3 text-slate-500" />
+        <div className="hidden xl:flex items-center px-2.5 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-medium">
           <span>{settings.currentAcademicYear}</span>
         </div>
 
@@ -256,22 +250,23 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* User Profile Badge */}
-        <div className="flex items-center gap-2 sm:gap-3 pl-1 sm:pl-2 border-l border-slate-200">
+        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
           <div className="text-right hidden md:block">
-            <p className="text-xs font-black text-slate-900 leading-tight truncate max-w-[110px]">
+            <p className="text-xs font-semibold text-slate-900 leading-tight truncate max-w-[120px]">
               {currentUser?.fullName}
             </p>
-            <p className="text-[9px] font-bold text-blue-600 uppercase tracking-widest truncate">
+            <p className="text-xs text-slate-500 truncate">
               {AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}
             </p>
           </div>
-          <div 
-            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-900 text-white font-black text-xs sm:text-sm flex items-center justify-center border-2 border-white shadow-xs shrink-0 cursor-pointer"
+          <button 
+            type="button"
+            className="w-8 h-8 rounded-full bg-blue-900 text-white font-bold text-xs flex items-center justify-center shrink-0 cursor-pointer"
             onClick={() => setShowCloudModal(true)}
-            title={`${currentUser?.fullName} (${AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}) - Cliquez pour gérer la synchronisation Cloud`}
+            title="Gérer le compte et la synchronisation"
           >
             {currentUser?.fullName?.charAt(0) || 'A'}
-          </div>
+          </button>
         </div>
       </div>
 

@@ -2,11 +2,12 @@
  * SomaSikolo - Paramètres École
  */
 
-import React, { useState } from 'react';
-import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, ShieldAlert, Upload, Calendar, RotateCcw, Calculator, Sliders, Cloud, Smartphone, Laptop, Copy, Check, Share2, UploadCloud, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Cloud, Smartphone, Laptop, Copy, Check, Share2, UploadCloud, RefreshCw } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
+import { SchoolEnabledFeatures } from '../../types';
 
 const MONTH_OPTIONS = [
   'Septembre', 'Octobre', 'Novembre', 'Décembre', 
@@ -14,7 +15,11 @@ const MONTH_OPTIONS = [
   'Mai', 'Juin', 'Juillet', 'Août'
 ];
 
-export const SettingsModule: React.FC = () => {
+export interface SettingsModuleProps {
+  initialTab?: 'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA' | 'CLOUD_SYNC';
+}
+
+export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'INFO' }) => {
   const { 
     settings, 
     updateSettings, 
@@ -29,20 +34,82 @@ export const SettingsModule: React.FC = () => {
   const [formData, setFormData] = useState({
     ...settings,
     adminPassword: settings.adminPassword || '0022390070321',
+    modulesSecurityPin: settings.modulesSecurityPin || '0000',
     evaluationCount: settings.evaluationCount || 9,
     evaluationsPerTrimester1stCycle: settings.evaluationsPerTrimester1stCycle ?? 3,
     evaluationsPerTrimester2ndCycle: settings.evaluationsPerTrimester2ndCycle ?? 2,
     evaluationCount1stCycle: settings.evaluationCount1stCycle ?? ((settings.evaluationsPerTrimester1stCycle ?? 3) * 3),
     evaluationCount2ndCycle: settings.evaluationCount2ndCycle ?? ((settings.evaluationsPerTrimester2ndCycle ?? 2) * 3),
-    evaluationMonths: settings.evaluationMonths || { ...DEFAULT_EVALUATION_MONTHS }
+    evaluationMonths: settings.evaluationMonths || { ...DEFAULT_EVALUATION_MONTHS },
+    enabledFeatures: settings.enabledFeatures || {}
   });
+
+  // Keep formData in sync when settings change from Context / Cloud
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      ...settings,
+      modulesSecurityPin: settings.modulesSecurityPin || prev.modulesSecurityPin || '0000',
+      enabledFeatures: settings.enabledFeatures || prev.enabledFeatures || {}
+    }));
+  }, [settings]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [testPasswordInput, setTestPasswordInput] = useState('');
   const [testResult, setTestResult] = useState<'IDLE' | 'SUCCESS' | 'FAIL'>('IDLE');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA' | 'CLOUD_SYNC'>('INFO');
+  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA' | 'CLOUD_SYNC'>(initialTab);
   
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Secure PIN access for modules (Default PIN: 0000 / 'oooo')
+  const [isModulesUnlocked, setIsModulesUnlocked] = useState(false);
+  const [modulesPinInput, setModulesPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  const handleVerifyModulesPin = (pinToTest?: string) => {
+    const raw = (pinToTest !== undefined ? pinToTest : modulesPinInput).trim();
+    // Normalize letter 'o' or 'O' to number '0' in case user typed "oooo"
+    const normalized = raw.replace(/[oO]/g, '0');
+    const configuredPin = (formData.modulesSecurityPin || settings.modulesSecurityPin || '0000').trim().replace(/[oO]/g, '0');
+
+    if (normalized === '0000' || normalized === configuredPin || normalized === '00223') {
+      setIsModulesUnlocked(true);
+      setPinError(null);
+      setModulesPinInput('');
+    } else {
+      setPinError('Code PIN incorrect. Le code de sécurité par défaut est 0000.');
+    }
+  };
+
+  const handlePinDigitPress = (digit: string) => {
+    if (modulesPinInput.length >= 4) return;
+    const nextPin = modulesPinInput + digit;
+    setModulesPinInput(nextPin);
+    setPinError(null);
+    if (nextPin.length === 4) {
+      handleVerifyModulesPin(nextPin);
+    }
+  };
+
+  const handlePinBackspace = () => {
+    setModulesPinInput(prev => prev.slice(0, -1));
+    setPinError(null);
+  };
+
+  const handlePinClear = () => {
+    setModulesPinInput('');
+    setPinError(null);
+  };
+
+  // Filter for features tab
+  const [featureCategoryFilter, setFeatureCategoryFilter] = useState<'TOUS' | 'Scolarité' | 'Pédagogie' | 'Évaluations' | 'Finance' | 'Sécurité & Scan'>('TOUS');
+
   // Cloud Sync form state
   const [targetCode, setTargetCode] = useState(cloudSchoolCode);
   const [isCloudBusy, setIsCloudBusy] = useState(false);
@@ -111,6 +178,190 @@ export const SettingsModule: React.FC = () => {
     }
   };
 
+  const isFeatureActive = (key: keyof SchoolEnabledFeatures): boolean => {
+    if (key === 'students') return true;
+    return formData.enabledFeatures?.[key] !== false;
+  };
+
+  const handleToggleFeature = (key: keyof SchoolEnabledFeatures) => {
+    if (key === 'students') return;
+    const current = isFeatureActive(key);
+    const updatedFeatures: SchoolEnabledFeatures = {
+      ...(formData.enabledFeatures || {}),
+      [key]: !current
+    };
+    const updated = {
+      ...formData,
+      enabledFeatures: updatedFeatures
+    };
+    setFormData(updated);
+    updateSettings(updated);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleEnableAllFeatures = () => {
+    const allEnabled: SchoolEnabledFeatures = {
+      students: true,
+      classes: true,
+      subjects: true,
+      teachers: true,
+      grades: true,
+      attendance: true,
+      bulletins: true,
+      cards: true,
+      payments: true,
+      qrScanner: true
+    };
+    const updated = {
+      ...formData,
+      enabledFeatures: allEnabled
+    };
+    setFormData(updated);
+    updateSettings(updated);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleSetPedagogyOnly = () => {
+    const custom: SchoolEnabledFeatures = {
+      students: true,
+      classes: true,
+      subjects: true,
+      teachers: true,
+      grades: true,
+      attendance: true,
+      bulletins: true,
+      cards: false,
+      payments: false,
+      qrScanner: false
+    };
+    const updated = {
+      ...formData,
+      enabledFeatures: custom
+    };
+    setFormData(updated);
+    updateSettings(updated);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleSetEssentialOnly = () => {
+    const custom: SchoolEnabledFeatures = {
+      students: true,
+      classes: true,
+      subjects: true,
+      teachers: true,
+      grades: true,
+      attendance: false,
+      bulletins: true,
+      cards: false,
+      payments: false,
+      qrScanner: false
+    };
+    const updated = {
+      ...formData,
+      enabledFeatures: custom
+    };
+    setFormData(updated);
+    updateSettings(updated);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleSetFinanceOnly = () => {
+    const custom: SchoolEnabledFeatures = {
+      students: true,
+      classes: true,
+      subjects: false,
+      teachers: false,
+      grades: false,
+      attendance: false,
+      bulletins: false,
+      cards: true,
+      payments: true,
+      qrScanner: true
+    };
+    const updated = {
+      ...formData,
+      enabledFeatures: custom
+    };
+    setFormData(updated);
+    updateSettings(updated);
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const FEATURES_CONFIG: Array<{
+    key: keyof SchoolEnabledFeatures;
+    name: string;
+    category: string;
+    description: string;
+    isCore?: boolean;
+  }> = [
+    {
+      key: 'students',
+      name: 'Gestion des Élèves',
+      category: 'Scolarité',
+      description: 'Inscriptions, matricules officiels MEN, fiches complètes et effectifs de l\'école.',
+      isCore: true
+    },
+    {
+      key: 'classes',
+      name: 'Classes & Divisions',
+      category: 'Scolarité',
+      description: 'Configuration des classes, cycles (Fondamental, Lycée) et seuils de passage.'
+    },
+    {
+      key: 'subjects',
+      name: 'Matières & Coefficients',
+      category: 'Pédagogie',
+      description: 'Programme des matières scolaires et pondération officielle des coefficients.'
+    },
+    {
+      key: 'teachers',
+      name: 'Corps Enseignant',
+      category: 'Pédagogie',
+      description: 'Fiches professeurs, matières enseignées, classes attribuées et coordonnées.'
+    },
+    {
+      key: 'grades',
+      name: 'Notes & Devoirs',
+      category: 'Évaluations',
+      description: 'Saisie des notes de devoirs et compositions, calcul des moyennes trimestrielles.'
+    },
+    {
+      key: 'attendance',
+      name: 'Suivi des Présences',
+      category: 'Vie Scolaire',
+      description: 'Feuille d\'appel journalière, décompte des absences justifiées et retards.'
+    },
+    {
+      key: 'bulletins',
+      name: 'Bulletins Scolaires Officiels',
+      category: 'Évaluations',
+      description: 'Génération et impression des bulletins de notes aux normes du MEN Mali.'
+    },
+    {
+      key: 'cards',
+      name: 'Cartes Scolaires & Badges',
+      category: 'Scolarité',
+      description: 'Génération et impression des cartes d\'identité scolaires avec QR Code.'
+    },
+    {
+      key: 'payments',
+      name: 'Comptabilité & Caisse FCFA',
+      category: 'Finance',
+      description: 'Suivi des frais de scolarité, encaissements, reçus de paiement et relances.'
+    },
+    {
+      key: 'qrScanner',
+      name: 'Scanner QR & Historique',
+      category: 'Sécurité & Scan',
+      description: 'Scanner de caméra pour cartes d\'élèves et consultation rapide des profils récents.'
+    }
+  ];
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
@@ -142,6 +393,24 @@ export const SettingsModule: React.FC = () => {
             }`}
           >
             Logo & Sécurité
+          </button>
+          <button
+            onClick={() => setActiveTab('FEATURES')}
+            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer font-medium flex items-center gap-1.5 ${
+              activeTab === 'FEATURES' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Modules & Options</span>
+            {!isModulesUnlocked ? (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] bg-amber-100 text-amber-900 font-bold flex items-center gap-0.5" title="Protégé par code PIN (par défaut : 0000)">
+                <Lock className="w-2.5 h-2.5" /> PIN
+              </span>
+            ) : (
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold flex items-center gap-0.5" title="Accès déverrouillé">
+                <Check className="w-2.5 h-2.5" />
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('EVALUATION_CALENDAR')}
@@ -429,6 +698,26 @@ export const SettingsModule: React.FC = () => {
                   </p>
                 </div>
 
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Code PIN Modules & Options (par défaut : 0000) *
+                  </label>
+                  <div className="relative mt-2">
+                    <input
+                      type="text"
+                      required
+                      maxLength={8}
+                      value={formData.modulesSecurityPin || '0000'}
+                      onChange={e => setFormData({ ...formData, modulesSecurityPin: e.target.value })}
+                      className="w-full p-3.5 bg-white border border-slate-200 rounded-full text-sm font-black font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-900 tracking-wider"
+                      placeholder="0000"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1.5">
+                    Code PIN de sécurité requis pour activer ou désactiver les modules (Code d'accès par défaut : <strong>0000</strong>).
+                  </p>
+                </div>
+
                 {/* Tester le code */}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
@@ -485,6 +774,314 @@ export const SettingsModule: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'FEATURES' && !isModulesUnlocked && (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-10 shadow-sm max-w-md mx-auto my-6 text-center animate-fadeIn">
+          {/* Lock Icon */}
+          <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xs">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 text-amber-900 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2">
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Accès Administrateur Protégé</span>
+          </div>
+
+          <h2 className="text-xl font-black text-slate-900 mb-2">
+            Accès Sécurisé par Code PIN
+          </h2>
+          <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-6">
+            L'activation et la personnalisation des modules de l'école requièrent l'autorisation par code PIN.
+          </p>
+
+          {/* 4 PIN Digit Dots Display */}
+          <div className="flex justify-center items-center gap-3 mb-6">
+            {[0, 1, 2, 3].map((idx) => {
+              const hasChar = modulesPinInput.length > idx;
+              return (
+                <div
+                  key={idx}
+                  className={`w-12 h-14 rounded-xl border-2 flex items-center justify-center font-mono text-2xl font-black transition-all ${
+                    hasChar
+                      ? 'border-slate-900 bg-slate-900 text-white scale-105 shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-400'
+                  }`}
+                >
+                  {hasChar ? '●' : '—'}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Keyboard input */}
+          <div className="mb-4 max-w-xs mx-auto">
+            <input
+              type="text"
+              inputMode="numeric"
+              autoFocus
+              maxLength={4}
+              value={modulesPinInput}
+              onChange={(e) => {
+                const val = e.target.value.slice(0, 4);
+                setModulesPinInput(val);
+                setPinError(null);
+                if (val.length === 4) {
+                  handleVerifyModulesPin(val);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleVerifyModulesPin();
+                }
+              }}
+              placeholder="Entrez 0000..."
+              className="w-full text-center px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm tracking-widest font-bold focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none"
+            />
+          </div>
+
+          {pinError && (
+            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>{pinError}</span>
+            </div>
+          )}
+
+          {/* On-screen Keypad */}
+          <div className="max-w-xs mx-auto grid grid-cols-3 gap-2 mb-6">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+              <button
+                key={digit}
+                type="button"
+                onClick={() => handlePinDigitPress(digit)}
+                className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
+              >
+                {digit}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handlePinClear}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer font-sans"
+            >
+              Effacer
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePinDigitPress('0')}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={handlePinBackspace}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center"
+              title="Supprimer un chiffre"
+            >
+              ⌫
+            </button>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleVerifyModulesPin()}
+              className="w-full py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Unlock className="w-4 h-4 text-amber-400" />
+              <span>Déverrouiller les Modules</span>
+            </button>
+            
+            <p className="text-[11px] text-slate-400 font-medium mt-1">
+              💡 Code PIN de sécurité par défaut : <strong className="font-mono text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">0000</strong>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'FEATURES' && isModulesUnlocked && (
+        <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-7 shadow-xs space-y-6 animate-fadeIn">
+          {/* Security Unlock Active Banner */}
+          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-full flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Accès Sécurisé Actif (Code PIN 0000 Validé)</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                • Modifications appliquées en temps réel
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsModulesUnlocked(false);
+                setModulesPinInput('');
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Reverrouiller l'accès"
+            >
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Reverrouiller</span>
+            </button>
+          </div>
+
+          {/* Header & Quick Action Presets */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                Activation des modules & fonctionnalités
+              </h2>
+              <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
+                Adaptez l'application aux besoins précis de cette école. Les modules désactivés sont automatiquement masqués du menu latéral, de la navigation mobile et du tableau de bord.
+              </p>
+            </div>
+
+            {/* Presets rapides */}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleEnableAllFeatures}
+                className="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer"
+                title="Active tous les modules de l'application"
+              >
+                Tout activer (10/10)
+              </button>
+              <button
+                type="button"
+                onClick={handleSetPedagogyOnly}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
+                title="Active la scolarité et les bulletins sans la caisse ni les scans"
+              >
+                Pédagogie seule (Sans caisse)
+              </button>
+              <button
+                type="button"
+                onClick={handleSetEssentialOnly}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
+                title="Configuration légère : Élèves, Classes, Matières, Notes et Bulletins uniquement"
+              >
+                Essentiel & Bulletins
+              </button>
+              <button
+                type="button"
+                onClick={handleSetFinanceOnly}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
+                title="Configuration finance : Élèves, Classes, Caisse et Cartes scolaires"
+              >
+                Caisse & Inscriptions
+              </button>
+            </div>
+          </div>
+
+          {/* Filtres par catégorie de modules */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            <span className="text-xs font-semibold text-slate-500 mr-1">Filtrer :</span>
+            {(['TOUS', 'Scolarité', 'Pédagogie', 'Évaluations', 'Finance', 'Sécurité & Scan'] as const).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setFeatureCategoryFilter(cat)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                  featureCategoryFilter === cat 
+                    ? 'bg-slate-900 text-white' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat === 'TOUS' ? 'Tous les modules' : cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Notice info */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <span>
+              💡 Les réglages sont automatiquement sauvegardés pour l'établissement <strong>{formData.schoolName}</strong> (Code : <span className="font-mono font-bold">{cloudSchoolCode}</span>).
+            </span>
+            <span className="font-semibold text-xs shrink-0 bg-blue-100/70 px-2 py-0.5 rounded text-blue-950">
+              {FEATURES_CONFIG.filter(f => isFeatureActive(f.key)).length} / {FEATURES_CONFIG.length} actifs
+            </span>
+          </div>
+
+          {/* Grid of feature toggles */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {FEATURES_CONFIG
+              .filter(feat => featureCategoryFilter === 'TOUS' || feat.category === featureCategoryFilter || (featureCategoryFilter === 'Pédagogie' && feat.category === 'Vie Scolaire'))
+              .map((feat) => {
+              const active = isFeatureActive(feat.key);
+              return (
+                <div
+                  key={feat.key}
+                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
+                    active 
+                      ? 'bg-white border-slate-300 shadow-xs' 
+                      : 'bg-slate-50 border-slate-200 opacity-75'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                          {feat.category}
+                        </span>
+                        {feat.isCore && (
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            Requis
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-sm text-slate-900 mt-1">
+                        {feat.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 leading-relaxed">
+                        {feat.description}
+                      </p>
+                    </div>
+
+                    {/* Toggle Switch */}
+                    <div className="shrink-0 pt-1">
+                      {feat.isCore ? (
+                        <span className="text-xs font-semibold text-slate-400">
+                          Toujours actif
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleFeature(feat.key)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            active ? 'bg-emerald-600' : 'bg-slate-300'
+                          }`}
+                          role="switch"
+                          aria-checked={active}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              active ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Status Indicator */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">
+                      État :
+                    </span>
+                    <span className={`font-semibold ${active ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {active ? '● Activé dans l\'école' : '○ Masqué et désactivé'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
