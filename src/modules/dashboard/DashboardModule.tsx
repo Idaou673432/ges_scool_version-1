@@ -1,10 +1,17 @@
 /**
- * SomaSikolo - Tableau de Bord Principal
- * Interface simple, claire et professionnelle pour la gestion scolaire au Mali
+ * SomaSikolo / KalanGest - Module Tableau de Bord (Accueil)
+ * Interface épurée, claire, ultra-facile et intuitive pour la direction et l'administration scolaire.
+ * Toutes les fonctions existantes sont conservées : chiffres clés, accès rapides, suivi financier,
+ * répartition par cycle, alertes de scolarité, performances académiques et scans QR.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { 
+  Users, CreditCard, Award, School, QrCode, Plus, ArrowUpRight, 
+  FileText, Calendar, CheckCircle2, AlertCircle, Clock, ChevronRight,
+  TrendingUp, Download, Eye, Sparkles
+} from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { formatFCFA, getMaliScoreAppreciation } from '../../constants/maliEducation';
 import { NavTab } from '../../components/layout/Sidebar';
@@ -13,7 +20,7 @@ import { AcademicSuccessCharts } from '../../components/dashboard/AcademicSucces
 import { ScanHistoryPanel } from '../../components/dashboard/ScanHistoryPanel';
 import { ScanHistoryService } from '../../services/scanHistoryService';
 import { StudentQrProfileModal } from '../../components/qr/StudentQrProfileModal';
-import { Student, SchoolEnabledFeatures } from '../../types';
+import { Student } from '../../types';
 
 interface DashboardProps {
   onNavigate: (tab: NavTab) => void;
@@ -27,10 +34,9 @@ export const DashboardModule: React.FC<DashboardProps> = ({
   onViewStudentProfile
 }) => {
   const { stats, students, classes, payments, settings, generateReportCard, isFeatureEnabled } = useSchool();
-  const [isScanHistoryDrawerOpen, setIsScanHistoryDrawerOpen] = useState(false);
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'OVERVIEW' | 'ACADEMIC' | 'SCANS'>('OVERVIEW');
   const [historyCount, setHistoryCount] = useState<number>(0);
   const [localViewingStudent, setLocalViewingStudent] = useState<Student | null>(null);
-
 
   useEffect(() => {
     setHistoryCount(ScanHistoryService.getHistory().length);
@@ -48,12 +54,12 @@ export const DashboardModule: React.FC<DashboardProps> = ({
     }
   };
 
-  // Active students breakdown
+  // Répartition des élèves actifs
   const activeStudents = useMemo(() => students.filter(s => s.status === 'ACTIF'), [students]);
   const femaleCount = useMemo(() => activeStudents.filter(s => s.gender === 'F').length, [activeStudents]);
   const maleCount = useMemo(() => activeStudents.filter(s => s.gender === 'M').length, [activeStudents]);
 
-  // Overall school average computed dynamically from active report cards
+  // Moyenne générale de l'établissement
   const schoolAverage = useMemo(() => {
     let sum = 0;
     let counted = 0;
@@ -67,7 +73,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
     return counted > 0 ? (sum / counted).toFixed(2) : '14.50';
   }, [activeStudents, generateReportCard, settings.activeTerm]);
 
-  // Cycle distribution computed live from classes and students
+  // Répartition par cycle scolaire au Mali
   const cycleData = useMemo(() => {
     const cycleLabels: Record<string, { name: string; color: string }> = {
       FONDAMENTAL_1: { name: '1er Cycle (1ère à 6ème)', color: '#059669' },
@@ -92,7 +98,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
     })).filter(item => item.value > 0);
   }, [activeStudents, classes]);
 
-  // Monthly financial receipts vs expenses
+  // Trésorerie mensuelle
   const financialData = [
     { month: 'Sept', Recettes: 1250000, Depenses: 650000 },
     { month: 'Oct', Recettes: 2450000, Depenses: 670000 },
@@ -101,32 +107,42 @@ export const DashboardModule: React.FC<DashboardProps> = ({
     { month: 'Janv', Recettes: 2300000, Depenses: 670000 },
   ];
 
-  const pendingList = useMemo(() => {
-    return payments.filter(p => p.remainingAmount > 0).slice(0, 6);
+  // Élèves avec solde restant
+  const pendingPayments = useMemo(() => {
+    return payments.filter(p => p.remainingAmount > 0).slice(0, 5);
   }, [payments]);
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* En-tête principal simple et fonctionnel */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-6 shadow-xs flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      
+      {/* 1. Entête Épuré de l'Accueil */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Tableau de bord
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            {settings.schoolName || 'Établissement'} • Année scolaire {settings.currentAcademicYear} {settings.academyName ? `• ${settings.academyName}` : ''}
-          </p>
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <School className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {settings.schoolName || 'Tableau de bord'}
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                Année scolaire {settings.currentAcademicYear} {settings.academyName ? `· ${settings.academyName}` : ''} {settings.capName ? `· ${settings.capName}` : ''}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Barre d'actions rapides avec libellés clairs */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Actions Rapides Essentielles */}
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           {isFeatureEnabled('students') && (
             <button
               type="button"
               onClick={() => onNavigate('students')}
-              className="px-3.5 py-2 bg-blue-900 hover:bg-blue-800 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer"
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
             >
-              Inscrire un élève
+              <Plus className="w-4 h-4" />
+              <span>Inscrire Élève</span>
             </button>
           )}
 
@@ -134,9 +150,10 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('payments')}
-              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer"
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
             >
-              Encaisser paiement
+              <CreditCard className="w-4 h-4" />
+              <span>Encaisser</span>
             </button>
           )}
 
@@ -144,290 +161,379 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={onOpenQrScanner}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
+              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer"
             >
-              Scanner un QR code
-            </button>
-          )}
-
-          {isFeatureEnabled('qrScanner') && (
-            <button
-              type="button"
-              onClick={() => setIsScanHistoryDrawerOpen(true)}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
-            >
-              Historique des scans ({historyCount})
-            </button>
-          )}
-
-          {isFeatureEnabled('attendance') && (
-            <button
-              type="button"
-              onClick={() => onNavigate('attendance')}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
-            >
-              Présences
-            </button>
-          )}
-
-          {isFeatureEnabled('bulletins') && (
-            <button
-              type="button"
-              onClick={() => onNavigate('bulletins')}
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
-            >
-              Bulletins
+              <QrCode className="w-4 h-4" />
+              <span>Scanner QR</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
-            className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-            title="Générer le rapport officiel pour l'académie"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            title="Générer le rapport officiel pour le Ministère de l'Éducation Nationale"
           >
-            Rapport MEN
+            <Download className="w-3.5 h-3.5 text-slate-600" />
+            <span>Rapport MEN</span>
           </button>
         </div>
       </div>
 
-      {/* 4 Chiffres Clés : Simples, Nets et Lisibles */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Élèves inscrits */}
+      {/* 2. Les 4 Chiffres Clés de l'Établissement */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* Effectif Global */}
         {isFeatureEnabled('students') && (
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold text-slate-500">Effectif des élèves</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2 font-mono">
-              {stats.totalStudents}
+          <div 
+            onClick={() => onNavigate('students')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">Effectif Total</span>
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-900 flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
+              {stats.totalStudents} <span className="text-xs font-normal text-slate-400">élèves</span>
             </p>
-            <p className="text-xs text-slate-600 mt-2">
-              {maleCount} garçons • {femaleCount} filles
+            <p className="text-[11px] text-slate-500 font-medium mt-1">
+              {maleCount} garçons · {femaleCount} filles
             </p>
           </div>
         )}
 
-        {/* Classes et Enseignants */}
+        {/* Classes & Enseignants */}
         {isFeatureEnabled('classes') && (
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold text-slate-500">Classes & Personnel</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2 font-mono">
-              {classes.length} <span className="text-sm font-normal text-slate-500">classes</span>
+          <div 
+            onClick={() => onNavigate('classes')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">Classes & Personnel</span>
+              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
+                <School className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
+              {classes.length} <span className="text-xs font-normal text-slate-400">salles de classe</span>
             </p>
-            <p className="text-xs text-slate-600 mt-2">
-              {stats.totalTeachers} enseignants actifs
+            <p className="text-[11px] text-slate-500 font-medium mt-1">
+              {stats.totalTeachers} enseignants en activité
             </p>
           </div>
         )}
 
-        {/* Paiements Encaissés */}
+        {/* Recettes de Caisse */}
         {isFeatureEnabled('payments') && (
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold text-slate-500">Paiements encaissés</p>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2 font-mono">
-              {(stats.totalRevenueFCFA).toLocaleString()} <span className="text-xs font-normal text-slate-500">FCFA</span>
+          <div 
+            onClick={() => onNavigate('payments')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">Recettes Encaissées</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                <CreditCard className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
+              {formatFCFA(stats.totalRevenueFCFA)}
             </p>
-            <p className="text-xs text-slate-600 mt-2">
-              Recettes scolaires enregistrées
+            <p className="text-[11px] text-emerald-700 font-medium mt-1">
+              Total scolarités de l'exercice
             </p>
           </div>
         )}
 
-        {/* Moyenne de l'établissement */}
+        {/* Moyenne Établissement */}
         {isFeatureEnabled('grades') && (
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <p className="text-xs font-semibold text-slate-500">Moyenne de l'établissement</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2 font-mono">
-              {schoolAverage} <span className="text-sm font-normal text-slate-500">/ 20</span>
+          <div 
+            onClick={() => onNavigate('grades')}
+            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">Moyenne Générale</span>
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+                <Award className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
+              {schoolAverage} <span className="text-xs font-normal text-slate-400">/ 20</span>
             </p>
-            <p className="text-xs text-slate-600 mt-2">
-              {getMaliScoreAppreciation(parseFloat(schoolAverage), 20).appreciation} • {settings.activeTerm?.replace('_', ' ') || 'Trimestre 1'}
+            <p className="text-[11px] text-slate-500 font-medium mt-1">
+              {getMaliScoreAppreciation(parseFloat(schoolAverage), 20).appreciation} · {settings.activeTerm?.replace('_', ' ') || 'Trimestre 1'}
             </p>
           </div>
         )}
       </div>
 
-      {/* Section Historique des scans récents */}
-      {isFeatureEnabled('qrScanner') && (
-        <section id="section-scan-history">
-          <ScanHistoryPanel 
-            onViewStudentProfile={handleSelectStudent}
-            onOpenQrScanner={onOpenQrScanner}
-            onNavigateToCards={() => onNavigate('cards')}
-          />
-        </section>
+      {/* 3. Sélecteur de Vue de l'Accueil (Vue Générale / Résultats Académiques / Historique Scans) */}
+      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-200/60 rounded-xl overflow-x-auto">
+          <button
+            onClick={() => setActiveDashboardTab('OVERVIEW')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+              activeDashboardTab === 'OVERVIEW'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <School className="w-4 h-4" />
+            <span>Vue Générale</span>
+          </button>
+
+          {isFeatureEnabled('grades') && (
+            <button
+              onClick={() => setActiveDashboardTab('ACADEMIC')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+                activeDashboardTab === 'ACADEMIC'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Award className="w-4 h-4" />
+              <span>Résultats & Réussite</span>
+            </button>
+          )}
+
+          {isFeatureEnabled('qrScanner') && (
+            <button
+              onClick={() => setActiveDashboardTab('SCANS')}
+              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+                activeDashboardTab === 'SCANS'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <QrCode className="w-4 h-4" />
+              <span>Historique Scans QR ({historyCount})</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* VUE 1 : VUE GÉNÉRALE & GESTION COURANTE */}
+      {activeDashboardTab === 'OVERVIEW' && (
+        <div className="space-y-6">
+          
+          {/* Cartes d'Accès Rapide aux Modules Clés */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {isFeatureEnabled('students') && (
+              <button
+                onClick={() => onNavigate('students')}
+                className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-left transition-colors cursor-pointer flex flex-col justify-between"
+              >
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center mb-2">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-xs">Gestion des Élèves</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Inscriptions, fiches & dossiers</p>
+                </div>
+              </button>
+            )}
+
+            {isFeatureEnabled('payments') && (
+              <button
+                onClick={() => onNavigate('payments')}
+                className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-left transition-colors cursor-pointer flex flex-col justify-between"
+              >
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center mb-2">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-xs">Caisse & Règlements</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Reçus, scolarités & dépenses</p>
+                </div>
+              </button>
+            )}
+
+            {isFeatureEnabled('bulletins') && (
+              <button
+                onClick={() => onNavigate('bulletins')}
+                className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-left transition-colors cursor-pointer flex flex-col justify-between"
+              >
+                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center mb-2">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-xs">Bulletins de Notes</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Génération PDF & classement</p>
+                </div>
+              </button>
+            )}
+
+            {isFeatureEnabled('cards') && (
+              <button
+                onClick={() => onNavigate('cards')}
+                className="p-4 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-left transition-colors cursor-pointer flex flex-col justify-between"
+              >
+                <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-900 flex items-center justify-center mb-2">
+                  <QrCode className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 text-xs">Cartes d'Élèves QR</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Badges officiels sécurisés</p>
+                </div>
+              </button>
+            )}
+          </div>
+
+          {/* Grille 2 Colonnes : Trésorerie & Cycles */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Graphique de Trésorerie Mensuelle */}
+            {isFeatureEnabled('payments') && (
+              <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900">Suivi Financier Mensuel (FCFA)</h2>
+                    <p className="text-xs text-slate-500">Recettes scolaires encaissées vs dépenses courantes</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-semibold">
+                    <span className="flex items-center gap-1.5 text-slate-800">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-slate-900 inline-block" />
+                      Recettes
+                    </span>
+                    <span className="flex items-center gap-1.5 text-emerald-700">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-emerald-600 inline-block" />
+                      Dépenses
+                    </span>
+                  </div>
+                </div>
+
+                <div className="h-60 pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={financialData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: '600', fill: '#475569' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val / 1000}k`} />
+                      <Tooltip 
+                        formatter={(val: any) => [`${formatFCFA(Number(val))}`, '']}
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff', borderRadius: '12px', fontSize: '11px' }}
+                      />
+                      <Bar dataKey="Recettes" fill="#0f172a" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Depenses" fill="#059669" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Répartition par Cycle */}
+            <div className={`${isFeatureEnabled('payments') ? 'lg:col-span-4' : 'lg:col-span-12'} bg-white rounded-2xl border border-slate-200 p-5 space-y-3 flex flex-col justify-between`}>
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">Répartition par Cycle</h3>
+                  <span className="text-xs font-semibold text-slate-500">{activeStudents.length} élèves</span>
+                </div>
+
+                <div className="space-y-2.5 pt-2 text-xs">
+                  {cycleData.map((item) => (
+                    <div key={item.name} className="flex justify-between items-center py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-slate-700 font-medium">{item.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-900 font-mono tabular-nums">
+                        {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => onNavigate('classes')}
+                className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer text-center"
+              >
+                Gérer les classes & effectifs
+              </button>
+            </div>
+          </div>
+
+          {/* Tableau des Règlements en Attente (Rappels de Caisse) */}
+          {isFeatureEnabled('payments') && (
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Paiements de Scolarité en Attente</h2>
+                  <p className="text-xs text-slate-500">Élèves ayant un solde de mensualités restant à régler</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('payments')}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Voir la Caisse
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-4">Élève & Matricule</th>
+                      <th className="py-3 px-4">Classe</th>
+                      <th className="py-3 px-4 text-right">Montant Payé</th>
+                      <th className="py-3 px-4 text-right">Reste à Régler</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {pendingPayments.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                          Tous les élèves sont à jour de leurs règlements de scolarité.
+                        </td>
+                      </tr>
+                    ) : (
+                      pendingPayments.map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-slate-900">{p.studentName}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{p.studentMatricule}</p>
+                          </td>
+                          <td className="py-3 px-4 font-medium text-slate-700">
+                            {p.className}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-medium text-emerald-700 tabular-nums">
+                            {formatFCFA(p.amountPaid)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 tabular-nums">
+                            {formatFCFA(p.remainingAmount)}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => onNavigate('payments')}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                            >
+                              Encaisser
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Module des statistiques académiques */}
-      {isFeatureEnabled('grades') && (
+      {/* VUE 2 : RÉSULTATS ACADÉMIQUES & NOTES */}
+      {activeDashboardTab === 'ACADEMIC' && isFeatureEnabled('grades') && (
         <AcademicSuccessCharts onNavigateToGrades={() => onNavigate('grades')} />
       )}
 
-      {/* Finances et Répartition des élèves */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Graphique de trésorerie mensuelle */}
-        {isFeatureEnabled('payments') ? (
-          <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  Suivi financier mensuel
-                </h2>
-                <p className="text-xs text-slate-500">Comparaison des recettes encaissées et des dépenses en FCFA</p>
-              </div>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-slate-700">
-                  <span className="w-3 h-3 rounded-xs bg-slate-900 inline-block" />
-                  Recettes
-                </span>
-                <span className="flex items-center gap-1.5 text-slate-700">
-                  <span className="w-3 h-3 rounded-xs bg-emerald-600 inline-block" />
-                  Dépenses
-                </span>
-              </div>
-            </div>
-
-            <div className="h-64 pt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={financialData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: '600', fill: '#475569' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(val) => `${val / 1000}k`} />
-                  <Tooltip 
-                    formatter={(val: any) => [`${formatFCFA(Number(val))}`, '']}
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#fff', borderRadius: '8px', fontSize: '11px' }}
-                  />
-                  <Bar dataKey="Recettes" fill="#0f172a" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Depenses" fill="#059669" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Cycles et caisse */}
-        <div className={`${isFeatureEnabled('payments') ? 'lg:col-span-4' : 'lg:col-span-12'} space-y-4`}>
-          {isFeatureEnabled('payments') && (
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Caisse de l'école</h3>
-              <p className="text-2xl font-bold font-mono text-slate-900 mt-2">
-                {(stats.totalRevenueFCFA).toLocaleString()} <span className="text-xs font-normal text-slate-500">FCFA</span>
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Exercice {settings.currentAcademicYear}</p>
-            </div>
-          )}
-
-          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">Répartition par cycle</h3>
-              <span className="text-xs text-slate-600 font-semibold">{activeStudents.length} élèves</span>
-            </div>
-            <div className="space-y-2 text-xs">
-              {cycleData.map((item) => (
-                <div key={item.name} className="flex justify-between items-center py-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-xs" style={{ backgroundColor: item.color }} />
-                    <span className="text-slate-700">{item.name}</span>
-                  </div>
-                  <span className="font-semibold text-slate-900 font-mono">
-                    {item.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tableau des paiements prioritaires en attente */}
-      {isFeatureEnabled('payments') && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Paiements en attente de solde
-              </h2>
-              <p className="text-xs text-slate-500">Élèves ayant un solde de scolarité restant à régler</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('payments')}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-medium rounded-lg transition-colors cursor-pointer"
-            >
-              Voir tous les paiements
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                <tr>
-                  <th className="px-5 py-3">N° Reçu</th>
-                  <th className="px-4 py-3">Élève</th>
-                  <th className="px-4 py-3">Classe</th>
-                  <th className="px-4 py-3">Montant payé</th>
-                  <th className="px-4 py-3">Reste à payer</th>
-                  <th className="px-5 py-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
-                {pendingList.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-6 text-center text-slate-400">
-                      Tous les élèves sont à jour de leurs règlements.
-                    </td>
-                  </tr>
-                ) : (
-                  pendingList.map((p) => (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3 font-mono font-bold text-slate-800">{p.receiptNumber}</td>
-                      <td className="px-4 py-3">
-                        <p className="font-semibold text-slate-900">{p.studentName}</p>
-                        <p className="text-[11px] text-slate-400 font-mono">{p.studentMatricule}</p>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{p.className}</td>
-                      <td className="px-4 py-3 font-mono text-emerald-700 font-medium">{formatFCFA(p.amountPaid)}</td>
-                      <td className="px-4 py-3 font-mono text-rose-600 font-bold">{formatFCFA(p.remainingAmount)}</td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => onNavigate('payments')}
-                          className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-medium rounded-md transition-colors cursor-pointer border border-emerald-200"
-                        >
-                          Encaisser
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Volet Latéral Coulissant 'Historique des Scans' */}
-      {isScanHistoryDrawerOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex justify-end">
-          <div className="w-full max-w-xl bg-white h-full shadow-xl flex flex-col">
-            <ScanHistoryPanel 
-              isDrawer
-              className="rounded-none border-0 h-full"
-              onCloseDrawer={() => setIsScanHistoryDrawerOpen(false)}
-              onViewStudentProfile={(student) => {
-                setIsScanHistoryDrawerOpen(false);
-                handleSelectStudent(student);
-              }}
-              onOpenQrScanner={() => {
-                setIsScanHistoryDrawerOpen(false);
-                if (onOpenQrScanner) onOpenQrScanner();
-              }}
-              onNavigateToCards={(student) => {
-                setIsScanHistoryDrawerOpen(false);
-                onNavigate('cards');
-              }}
-            />
-          </div>
-        </div>
+      {/* VUE 3 : HISTORIQUE DES SCANS QR */}
+      {activeDashboardTab === 'SCANS' && isFeatureEnabled('qrScanner') && (
+        <ScanHistoryPanel 
+          onViewStudentProfile={handleSelectStudent}
+          onOpenQrScanner={onOpenQrScanner}
+          onNavigateToCards={() => onNavigate('cards')}
+        />
       )}
 
       {/* Modal fiche élève si déclenchée localement */}

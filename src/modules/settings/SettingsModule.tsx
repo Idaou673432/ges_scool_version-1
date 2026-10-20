@@ -67,7 +67,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
     }
   }, [initialTab]);
 
-  // Secure PIN access for modules (Default PIN: 0000 / 'oooo')
+  // Secure PIN access for settings & modules (Default PIN: 0000)
   const [isModulesUnlocked, setIsModulesUnlocked] = useState(false);
   const [modulesPinInput, setModulesPinInput] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
       setPinError(null);
       setModulesPinInput('');
     } else {
-      setPinError('Code PIN incorrect. Le code de sécurité par défaut est 0000.');
+      setPinError('Code PIN incorrect. Veuillez réessayer.');
     }
   };
 
@@ -403,7 +403,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             <Sliders className="w-3.5 h-3.5" />
             <span>Modules & Options</span>
             {!isModulesUnlocked ? (
-              <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] bg-amber-100 text-amber-900 font-bold flex items-center gap-0.5" title="Protégé par code PIN (par défaut : 0000)">
+              <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] bg-amber-100 text-amber-900 font-bold flex items-center gap-0.5" title="Protégé par code PIN administrateur">
                 <Lock className="w-2.5 h-2.5" /> PIN
               </span>
             ) : (
@@ -442,15 +442,160 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
         </div>
       </div>
 
-      {savedSuccess && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Paramètres mis à jour avec succès.</span>
-        </div>
-      )}
+      {/* Si non déverrouillé, afficher l'écran d'accès sécurisé par code PIN pour l'ensemble des paramètres */}
+      {!isModulesUnlocked ? (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-10 shadow-sm max-w-md mx-auto my-6 text-center animate-fadeIn">
+          {/* Lock Icon */}
+          <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xs">
+            <Lock className="w-8 h-8" />
+          </div>
 
-      {activeTab === 'INFO' && (
-        <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs space-y-6">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 text-amber-900 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2">
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Accès Administrateur Protégé</span>
+          </div>
+
+          <h2 className="text-xl font-black text-slate-900 mb-2">
+            Accès Sécurisé par Code PIN
+          </h2>
+          <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-6">
+            L'accès aux paramètres et la personnalisation de l'établissement requièrent l'autorisation par code PIN.
+          </p>
+
+          {/* 4 PIN Digit Dots Display */}
+          <div className="flex justify-center items-center gap-3 mb-6">
+            {[0, 1, 2, 3].map((idx) => {
+              const hasChar = modulesPinInput.length > idx;
+              return (
+                <div
+                  key={idx}
+                  className={`w-12 h-14 rounded-xl border-2 flex items-center justify-center font-mono text-2xl font-black transition-all ${
+                    hasChar
+                      ? 'border-slate-900 bg-slate-900 text-white scale-105 shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-400'
+                  }`}
+                >
+                  {hasChar ? '●' : '—'}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Keyboard input (masqué avec type password et placeholder ••••) */}
+          <div className="mb-4 max-w-xs mx-auto">
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              maxLength={4}
+              value={modulesPinInput}
+              onChange={(e) => {
+                const val = e.target.value.slice(0, 4);
+                setModulesPinInput(val);
+                setPinError(null);
+                if (val.length === 4) {
+                  handleVerifyModulesPin(val);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleVerifyModulesPin();
+                }
+              }}
+              placeholder="••••"
+              className="w-full text-center px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-base tracking-widest font-bold focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none"
+            />
+          </div>
+
+          {pinError && (
+            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>{pinError}</span>
+            </div>
+          )}
+
+          {/* On-screen Keypad */}
+          <div className="max-w-xs mx-auto grid grid-cols-3 gap-2 mb-6">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+              <button
+                key={digit}
+                type="button"
+                onClick={() => handlePinDigitPress(digit)}
+                className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
+              >
+                {digit}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={handlePinClear}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer font-sans"
+            >
+              Effacer
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePinDigitPress('0')}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={handlePinBackspace}
+              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center"
+              title="Supprimer un chiffre"
+            >
+              ⌫
+            </button>
+          </div>
+
+          {/* Action Button */}
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => handleVerifyModulesPin()}
+              className="w-full py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Unlock className="w-4 h-4 text-amber-400" />
+              <span>Déverrouiller les Paramètres</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Security Unlock Active Banner */}
+          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-full flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Accès Administrateur Déverrouillé</span>
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsModulesUnlocked(false);
+                setModulesPinInput('');
+              }}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Reverrouiller l'accès"
+            >
+              <Lock className="w-3.5 h-3.5 text-slate-500" />
+              <span>Reverrouiller</span>
+            </button>
+          </div>
+
+          {savedSuccess && (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Paramètres mis à jour avec succès.</span>
+            </div>
+          )}
+
+          {activeTab === 'INFO' && (
+            <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Nom Officiel de l'Établissement *</label>
@@ -700,21 +845,21 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
 
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Code PIN Modules & Options (par défaut : 0000) *
+                    Code PIN de Sécurité (Paramètres & Modules) *
                   </label>
                   <div className="relative mt-2">
                     <input
-                      type="text"
+                      type="password"
                       required
                       maxLength={8}
                       value={formData.modulesSecurityPin || '0000'}
                       onChange={e => setFormData({ ...formData, modulesSecurityPin: e.target.value })}
-                      className="w-full p-3.5 bg-white border border-slate-200 rounded-full text-sm font-black font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-900 tracking-wider"
-                      placeholder="0000"
+                      className="w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-900 tracking-wider"
+                      placeholder="••••"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400 font-bold mt-1.5">
-                    Code PIN de sécurité requis pour activer ou désactiver les modules (Code d'accès par défaut : <strong>0000</strong>).
+                  <p className="text-[10px] text-slate-400 font-medium mt-1.5">
+                    Code PIN de sécurité requis pour déverrouiller et modifier les Paramètres ainsi que les Modules.
                   </p>
                 </div>
 
@@ -778,158 +923,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
         </div>
       )}
 
-      {activeTab === 'FEATURES' && !isModulesUnlocked && (
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-10 shadow-sm max-w-md mx-auto my-6 text-center animate-fadeIn">
-          {/* Lock Icon */}
-          <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xs">
-            <Lock className="w-8 h-8" />
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 text-amber-900 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2">
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Accès Administrateur Protégé</span>
-          </div>
-
-          <h2 className="text-xl font-black text-slate-900 mb-2">
-            Accès Sécurisé par Code PIN
-          </h2>
-          <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-6">
-            L'activation et la personnalisation des modules de l'école requièrent l'autorisation par code PIN.
-          </p>
-
-          {/* 4 PIN Digit Dots Display */}
-          <div className="flex justify-center items-center gap-3 mb-6">
-            {[0, 1, 2, 3].map((idx) => {
-              const hasChar = modulesPinInput.length > idx;
-              return (
-                <div
-                  key={idx}
-                  className={`w-12 h-14 rounded-xl border-2 flex items-center justify-center font-mono text-2xl font-black transition-all ${
-                    hasChar
-                      ? 'border-slate-900 bg-slate-900 text-white scale-105 shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-400'
-                  }`}
-                >
-                  {hasChar ? '●' : '—'}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Keyboard input */}
-          <div className="mb-4 max-w-xs mx-auto">
-            <input
-              type="text"
-              inputMode="numeric"
-              autoFocus
-              maxLength={4}
-              value={modulesPinInput}
-              onChange={(e) => {
-                const val = e.target.value.slice(0, 4);
-                setModulesPinInput(val);
-                setPinError(null);
-                if (val.length === 4) {
-                  handleVerifyModulesPin(val);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleVerifyModulesPin();
-                }
-              }}
-              placeholder="Entrez 0000..."
-              className="w-full text-center px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm tracking-widest font-bold focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none"
-            />
-          </div>
-
-          {pinError && (
-            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>{pinError}</span>
-            </div>
-          )}
-
-          {/* On-screen Keypad */}
-          <div className="max-w-xs mx-auto grid grid-cols-3 gap-2 mb-6">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-              <button
-                key={digit}
-                type="button"
-                onClick={() => handlePinDigitPress(digit)}
-                className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
-              >
-                {digit}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={handlePinClear}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer font-sans"
-            >
-              Effacer
-            </button>
-            <button
-              type="button"
-              onClick={() => handlePinDigitPress('0')}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
-            >
-              0
-            </button>
-            <button
-              type="button"
-              onClick={handlePinBackspace}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center"
-              title="Supprimer un chiffre"
-            >
-              ⌫
-            </button>
-          </div>
-
-          {/* Action Button */}
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => handleVerifyModulesPin()}
-              className="w-full py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Unlock className="w-4 h-4 text-amber-400" />
-              <span>Déverrouiller les Modules</span>
-            </button>
-            
-            <p className="text-[11px] text-slate-400 font-medium mt-1">
-              💡 Code PIN de sécurité par défaut : <strong className="font-mono text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded">0000</strong>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'FEATURES' && isModulesUnlocked && (
+      {activeTab === 'FEATURES' && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-7 shadow-xs space-y-6 animate-fadeIn">
-          {/* Security Unlock Active Banner */}
-          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-full flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Accès Sécurisé Actif (Code PIN 0000 Validé)</span>
-              </span>
-              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-                • Modifications appliquées en temps réel
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsModulesUnlocked(false);
-                setModulesPinInput('');
-              }}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Reverrouiller l'accès"
-            >
-              <Lock className="w-3.5 h-3.5 text-slate-500" />
-              <span>Reverrouiller</span>
-            </button>
-          </div>
 
           {/* Header & Quick Action Presets */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
@@ -1934,6 +1929,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* PWA Installation Modal */}
