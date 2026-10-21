@@ -34,14 +34,20 @@ import {
   MessageSquare,
   ChevronRight,
   TrendingUp,
-  RotateCcw
+  RotateCcw,
+  Lock,
+  ShieldCheck,
+  Building2,
+  FileCheck
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
-import { Payment, PaymentCategory, PaymentMethod, Student, Expense, ExpenseCategory, TuitionInvoice, InvoiceStatus } from '../../types';
+import { Payment, PaymentCategory, PaymentMethod, Student, Expense, ExpenseCategory, TuitionInvoice, InvoiceStatus, DailyCashClosure } from '../../types';
 import { formatFCFA, getAnnualTuitionFee, getEvaluationCountForClass } from '../../constants/maliEducation';
 import { PdfService } from '../../services/pdfService';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 import { cloudSyncService } from '../../services/cloudSyncService';
+import { DailyCashClosureModal } from '../../components/payments/DailyCashClosureModal';
+import { ReceiptVerificationModal } from '../../components/receipts/ReceiptVerificationModal';
 
 const INITIAL_EXPENSES: Expense[] = [
   {
@@ -104,7 +110,7 @@ export const PaymentsModule: React.FC = () => {
   } = useSchool();
 
   // Navigation par onglets simples
-  const [activeTab, setActiveTab] = useState<'STUDENTS_FINANCES' | 'TRANSACTIONS' | 'EXPENSES' | 'INVOICES'>('STUDENTS_FINANCES');
+  const [activeTab, setActiveTab] = useState<'STUDENTS_FINANCES' | 'TRANSACTIONS' | 'CLOSURES' | 'EXPENSES' | 'INVOICES'>('STUDENTS_FINANCES');
 
   // Filtres Situation Élèves
   const [studentSearchGlobal, setStudentSearchGlobal] = useState('');
@@ -123,9 +129,40 @@ export const PaymentsModule: React.FC = () => {
   const [modalStudentSearch, setModalStudentSearch] = useState('');
   const [isChangingStudent, setIsChangingStudent] = useState(false);
   const [receiptModalPayment, setReceiptModalPayment] = useState<Payment | null>(null);
+  const [selectedPaymentForVerification, setSelectedPaymentForVerification] = useState<Payment | null>(null);
   const [selectedStudentForDetails, setSelectedStudentForDetails] = useState<Student | null>(null);
   const [paymentToDeleteModal, setPaymentToDeleteModal] = useState<Payment | null>(null);
   const [paymentToEditModal, setPaymentToEditModal] = useState<Payment | null>(null);
+
+  // Clôture Journalière de Caisse State
+  const [closures, setClosures] = useState<DailyCashClosure[]>(() => {
+    try {
+      const saved = localStorage.getItem('kalangest_cash_closures');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+  const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
+  const [closureToDelete, setClosureToDelete] = useState<DailyCashClosure | null>(null);
+
+  const handleSaveClosure = (newClosure: DailyCashClosure) => {
+    const updated = [newClosure, ...closures];
+    setClosures(updated);
+    localStorage.setItem('kalangest_cash_closures', JSON.stringify(updated));
+    setSyncToast(`Procès-Verbal N° ${newClosure.reference} enregistré avec succès !`);
+    setTimeout(() => setSyncToast(null), 4000);
+  };
+
+  const handleDeleteClosure = (id: string) => {
+    const updated = closures.filter(c => c.id !== id);
+    setClosures(updated);
+    localStorage.setItem('kalangest_cash_closures', JSON.stringify(updated));
+    setClosureToDelete(null);
+    setSyncToast('Procès-verbal de clôture supprimé.');
+    setTimeout(() => setSyncToast(null), 3000);
+  };
 
   // Factures & Échéances State
   const [globalDueDate] = useState('2025-11-10');
@@ -476,6 +513,55 @@ export const PaymentsModule: React.FC = () => {
     });
   };
 
+  const handleSwitchReminderLanguage = (lang: 'FR' | 'BAMBARA') => {
+    if (!unpaidReminderModalData) return;
+    const ecole = settings.schoolName || 'Établissement Scolaire';
+    const annee = settings.currentAcademicYear || '2025-2026';
+    const contact = settings.phone || '';
+    const studentFullName = unpaidReminderModalData.studentName;
+
+    if (lang === 'BAMBARA') {
+      const bamanankanMsg = (
+        `*KALANSARA LAKALI - ${ecole.toUpperCase()}*\n` +
+        `----------------------------------------\n` +
+        `I ni ce k'an kɛnɛya chers parents,\n\n` +
+        `An b'aw laseli den ka kalansara kow la :\n` +
+        `👤 *${studentFullName}*\n` +
+        `📚 Klasikɔnɔ : *${unpaidReminderModalData.className}*\n` +
+        `🆔 Matricule : *${unpaidReminderModalData.matricule}*\n` +
+        `📅 San : *${annee}*\n\n` +
+        `📊 *Kalansara Jateminɛ :*\n` +
+        `• Kalansara bɛɛ lajɛlen : ${formatFCFA(unpaidReminderModalData.annualFee)}\n` +
+        `• A sara kɔrɔ : ${formatFCFA(unpaidReminderModalData.totalPaid)}\n` +
+        `⚠️ *DESE BƐ A LA : ${formatFCFA(unpaidReminderModalData.remainingFee)}*\n\n` +
+        `Aw ye hami ka den ka kalansara sara kɛnɛ ma cike la (Caisse walima Orange Money).\n` +
+        `Ala ka denw ka kalan n'u sɔrɔ dèmè!\n` +
+        (contact ? `📞 Caisse & Direction : ${contact}\n` : '') +
+        `_Kalan Kuntigi - ${ecole}_`
+      );
+      setUnpaidReminderModalData(prev => prev ? ({ ...prev, messageText: bamanankanMsg }) : null);
+    } else {
+      const frenchMsg = (
+        `*RAPPEL DE SCOLARITÉ - ${ecole.toUpperCase()}*\n` +
+        `----------------------------------------\n` +
+        `Bonjour Chers Parents / Tuteurs,\n\n` +
+        `Nous vous contactons au sujet de la scolarité de l'élève :\n` +
+        `👤 *${studentFullName}*\n` +
+        `📚 Classe : *${unpaidReminderModalData.className}*\n` +
+        `🆔 Matricule : *${unpaidReminderModalData.matricule}*\n` +
+        `📅 Année Scolaire : *${annee}*\n\n` +
+        `📊 *Situation Financière :*\n` +
+        `• Frais annuels exigibles : ${formatFCFA(unpaidReminderModalData.annualFee)}\n` +
+        `• Déjà versé : ${formatFCFA(unpaidReminderModalData.totalPaid)}\n` +
+        `⚠️ *SOLDE RESTANT À RÉGLER : ${formatFCFA(unpaidReminderModalData.remainingFee)}*\n\n` +
+        `Merci de régulariser ce solde auprès de la caisse ou par mobile money.\n` +
+        (contact ? `📞 Caisse & Direction : ${contact}\n` : '') +
+        `_Direction - ${ecole}_`
+      );
+      setUnpaidReminderModalData(prev => prev ? ({ ...prev, messageText: frenchMsg }) : null);
+    }
+  };
+
   const handleSendReminderViaWhatsApp = () => {
     if (!unpaidReminderModalData) return;
     const cleanPhone = unpaidReminderModalData.phone.replace(/[^0-9]/g, '');
@@ -671,6 +757,17 @@ export const PaymentsModule: React.FC = () => {
             <span>Encaisser un Élève</span>
           </button>
 
+          {/* Bouton Clôture de Caisse Journalière (Procédure Anti-Fraude) */}
+          <button
+            type="button"
+            onClick={() => setIsClosureModalOpen(true)}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            title="Effectuer le contrôle et le PV de clôture journalière à l'aveugle"
+          >
+            <Lock className="w-4 h-4 text-slate-950" />
+            <span>Clôture Journalière (PV)</span>
+          </button>
+
           {/* Bouton Dépense */}
           <button
             type="button"
@@ -827,6 +924,19 @@ export const PaymentsModule: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setActiveTab('CLOSURES')}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+              activeTab === 'CLOSURES'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Lock className="w-4 h-4 text-amber-600" />
+            <span>Clôtures & PV ({closures.length})</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('EXPENSES')}
             className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
               activeTab === 'EXPENSES'
@@ -835,7 +945,7 @@ export const PaymentsModule: React.FC = () => {
             }`}
           >
             <MinusCircle className="w-4 h-4 text-rose-600" />
-            <span>Dépenses de l'École ({expenses.length})</span>
+            <span>Dépenses ({expenses.length})</span>
           </button>
 
           <button
@@ -1168,6 +1278,17 @@ export const PaymentsModule: React.FC = () => {
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Certificat Anti-Fraude */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPaymentForVerification(p)}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Vérifier le certificat officiel anti-fraude de ce reçu"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="hidden sm:inline">Certificat</span>
+                            </button>
+
                             {/* Imprimer Reçu */}
                             <button
                               type="button"
@@ -1220,7 +1341,165 @@ export const PaymentsModule: React.FC = () => {
         </div>
       )}
 
-      {/* 6. ONGLET 3 : Dépenses de l'École */}
+      {/* =========================================================================
+          NOUVEL ONGLET : Clôtures Journalières & Procès-Verbaux de Caisse
+          ========================================================================= */}
+      {activeTab === 'CLOSURES' && (
+        <div className="space-y-4">
+          
+          {/* En-tête de section Clôtures */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-950 flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  Registre des Clôtures de Caisse & Procès-Verbaux
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Contrôles à l'aveugle · Confrontation recettes vs physique · Historique officiel
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsClosureModalOpen(true)}
+              className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-slate-950" />
+              <span>Faire la Clôture de Caisse du Jour</span>
+            </button>
+          </div>
+
+          {/* Table des Clôtures */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            {closures.length === 0 ? (
+              <div className="p-10 text-center space-y-3">
+                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto text-amber-700">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Aucune clôture de caisse enregistrée</h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+                    À la fin de chaque journée ou service, cliquez sur le bouton ci-dessous pour saisir vos espèces comptées à l'aveugle et imprimer le procès-verbal officiel.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsClosureModalOpen(true)}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Effectuer la première clôture</span>
+                </button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-3 px-4">Réf PV & Date</th>
+                      <th className="py-3 px-4">Caissier</th>
+                      <th className="py-3 px-4 text-right">Espèces Comptées</th>
+                      <th className="py-3 px-4 text-right">Attendu Système</th>
+                      <th className="py-3 px-4 text-center">Écart de Caisse</th>
+                      <th className="py-3 px-4 text-center">Statut</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {closures.map(closure => {
+                      const isEquilibre = closure.status === 'EQUILIBRE';
+                      return (
+                        <tr key={closure.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-4">
+                            <p className="font-mono font-bold text-slate-900">{closure.reference}</p>
+                            <p className="text-[10px] text-slate-500">
+                              {new Date(closure.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                          </td>
+
+                          <td className="py-3 px-4 font-medium text-slate-700">
+                            {closure.cashierName}
+                          </td>
+
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                            {formatFCFA(closure.countedCash)}
+                          </td>
+
+                          <td className="py-3 px-4 text-right font-mono text-slate-600">
+                            {formatFCFA(closure.systemNetExpectedCash)}
+                          </td>
+
+                          <td className="py-3 px-4 text-center font-mono font-bold">
+                            <span className={`inline-block px-2.5 py-1 rounded-lg text-xs ${
+                              isEquilibre 
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                                : closure.cashDiscrepancy > 0 
+                                ? 'bg-blue-50 text-blue-800 border border-blue-200' 
+                                : 'bg-rose-50 text-rose-800 border border-rose-200'
+                            }`}>
+                              {closure.cashDiscrepancy > 0 ? '+' : ''}{formatFCFA(closure.cashDiscrepancy)}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-center">
+                            {isEquilibre ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Conforme</span>
+                              </span>
+                            ) : closure.status === 'EXCEDENT' ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700">
+                                <TrendingUp className="w-3.5 h-3.5" />
+                                <span>Excédent</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                <span>Manquant</span>
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Imprimer PV */}
+                              <button
+                                type="button"
+                                onClick={() => PdfService.generateCashClosurePvPdf(closure, settings)}
+                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-emerald-200"
+                                title="Télécharger ou imprimer le procès-verbal signé"
+                              >
+                                <Printer className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Imprimer PV</span>
+                              </button>
+
+                              {/* Supprimer */}
+                              <button
+                                type="button"
+                                onClick={() => setClosureToDelete(closure)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Supprimer ce procès-verbal"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 6. ONGLET 4 : Dépenses de l'École */}
       {activeTab === 'EXPENSES' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1774,6 +2053,20 @@ export const PaymentsModule: React.FC = () => {
                 <MessageCircle className="w-4 h-4" />
                 <span>Envoyer le Reçu par WhatsApp au Parent</span>
               </button>
+
+              {/* Bouton Certificat d'Authenticité Anti-Fraude */}
+              <button
+                type="button"
+                onClick={() => {
+                  const p = receiptModalPayment;
+                  setReceiptModalPayment(null);
+                  setSelectedPaymentForVerification(p);
+                }}
+                className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-700" />
+                <span>Voir le Certificat Anti-Fraude Officiel</span>
+              </button>
             </div>
 
             <div className="pt-2 text-center border-t border-slate-100 flex items-center justify-between">
@@ -1982,14 +2275,32 @@ export const PaymentsModule: React.FC = () => {
                 </div>
               </div>
 
-              {/* Texte du message */}
+              {/* Texte du message avec choix de la langue */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1.5">Message Type :</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="font-bold text-slate-700 block">Message de Relance :</label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchReminderLanguage('FR')}
+                      className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 hover:bg-blue-200 text-blue-900 transition-colors cursor-pointer"
+                    >
+                      🇫🇷 Français
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchReminderLanguage('BAMBARA')}
+                      className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 transition-colors cursor-pointer"
+                    >
+                      🇲🇱 Bambara
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   rows={6}
                   value={unpaidReminderModalData.messageText}
                   onChange={e => setUnpaidReminderModalData({ ...unpaidReminderModalData, messageText: e.target.value })}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-[11px] leading-relaxed outline-none"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-800 text-[11px] leading-relaxed outline-none focus:bg-white focus:border-amber-500"
                 />
               </div>
 
@@ -2285,6 +2596,59 @@ export const PaymentsModule: React.FC = () => {
         itemCount={payments.length}
         description="Attention ! Cette action supprimera définitivement TOUS les reçus de paiement enregistrés dans la caisse."
       />
+
+      {/* Modal Clôture de Caisse Journalière "À l'aveugle" */}
+      {isClosureModalOpen && (
+        <DailyCashClosureModal
+          payments={payments}
+          expenses={expenses}
+          settings={settings}
+          onSaveClosure={handleSaveClosure}
+          onClose={() => setIsClosureModalOpen(false)}
+        />
+      )}
+
+      {/* Modal Certificat Anti-Fraude & Vérification Reçu */}
+      {selectedPaymentForVerification && (
+        <ReceiptVerificationModal
+          payment={selectedPaymentForVerification}
+          settings={settings}
+          onClose={() => setSelectedPaymentForVerification(null)}
+        />
+      )}
+
+      {/* Modal Suppression PV de Clôture */}
+      {closureToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4 border border-slate-200 text-center">
+            <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-xl flex items-center justify-center mx-auto border border-rose-100">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Supprimer ce Procès-Verbal ?</h3>
+              <p className="text-xs text-slate-600 mt-1">
+                Voulez-vous supprimer le PV de clôture <strong>{closureToDelete.reference}</strong> ({new Date(closureToDelete.date).toLocaleDateString('fr-FR')}) de l'historique ?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setClosureToDelete(null)}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteClosure(closureToDelete.id)}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl cursor-pointer"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

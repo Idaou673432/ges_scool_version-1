@@ -29,6 +29,8 @@ import { Student, Gender, StudentStatus } from '../../types';
 import { PdfService } from '../../services/pdfService';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 import { ExcelImportModal } from '../../components/students/ExcelImportModal';
+import { MenOfficialStatsModal } from '../../components/students/MenOfficialStatsModal';
+import { Building2 } from 'lucide-react';
 
 export const StudentsModule: React.FC = () => {
   const { students, classes, saveStudent, deleteStudent, deleteAllStudents, settings } = useSchool();
@@ -38,6 +40,7 @@ export const StudentsModule: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
+  const [isMenStatsOpen, setIsMenStatsOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [qrModalStudent, setQrModalStudent] = useState<{ student: Student; qrUrl: string } | null>(null);
@@ -236,6 +239,17 @@ export const StudentsModule: React.FC = () => {
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>Importer Excel</span>
+          </button>
+
+          {/* Fiche Statistique CAP / MEN */}
+          <button
+            type="button"
+            onClick={() => setIsMenStatsOpen(true)}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            title="Générer la fiche officielle statistique demandée par le CAP et l'Académie"
+          >
+            <Building2 className="w-4 h-4 text-slate-950" />
+            <span>Fiche CAP / MEN</span>
           </button>
 
           {/* Exporter CSV */}
@@ -841,6 +855,16 @@ export const StudentsModule: React.FC = () => {
         itemCount={students.length}
         description="Attention ! Cette action supprimera définitivement TOUS les élèves inscrits ainsi que leurs dossiers scolaires."
       />
+
+      {/* Modal Fiche Statistique Officielle MEN / CAP */}
+      {isMenStatsOpen && (
+        <MenOfficialStatsModal
+          students={students}
+          classes={classes}
+          settings={settings}
+          onClose={() => setIsMenStatsOpen(false)}
+        />
+      )}
     </div>
   );
 };

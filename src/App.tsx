@@ -3,7 +3,7 @@
  * Système de Gestion Scolaire Professionnel pour les Établissements du Mali
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import { SchoolProvider } from './contexts/SchoolContext';
 import { Sidebar, NavTab } from './components/layout/Sidebar';
@@ -25,14 +25,15 @@ import { SettingsModule } from './modules/settings/SettingsModule';
 import { StudentQrScannerModal } from './components/qr/StudentQrScannerModal';
 import { StudentQrProfileModal } from './components/qr/StudentQrProfileModal';
 import { StandaloneStudentQrView } from './components/qr/StandaloneStudentQrView';
-import { Student } from './types';
+import { ReceiptVerificationModal } from './components/receipts/ReceiptVerificationModal';
+import { Student, Payment } from './types';
 import { useSchool } from './contexts/SchoolContext';
 import { ScanHistoryService } from './services/scanHistoryService';
 import { SchoolEnabledFeatures } from './types';
 import { OfflineScanBanner } from './components/common/OfflineScanBanner';
 
 export function AppContent() {
-  const { classes, isFeatureEnabled } = useSchool();
+  const { classes, isFeatureEnabled, payments, settings, students } = useSchool();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
 
   useEffect(() => {
@@ -117,6 +118,41 @@ export function AppContent() {
     setIsUnlocked(false);
   };
 
+  // Detection scan de reçu anti-fraude (par caméra externe ou lien direct)
+  const [externalReceiptNumber, setExternalReceiptNumber] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('verify_receipt') || urlParams.get('receipt') || null;
+    }
+    return null;
+  });
+
+  const verifiedReceiptPayment = useMemo(() => {
+    if (!externalReceiptNumber) return null;
+    const match = payments.find(p => p.receiptNumber.toUpperCase() === externalReceiptNumber.toUpperCase() || p.id === externalReceiptNumber);
+    if (match) return match;
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const matricule = urlParams?.get('mat') || 'MLE-OFFICIEL';
+    const std = students.find(s => s.matricule.toUpperCase() === matricule.toUpperCase());
+    const amount = Number(urlParams?.get('m')) || 25000;
+    return {
+      id: 'verify-' + externalReceiptNumber,
+      receiptNumber: externalReceiptNumber,
+      studentId: std?.id || '',
+      studentMatricule: matricule,
+      studentName: std ? `${std.lastName.toUpperCase()} ${std.firstName}` : (urlParams?.get('name') || 'Élève Enregistré'),
+      className: std ? (classes.find(c => c.id === std.classId)?.name || 'Classe Enregistrée') : 'Classe Enregistrée',
+      category: 'MENSUALITE',
+      amountPaid: amount,
+      expectedAmount: amount,
+      remainingAmount: 0,
+      paymentDate: new Date().toISOString(),
+      method: 'ESPECES',
+      cashierName: 'Caisse Principale',
+      academicYear: settings.currentAcademicYear
+    } as Payment;
+  }, [externalReceiptNumber, payments, students, classes, settings.currentAcademicYear]);
+
   // If opened via external phone camera scan (QR code outside the application),
   // render the dedicated high-definition student presentation view directly!
   if (externalQrData !== null) {
@@ -128,6 +164,22 @@ export function AppContent() {
             window.history.replaceState({}, document.title, window.location.pathname);
           }
           setExternalQrData(null);
+        }}
+      />
+    );
+  }
+
+  // If opened via receipt verification QR Code scan
+  if (externalReceiptNumber !== null && verifiedReceiptPayment) {
+    return (
+      <ReceiptVerificationModal
+        payment={verifiedReceiptPayment}
+        settings={settings}
+        onClose={() => {
+          if (typeof window !== 'undefined' && window.history) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+          setExternalReceiptNumber(null);
         }}
       />
     );

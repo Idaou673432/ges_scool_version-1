@@ -5,7 +5,7 @@
 
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
-import { ReportCard, Payment, Student, SchoolSettings, SchoolClass, TuitionInvoice, AttendanceRecord } from '../types';
+import { ReportCard, Payment, Student, SchoolSettings, SchoolClass, TuitionInvoice, AttendanceRecord, DailyCashClosure } from '../types';
 import { formatFCFA, getTermLabel } from '../constants/maliEducation';
 
 export class PdfService {
@@ -345,13 +345,13 @@ export class PdfService {
   }
 
   /**
-   * Génère le Reçu Officiel de Paiement (Format A5 Paysage)
+   * Génère le Reçu Officiel de Paiement (Format A5 Paysage) avec QR Code Anti-Fraude
    */
-  public static generateReceiptPdf(
+  public static async generateReceiptPdf(
     payment: Payment,
     settings: SchoolSettings,
     action: 'download' | 'print' = 'print'
-  ): void {
+  ): Promise<void> {
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
@@ -431,6 +431,29 @@ export class PdfService {
     doc.setTextColor(220, 38, 38);
     doc.setFontSize(9);
     doc.text(`Reste à Payer : ${formatFCFA(payment.remainingAmount)}`, 110, 76);
+
+    // QR Code Anti-Fraude & Sécurité sur le reçu A5
+    try {
+      const baseUrl = typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : 'https://kalangest.somasikolo.ml';
+      const verifyUrl = `${baseUrl}?verify_receipt=${encodeURIComponent(payment.receiptNumber)}&mat=${encodeURIComponent(payment.studentMatricule)}`;
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
+      doc.addImage(qrDataUrl, 'PNG', 15, 92, 28, 28);
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(7.5);
+      doc.setTextColor(5, 150, 105);
+      doc.text('CERTIFICAT ANTI-FRAUDE', 46, 97);
+      
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text('Scanner pour vérifier l\'authenticité', 46, 103);
+      doc.text('de cet encaissement officiel.', 46, 107);
+      doc.setFont('Helvetica', 'bold');
+      doc.text(`Réf: ${payment.receiptNumber}`, 46, 113);
+    } catch (e) {
+      console.warn('Erreur génération QR reçu A5:', e);
+    }
 
     // Signature et Cachet Officiel
     doc.setTextColor(0, 0, 0);
@@ -614,17 +637,17 @@ export class PdfService {
   }
 
   /**
-   * Génère le Ticket de Caisse Thermique POS 80mm
+   * Génère le Ticket de Caisse Thermique POS 80mm avec QR Code Anti-Fraude
    */
-  public static generateReceiptPosTicketPdf(
+  public static async generateReceiptPosTicketPdf(
     payment: Payment,
     settings: SchoolSettings,
     action: 'download' | 'print' = 'print'
-  ): void {
+  ): Promise<void> {
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: [80, 165] // POS Ticket 80mm
+      format: [80, 205] // POS Ticket 80mm étendu pour le QR Code
     });
 
     let y = 8;
@@ -717,9 +740,30 @@ export class PdfService {
       try {
         y += 2;
         doc.addImage(settings.stampUrl, 'PNG', 25, y, 30, 18);
+        y += 19;
       } catch (e) {
         console.warn('Erreur cachet POS', e);
       }
+    } else {
+      y += 2;
+    }
+
+    // QR Code Anti-Fraude certifié sur Ticket POS
+    try {
+      const baseUrl = typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : 'https://kalangest.somasikolo.ml';
+      const verifyUrl = `${baseUrl}?verify_receipt=${encodeURIComponent(payment.receiptNumber)}&mat=${encodeURIComponent(payment.studentMatricule)}`;
+      const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 90 });
+      doc.addImage(qrDataUrl, 'PNG', 27, y, 26, 26);
+      y += 28;
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(6.5);
+      doc.text('VÉRIFICATION ANTI-FRAUDE', 40, y, { align: 'center' });
+      y += 3.5;
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.text('Scanner pour vérifier l\'authenticité', 40, y, { align: 'center' });
+    } catch (e) {
+      console.warn('Erreur QR ticket POS', e);
     }
 
     this.handlePdfOutput(doc, `Ticket_POS_${payment.receiptNumber}.pdf`, action);
@@ -2040,4 +2084,452 @@ export class PdfService {
 
     doc.save(`Rapport_Assiduite_${className.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   }
+
+  /**
+   * Génère le Procès-Verbal Officiel de Clôture Journalière de Caisse (PDF A4 Portrait)
+   */
+  public static async generateCashClosurePvPdf(
+    closure: DailyCashClosure,
+    settings: SchoolSettings
+  ): Promise<void> {
+    const doc = new jsPDF('p', 'mm', 'a4');
+
+    // Header République du Mali
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text('RÉPUBLIQUE DU MALI', 15, 14);
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Un Peuple - Un But - Une Foi', 15, 18);
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text((settings.academyName || "Académie d'Enseignement").toUpperCase(), 15, 24);
+    doc.setFontSize(9);
+    doc.text((settings.schoolName || 'Établissement Scolaire').toUpperCase(), 15, 29);
+
+    // Titre Box
+    doc.setFillColor(15, 23, 42);
+    doc.rect(70, 10, 70, 10, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('PV DE CLÔTURE DE CAISSE', 105, 16.5, { align: 'center' });
+
+    // Bloc droite
+    doc.setTextColor(51, 65, 85);
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(`${settings.city || 'Bamako'}, Mali`, 195, 14, { align: 'right' });
+    doc.text(`Date de Caisse: ${new Date(closure.date).toLocaleDateString('fr-FR')}`, 195, 19, { align: 'right' });
+    doc.setFont('Helvetica', 'bold');
+    doc.text(`Réf: ${closure.reference}`, 195, 24, { align: 'right' });
+
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.line(15, 33, 195, 33);
+
+    // 1. Cadre d'identification
+    doc.setFillColor(248, 250, 252);
+    doc.rect(15, 36, 180, 16, 'F');
+    doc.rect(15, 36, 180, 16);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`CAISSIER RESPONSABLE : ${closure.cashierName.toUpperCase()}`, 20, 43);
+    doc.setFont('Helvetica', 'normal');
+    doc.text(`Heure de Clôture : ${new Date(closure.closedAt).toLocaleTimeString('fr-FR')}`, 20, 48.5);
+    doc.text(`Année Scolaire : ${closure.academicYear || settings.currentAcademicYear}`, 120, 43);
+    doc.text(`Agrément MEN : ${settings.registrationNumber}`, 120, 48.5);
+
+    // 2. Section Comparaison : Théorique vs Physique
+    let y = 58;
+    doc.setFillColor(15, 23, 42);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text('1. CONFRONTATION DES ENCAISSEMENTS ET DU COMPTAGE PHYSIQUE', 20, y + 4.8);
+
+    y += 7;
+    // En-tête colonnes
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.rect(15, y, 180, 7);
+    doc.setTextColor(51, 65, 85);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text('POSTE DE TRÉSORERIE', 20, y + 4.8);
+    doc.text('THÉORIQUE SYSTÈME', 95, y + 4.8, { align: 'right' });
+    doc.text('COMPTAGE PHYSIQUE', 145, y + 4.8, { align: 'right' });
+    doc.text('ÉCART (+ / -)', 188, y + 4.8, { align: 'right' });
+
+    y += 7;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+
+    // Ligne 1 : Espèces de caisse
+    doc.rect(15, y, 180, 7);
+    doc.text('Espèces en Caisse (Billets & Pièces)', 20, y + 4.8);
+    doc.text(formatFCFA(closure.systemNetExpectedCash), 95, y + 4.8, { align: 'right' });
+    doc.setFont('Helvetica', 'bold');
+    doc.text(formatFCFA(closure.countedCash), 145, y + 4.8, { align: 'right' });
+    const cashEcartColor = closure.cashDiscrepancy === 0 ? [16, 185, 129] : closure.cashDiscrepancy > 0 ? [37, 99, 235] : [225, 29, 72];
+    doc.setTextColor(cashEcartColor[0], cashEcartColor[1], cashEcartColor[2]);
+    doc.text((closure.cashDiscrepancy > 0 ? '+' : '') + formatFCFA(closure.cashDiscrepancy), 188, y + 4.8, { align: 'right' });
+
+    // Ligne 2 : Orange Money
+    y += 7;
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.rect(15, y, 180, 7);
+    doc.text('Orange Money Établissement', 20, y + 4.8);
+    doc.text(formatFCFA(closure.systemMobileMoneyReceipts), 95, y + 4.8, { align: 'right' });
+    doc.text(formatFCFA(closure.countedOrangeMoney), 145, y + 4.8, { align: 'right' });
+    const omEcart = closure.countedOrangeMoney - closure.systemMobileMoneyReceipts;
+    doc.setFont('Helvetica', 'bold');
+    doc.text((omEcart > 0 ? '+' : '') + formatFCFA(omEcart), 188, y + 4.8, { align: 'right' });
+
+    // Ligne 3 : Moov Money & Wave & Autres
+    y += 7;
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.rect(15, y, 180, 7);
+    doc.text('Moov Money / Wave / Chèques', 20, y + 4.8);
+    doc.text(formatFCFA(closure.systemOtherReceipts), 95, y + 4.8, { align: 'right' });
+    doc.text(formatFCFA(closure.countedMoovMoney + closure.countedOther), 145, y + 4.8, { align: 'right' });
+    const otherEcart = (closure.countedMoovMoney + closure.countedOther) - closure.systemOtherReceipts;
+    doc.setFont('Helvetica', 'bold');
+    doc.text((otherEcart > 0 ? '+' : '') + formatFCFA(otherEcart), 188, y + 4.8, { align: 'right' });
+
+    // Ligne 4 : Dépenses de la journée
+    y += 7;
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(15, y, 180, 7, 'F');
+    doc.rect(15, y, 180, 7);
+    doc.text('Dépenses Justifiées Sorties de Caisse', 20, y + 4.8);
+    doc.text(formatFCFA(closure.systemExpenses), 95, y + 4.8, { align: 'right' });
+    doc.text(formatFCFA(closure.systemExpenses), 145, y + 4.8, { align: 'right' });
+    doc.text('0 FCFA', 188, y + 4.8, { align: 'right' });
+
+    // Ligne Totale
+    y += 7;
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, y, 180, 8, 'F');
+    doc.rect(15, y, 180, 8);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('TOTAL GÉNÉRAL NET', 20, y + 5.5);
+    const netTheorique = closure.systemTotalReceipts - closure.systemExpenses;
+    doc.text(formatFCFA(netTheorique), 95, y + 5.5, { align: 'right' });
+    doc.text(formatFCFA(closure.totalPhysicalCounted), 145, y + 5.5, { align: 'right' });
+    doc.setTextColor(cashEcartColor[0], cashEcartColor[1], cashEcartColor[2]);
+    doc.text((closure.totalDiscrepancy > 0 ? '+' : '') + formatFCFA(closure.totalDiscrepancy), 188, y + 5.5, { align: 'right' });
+
+    // 3. Verdict de Conformité
+    y += 14;
+    const isEquilibre = closure.status === 'EQUILIBRE';
+    doc.setFillColor(isEquilibre ? 240 : 254, isEquilibre ? 253 : 242, isEquilibre ? 244 : 242);
+    doc.rect(15, y, 180, 16, 'F');
+    doc.setDrawColor(isEquilibre ? 16 : 225, isEquilibre ? 185 : 29, isEquilibre ? 129 : 72);
+    doc.rect(15, y, 180, 16);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(isEquilibre ? 5 : 185, isEquilibre ? 150 : 28, isEquilibre ? 105 : 28);
+    const statusLabel = isEquilibre 
+      ? '✓ CAISSE PARFAITEMENT ÉQUILIBRÉE — ÉCART STRICTEMENT CONFORME (0 FCFA)' 
+      : closure.status === 'EXCEDENT'
+      ? `▲ EXCÉDENT DE CAISSE DÉTECTÉ (+${formatFCFA(closure.totalDiscrepancy)})`
+      : `▼ DÉFICIT / MANQUANT DE CAISSE CONSTATÉ (${formatFCFA(closure.totalDiscrepancy)})`;
+    doc.text(statusLabel, 105, y + 7, { align: 'center' });
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(
+      isEquilibre 
+        ? 'Toutes les écritures concordent intégralement avec les espèces physiques et les comptes mobile money.'
+        : 'Un écart a été relevé entre le comptage physique à l\'aveugle et les encaissements enregistrés dans le système.',
+      105, y + 12, { align: 'center' }
+    );
+
+    // Observations du caissier
+    y += 22;
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(15, y, 180, 14, 'F');
+    doc.rect(15, y, 180, 14);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('OBSERVATIONS & JUSTIFICATIONS :', 20, y + 5);
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(closure.notes || 'Aucune observation particulière. Clôture effectuée en fin de service.', 20, y + 10, { maxWidth: 170 });
+
+    // QR Code d'Authenticité du PV & Signatures
+    y += 20;
+    try {
+      const qrData = `PV-CLOTURE|REF:${closure.reference}|DATE:${closure.date}|CAISSIER:${closure.cashierName}|PHYS:${closure.totalPhysicalCounted}|THEO:${netTheorique}|ECART:${closure.totalDiscrepancy}|ECOLE:${settings.schoolName}`;
+      const qrDataUrl = await QRCode.toDataURL(qrData, { margin: 1, width: 80 });
+      doc.addImage(qrDataUrl, 'PNG', 18, y, 22, 22);
+    } catch (e) {
+      console.warn('Erreur QR PV Cloture', e);
+    }
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('LE CAISSIER COMPTABLE', 60, y + 5);
+    doc.text('LE DIRECTEUR D\'ÉTABLISSEMENT', 130, y + 5);
+
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Mention manuscrite "Certifié exact et conforme"', 60, y + 10);
+    doc.text('Date, signature et cachet officiel', 130, y + 10);
+
+    if (settings.stampUrl) {
+      try {
+        doc.addImage(settings.stampUrl, 'PNG', 140, y + 12, 35, 22);
+      } catch (e) {
+        console.warn('Erreur cachet PV', e);
+      }
+    }
+
+    doc.save(`PV_Cloture_Caisse_${closure.reference}.pdf`);
+  }
+
+  /**
+   * Génère la Fiche Statistique Officielle de Scolarisation MEN / CAP Mali (A4 Paysage)
+   */
+  public static generateMenOfficialTablePdf(
+    classesData: Array<{
+      className: string;
+      levelCategory: string;
+      under10: { F: number; M: number; T: number };
+      age10_11: { F: number; M: number; T: number };
+      age12_13: { F: number; M: number; T: number };
+      age14_15: { F: number; M: number; T: number };
+      age16Plus: { F: number; M: number; T: number };
+      total: { F: number; M: number; T: number };
+      redoublants: { F: number; M: number; T: number };
+    }>,
+    totals: {
+      totalStudents: number;
+      totalGirls: number;
+      totalBoys: number;
+      totalRedoublants: number;
+      femaleRate: string;
+      genderParityIndex: string;
+    },
+    settings: SchoolSettings
+  ): void {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // En-tête officiel République du Mali
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('RÉPUBLIQUE DU MALI', 15, 12);
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.text('Un Peuple - Un But - Une Foi', 15, 16);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text('MINISTÈRE DE L\'ÉDUCATION NATIONALE', 190, 12);
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text((settings.academyName || 'Académie d\'Enseignement').toUpperCase(), 190, 16);
+    doc.text((settings.capName ? `CAP DE ${settings.capName}` : 'CAP DE RATTACHEMENT').toUpperCase(), 190, 20);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(15, 23, 282, 23);
+
+    // Titre Officiel
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(15, 26, 267, 9, 1.5, 1.5, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(255, 255, 255);
+    doc.text(
+      `TABLEAU STATISTIQUE OFFICIEL DES EFFECTIFS PAR ÂGE ET SEXE — ANNÉE SCOLAIRE ${settings.currentAcademicYear || '2025-2026'}`,
+      148, 32, { align: 'center' }
+    );
+
+    // Métadonnées Établissement
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(8);
+    doc.setFont('Helvetica', 'bold');
+    doc.text(`Établissement : ${settings.schoolName.toUpperCase()}`, 15, 40);
+    doc.setFont('Helvetica', 'normal');
+    doc.text(`N° Autorisation / Décision : ${settings.registrationNumber || 'Non renseigné'} | Commune: ${settings.city}`, 15, 44);
+    doc.text(`Indice de Parité Filles/Garçons (IPG) : ${totals.genderParityIndex} | Taux de Féminisation : ${totals.femaleRate}%`, 180, 44);
+
+    // Tableau Matriciel MEN
+    let y = 48;
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, y, 267, 10, 'F');
+    doc.rect(15, y, 267, 10);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+
+    doc.text('CLASSE', 18, y + 6);
+    doc.text('< 10 ANS', 50, y + 4, { align: 'center' });
+    doc.text('10-11 ANS', 82, y + 4, { align: 'center' });
+    doc.text('12-13 ANS', 114, y + 4, { align: 'center' });
+    doc.text('14-15 ANS', 146, y + 4, { align: 'center' });
+    doc.text('16+ ANS', 178, y + 4, { align: 'center' });
+    doc.text('EFFECTIF TOTAL', 215, y + 4, { align: 'center' });
+    doc.text('DONT REDOUBLANTS', 257, y + 4, { align: 'center' });
+
+    // Sous-colonnes F / G / T
+    doc.setFontSize(6);
+    doc.setTextColor(100, 116, 139);
+    const subCols = [
+      { xF: 44, xG: 50, xT: 56 },
+      { xF: 76, xG: 82, xT: 88 },
+      { xF: 108, xG: 114, xT: 120 },
+      { xF: 140, xG: 146, xT: 152 },
+      { xF: 172, xG: 178, xT: 184 },
+      { xF: 207, xG: 215, xT: 223 },
+      { xF: 249, xG: 257, xT: 265 }
+    ];
+
+    subCols.forEach(col => {
+      doc.text('F', col.xF, y + 8.5);
+      doc.text('G', col.xG, y + 8.5);
+      doc.text('T', col.xT, y + 8.5);
+    });
+
+    y += 10;
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+
+    classesData.forEach((row, idx) => {
+      if (idx % 2 === 1) {
+        doc.setFillColor(248, 250, 252);
+        doc.rect(15, y, 267, 6, 'F');
+      }
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(15, y, 267, 6);
+
+      doc.setFont('Helvetica', 'bold');
+      doc.text(row.className, 18, y + 4.2);
+      doc.setFont('Helvetica', 'normal');
+
+      // under10
+      doc.text(String(row.under10.F), 44, y + 4.2);
+      doc.text(String(row.under10.M), 50, y + 4.2);
+      doc.text(String(row.under10.T), 56, y + 4.2);
+
+      // 10-11
+      doc.text(String(row.age10_11.F), 76, y + 4.2);
+      doc.text(String(row.age10_11.M), 82, y + 4.2);
+      doc.text(String(row.age10_11.T), 88, y + 4.2);
+
+      // 12-13
+      doc.text(String(row.age12_13.F), 108, y + 4.2);
+      doc.text(String(row.age12_13.M), 114, y + 4.2);
+      doc.text(String(row.age12_13.T), 120, y + 4.2);
+
+      // 14-15
+      doc.text(String(row.age14_15.F), 140, y + 4.2);
+      doc.text(String(row.age14_15.M), 146, y + 4.2);
+      doc.text(String(row.age14_15.T), 152, y + 4.2);
+
+      // 16+
+      doc.text(String(row.age16Plus.F), 172, y + 4.2);
+      doc.text(String(row.age16Plus.M), 178, y + 4.2);
+      doc.text(String(row.age16Plus.T), 184, y + 4.2);
+
+      // Total
+      doc.setFont('Helvetica', 'bold');
+      doc.text(String(row.total.F), 207, y + 4.2);
+      doc.text(String(row.total.M), 215, y + 4.2);
+      doc.text(String(row.total.T), 223, y + 4.2);
+
+      // Redoublants
+      doc.text(String(row.redoublants.F), 249, y + 4.2);
+      doc.text(String(row.redoublants.M), 257, y + 4.2);
+      doc.text(String(row.redoublants.T), 265, y + 4.2);
+      doc.setFont('Helvetica', 'normal');
+
+      y += 6;
+      if (y > 175) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
+    // Ligne TOTAL ÉTABLISSEMENT
+    doc.setFillColor(226, 232, 240);
+    doc.rect(15, y, 267, 7, 'F');
+    doc.setDrawColor(15, 23, 42);
+    doc.rect(15, y, 267, 7);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text('TOTAL GÉNÉRAL ÉTABLISSEMENT', 18, y + 4.8);
+
+    doc.text(String(totals.totalGirls), 207, y + 4.8);
+    doc.text(String(totals.totalBoys), 215, y + 4.8);
+    doc.text(String(totals.totalStudents), 223, y + 4.8);
+
+    doc.text(String(totals.totalRedoublants), 265, y + 4.8);
+
+    // Signatures
+    y += 14;
+    if (y > 170) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Fait à ${settings.city || 'Bamako'}, le ` + new Date().toLocaleDateString('fr-FR'), 15, y);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text('L\'INSPECTEUR / CONSEILLER PÉDAGOGIQUE DU CAP', 35, y + 6);
+    doc.text('LE CHEF D\'ÉTABLISSEMENT / DIRECTEUR GÉNÉRAL', 190, y + 6);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Visa et observations du CAP :', 35, y + 11);
+    doc.text('Signature et cachet officiel :', 190, y + 11);
+
+    if (settings.stampUrl) {
+      try {
+        doc.addImage(settings.stampUrl, 'PNG', 205, y + 13, 40, 24);
+      } catch (e) {
+        console.warn('Erreur cachet MEN', e);
+      }
+    }
+
+    doc.save(`Fiche_Statistique_MEN_CAP_${settings.currentAcademicYear || '2025-2026'}.pdf`);
+  }
 }
+

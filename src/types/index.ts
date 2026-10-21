@@ -305,6 +305,34 @@ export interface Payment {
   notes?: string;
 }
 
+export interface DailyCashClosure {
+  id: string;
+  reference: string; // Ex: 'CLOT-2025-1025-01'
+  date: string; // YYYY-MM-DD
+  closedAt: string; // ISO timestamp
+  cashierName: string;
+  academicYear: string;
+  // Physical counted amounts (entered blindly)
+  countedCash: number;
+  countedOrangeMoney: number;
+  countedMoovMoney: number;
+  countedOther: number;
+  totalPhysicalCounted: number;
+  // System theoretical amounts computed for this day
+  systemCashReceipts: number;
+  systemMobileMoneyReceipts: number;
+  systemOtherReceipts: number;
+  systemTotalReceipts: number;
+  systemExpenses: number;
+  systemNetExpectedCash: number;
+  // Discrepancies
+  cashDiscrepancy: number; // countedCash - systemNetExpectedCash
+  totalDiscrepancy: number; // totalPhysicalCounted - (systemTotalReceipts - systemExpenses)
+  status: 'EQUILIBRE' | 'EXCEDENT' | 'DEFICIT';
+  notes?: string;
+  verifiedBy?: string;
+}
+
 export interface SchoolSettings {
   schoolName: string; // Nom officiel de l'établissement
   schoolType: 'PRIVE' | 'PUBLIC' | 'CONFESSIONNEL';
