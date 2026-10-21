@@ -108,10 +108,18 @@ export default defineConfig(() => {
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
+    esbuild: {
+      drop: process.env.NODE_ENV === 'production' ? ['debugger'] : [],
+      legalComments: 'none',
+    },
     build: {
+      sourcemap: false, // Prevents exposing raw source code, component files, or TypeScript mappings in browser DevTools
+      minify: 'esbuild',
+      target: 'es2020',
       chunkSizeWarningLimit: 1600,
       rollupOptions: {
         output: {
+          compact: true,
           manualChunks(id) {
             if (id.includes('node_modules')) {
               if (id.includes('react') || id.includes('react-dom') || id.includes('motion')) {

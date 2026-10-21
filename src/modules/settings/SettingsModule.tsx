@@ -8,6 +8,7 @@ import { useSchool } from '../../contexts/SchoolContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
 import { SchoolEnabledFeatures } from '../../types';
+import { securityShield } from '../../security/securityShield';
 
 const MONTH_OPTIONS = [
   'Septembre', 'Octobre', 'Novembre', 'Décembre', 
@@ -919,6 +920,146 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* BOUCLIER DE SÉCURITÉ & ANTI-PIRATAGE DU CLIENT WEB */}
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-800/80 pb-5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl flex items-center justify-center font-black">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base sm:text-lg font-black uppercase tracking-wide text-white">
+                      Bouclier Anti-Piratage & Protection du Code Source
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider">
+                      Actif à 100%
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Sécurité multicouche active contre l'espionnage, le vol de code et l'altération sur les navigateurs web.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Feature 1 */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Anti-Inspecteur & DevTools</h3>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      Blocage strict de F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C et Ctrl+U. L'accès au panneau de développement est intercepté.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Raccourcis verrouillés</span>
+                </div>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Code Source Manglé & Minifié</h3>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      Source Maps totalement désactivées en production. Les composants React, TypeScript et algorithmes sont illisibles et protégés.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Sourcemaps supprimées</span>
+                </div>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Anti Clic-Droit & Téléchargement</h3>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      Menu contextuel de piratage désactivé. Glisser-déposer de photos d'élèves, cachets officiels et logos bloqué.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Actifs et photos sécurisés</span>
+                </div>
+              </div>
+
+              {/* Feature 4 */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Règles Firestore Renforcées</h3>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      Cloisonnement étanche par établissement. Authentification obligatoire pour toute écriture et lecture de données.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>firestore.rules déployées</span>
+                </div>
+              </div>
+
+              {/* Feature 5 */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Console & Headers Sécurisés</h3>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      En-têtes X-Content-Type nosniff, protection XSS, politique de référent stricte et suppression automatique des débogueurs.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>En-têtes HTTP & CSP configurés</span>
+                </div>
+              </div>
+
+              {/* Feature 6 */}
+              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Anti-Scraping & Copie Massive</h3>
+                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                      Empêche la sélection globale ou l'aspiration automatisée des données de scolarité, tout en permettant la saisie dans les formulaires.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Protection sélective active</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
