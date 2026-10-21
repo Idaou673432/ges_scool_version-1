@@ -27,6 +27,9 @@ import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Student } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
 import { ScanHistoryService } from '../../services/scanHistoryService';
+import { offlineScanQueueService } from '../../services/offlineScanQueue';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { WifiOff, Layers } from 'lucide-react';
 
 interface StudentQrScannerModalProps {
   isOpen: boolean;
@@ -41,6 +44,8 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
 }) => {
   const { students, classes } = useSchool();
   const [activeTab, setActiveTab] = useState<'CAMERA' | 'UPLOAD' | 'JSON_PASTE' | 'TEST'>('CAMERA');
+  const isOnline = useOnlineStatus();
+  const [offlineQueuedNotice, setOfflineQueuedNotice] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
@@ -115,7 +120,22 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
       playScanBeep();
       stopScanner();
       const cls = classes.find(c => c.id === matched.classId);
-      ScanHistoryService.recordScan(matched, cls?.name, 'CAMERA');
+      ScanHistoryService.recordScan(matched, cls?.name, activeTab === 'UPLOAD' ? 'CAMERA' : activeTab === 'JSON_PASTE' ? 'JSON' : 'CAMERA');
+      
+      // Auto queue if offline
+      if (!isOnline) {
+        offlineScanQueueService.enqueueScan({
+          studentId: matched.id,
+          studentMatricule: matched.matricule,
+          studentName: `${matched.lastName.toUpperCase()} ${matched.firstName}`,
+          className: cls?.name,
+          scanPayload: decodedText,
+          scanSource: activeTab === 'UPLOAD' ? 'IMAGE' : activeTab === 'JSON_PASTE' ? 'JSON' : 'CAMERA',
+          action: 'BADGE_VERIFY'
+        });
+        setOfflineQueuedNotice(`Scan hors-ligne de ${matched.firstName} mis en file d'attente locale !`);
+      }
+
       onStudentFound(matched);
       return true;
     } else if (parsed && (parsed.matricule || parsed.m || parsed.name || parsed.firstName || parsed.fn)) {
@@ -151,6 +171,20 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
         }
       };
       ScanHistoryService.recordScan(syntheticStudent, parsed.className, 'JSON');
+      
+      if (!isOnline) {
+        offlineScanQueueService.enqueueScan({
+          studentId: syntheticStudent.id,
+          studentMatricule: syntheticStudent.matricule,
+          studentName: `${syntheticStudent.lastName.toUpperCase()} ${syntheticStudent.firstName}`,
+          className: parsed.className,
+          scanPayload: decodedText,
+          scanSource: 'JSON',
+          action: 'BADGE_VERIFY'
+        });
+        setOfflineQueuedNotice(`Scan hors-ligne de ${syntheticStudent.firstName} mis en file d'attente locale !`);
+      }
+
       onStudentFound(syntheticStudent);
       return true;
     } else {
@@ -332,6 +366,31 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Offline Status Ribbon */}
+        {!isOnline && (
+          <div className="bg-amber-500 text-slate-950 px-5 py-2 text-xs font-bold flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4 text-slate-950 shrink-0" />
+              <span>
+                Mode Hors-Ligne Actif • Recherche instantanée parmi les {students.length} élèves synchronisés. Les scans sont placés en file d'attente.
+              </span>
+            </div>
+            <span className="bg-slate-950 text-amber-300 px-2 py-0.5 rounded text-[10px] font-black uppercase shrink-0">
+              File Hors-Ligne
+            </span>
+          </div>
+        )}
+
+        {offlineQueuedNotice && (
+          <div className="bg-emerald-600 text-white px-5 py-2 text-xs font-bold flex items-center justify-between shrink-0 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+              <span>{offlineQueuedNotice}</span>
+            </div>
+            <span className="text-[10px] uppercase font-mono opacity-80">Enregistré</span>
+          </div>
+        )}
 
         {/* Tab Controls: Camera / Upload / Coller JSON / Test Express */}
         <div className="bg-slate-50 border-b border-slate-200 p-2 grid grid-cols-2 sm:grid-cols-4 gap-1.5 shrink-0">

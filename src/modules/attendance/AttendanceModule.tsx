@@ -35,6 +35,7 @@ import { PdfService } from '../../services/pdfService';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 import { StudentQrScannerModal } from '../../components/qr/StudentQrScannerModal';
 import { StudentQrProfileModal } from '../../components/qr/StudentQrProfileModal';
+import { offlineScanQueueService } from '../../services/offlineScanQueue';
 
 export const AttendanceModule: React.FC = () => {
   const { students, classes, attendanceRecords, saveAttendanceBatch, deleteAllAttendanceRecords, settings } = useSchool();
@@ -911,6 +912,19 @@ export const AttendanceModule: React.FC = () => {
         onClose={() => setIsScannerOpen(false)}
         onStudentFound={(student) => {
           setIsScannerOpen(false);
+          // Mark as present in the current call state
+          handleStatusChange(student.id, 'PRESENT');
+          // If offline, queue for persistent background sync
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            const cls = classes.find(c => c.id === student.classId);
+            offlineScanQueueService.enqueueAttendanceScan(
+              student,
+              cls?.name,
+              selectedDate,
+              'PRESENT',
+              'CAMERA'
+            );
+          }
           setSelectedStudentForProfile(student);
         }}
       />

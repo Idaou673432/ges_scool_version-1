@@ -29,6 +29,7 @@ import { Student } from './types';
 import { useSchool } from './contexts/SchoolContext';
 import { ScanHistoryService } from './services/scanHistoryService';
 import { SchoolEnabledFeatures } from './types';
+import { OfflineScanBanner } from './components/common/OfflineScanBanner';
 
 export function AppContent() {
   const { classes, isFeatureEnabled } = useSchool();
@@ -162,6 +163,9 @@ export function AppContent() {
           onToggleSidebarCollapse={() => setIsSidebarCollapsed(prev => !prev)}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
         />
+
+        {/* Global Offline Status & Scan Queue Synchronization Banner */}
+        <OfflineScanBanner />
 
         <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 pb-24 lg:pb-6 custom-scrollbar">
           {activeTab === 'dashboard' && (
