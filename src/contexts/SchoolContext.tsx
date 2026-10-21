@@ -24,6 +24,7 @@ import {
 import { storageService } from '../services/storageService';
 import { cloudSyncService } from '../services/cloudSyncService';
 import { getMaliScoreAppreciation, getRelatedTermsForPeriod, getEvaluationsPerTrimesterForClass } from '../constants/maliEducation';
+import { secureLocalStorage } from '../services/secureStorage';
 
 export type SyncStatus = 'CONNECTED' | 'SYNCING' | 'OFFLINE' | 'ERROR';
 
@@ -143,7 +144,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onStudentsChange: (cloudStudents) => {
         isSyncingFromCloud.current = true;
         try {
-          localStorage.setItem('somasikolo_students', JSON.stringify(cloudStudents));
+          secureLocalStorage.setJSON('somasikolo_students', cloudStudents);
         } catch {}
         setStudents(cloudStudents);
         isSyncingFromCloud.current = false;
@@ -151,7 +152,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onClassesChange: (cloudClasses) => {
         isSyncingFromCloud.current = true;
         try {
-          localStorage.setItem('somasikolo_classes', JSON.stringify(cloudClasses));
+          secureLocalStorage.setJSON('somasikolo_classes', cloudClasses);
         } catch {}
         setClasses(cloudClasses);
         isSyncingFromCloud.current = false;
@@ -159,7 +160,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onSubjectsChange: (cloudSubjects) => {
         isSyncingFromCloud.current = true;
         try {
-          localStorage.setItem('somasikolo_subjects', JSON.stringify(cloudSubjects));
+          secureLocalStorage.setJSON('somasikolo_subjects', cloudSubjects);
         } catch {}
         setSubjects(cloudSubjects);
         isSyncingFromCloud.current = false;
@@ -167,7 +168,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onTeachersChange: (cloudTeachers) => {
         isSyncingFromCloud.current = true;
         try {
-          localStorage.setItem('somasikolo_teachers', JSON.stringify(cloudTeachers));
+          secureLocalStorage.setJSON('somasikolo_teachers', cloudTeachers);
         } catch {}
         setTeachers(cloudTeachers);
         isSyncingFromCloud.current = false;
@@ -175,7 +176,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onGradesChange: (cloudGrades) => {
         isSyncingFromCloud.current = true;
         try {
-          localStorage.setItem('somasikolo_grades', JSON.stringify(cloudGrades));
+          secureLocalStorage.setJSON('somasikolo_grades', cloudGrades);
         } catch {}
         setGrades(cloudGrades);
         isSyncingFromCloud.current = false;
@@ -186,10 +187,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           // Check for any offline pending payments that need pushing to cloud
           let pendingToPush: Payment[] = [];
           try {
-            const pendingRaw = localStorage.getItem('soma_pending_offline_payments');
-            if (pendingRaw) {
-              pendingToPush = JSON.parse(pendingRaw);
-            }
+            pendingToPush = secureLocalStorage.getJSON<Payment[]>('soma_pending_offline_payments', []);
           } catch {}
 
           if (pendingToPush.length > 0) {
@@ -198,7 +196,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             });
           }
 
-          localStorage.setItem('somasikolo_payments', JSON.stringify(cloudPayments));
+          secureLocalStorage.setJSON('somasikolo_payments', cloudPayments);
           setPayments(cloudPayments);
         } catch (e) {
           console.warn('[SchoolContext] Error in onPaymentsChange:', e);
@@ -209,7 +207,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       onAttendanceChange: (cloudAttendance) => {
         isSyncingFromCloud.current = true;
         try {
-          localStorage.setItem('somasikolo_attendance', JSON.stringify(cloudAttendance));
+          secureLocalStorage.setJSON('somasikolo_attendance', cloudAttendance);
         } catch {}
         setAttendanceRecords(cloudAttendance);
         isSyncingFromCloud.current = false;
@@ -225,7 +223,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         cloudSyncService.fetchAllCloudPayments(cloudSchoolCode).then((fresh) => {
           if (fresh && fresh.length > 0) {
-            localStorage.setItem('somasikolo_payments', JSON.stringify(fresh));
+            secureLocalStorage.setJSON('somasikolo_payments', fresh);
             setPayments(fresh);
           }
         });
@@ -436,10 +434,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Track in pending offline queue in case connection drops
     try {
-      const pendingRaw = localStorage.getItem('soma_pending_offline_payments');
-      const pending: Payment[] = pendingRaw ? JSON.parse(pendingRaw) : [];
+      const pending: Payment[] = secureLocalStorage.getJSON<Payment[]>('soma_pending_offline_payments', []);
       pending.push(res);
-      localStorage.setItem('soma_pending_offline_payments', JSON.stringify(pending));
+      secureLocalStorage.setJSON('soma_pending_offline_payments', pending);
     } catch {}
 
     // Direct robust synchronization to Cloud Firestore
@@ -448,12 +445,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setSyncStatus('CONNECTED');
         setSyncStatusMessage(`Paiement [${res.receiptNumber}] synchronisé sur tous vos appareils`);
         try {
-          const pendingRaw = localStorage.getItem('soma_pending_offline_payments');
-          if (pendingRaw) {
-            const pending: Payment[] = JSON.parse(pendingRaw);
-            const filtered = pending.filter(x => x.id !== res.id);
-            localStorage.setItem('soma_pending_offline_payments', JSON.stringify(filtered));
-          }
+          const pending = secureLocalStorage.getJSON<Payment[]>('soma_pending_offline_payments', []);
+          const filtered = pending.filter(x => x.id !== res.id);
+          secureLocalStorage.setJSON('soma_pending_offline_payments', filtered);
         } catch {}
       }
     }).catch(err => {
@@ -493,7 +487,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       const cloudFresh = await cloudSyncService.fetchAllCloudPayments(cloudSchoolCode);
       if (cloudFresh.length > 0) {
-        localStorage.setItem('somasikolo_payments', JSON.stringify(cloudFresh));
+        secureLocalStorage.setJSON('somasikolo_payments', cloudFresh);
         setPayments(cloudFresh);
       }
       setSyncStatus('CONNECTED');

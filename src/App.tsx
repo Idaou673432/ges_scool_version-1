@@ -31,6 +31,7 @@ import { useSchool } from './contexts/SchoolContext';
 import { ScanHistoryService } from './services/scanHistoryService';
 import { SchoolEnabledFeatures } from './types';
 import { OfflineScanBanner } from './components/common/OfflineScanBanner';
+import { secureLocalStorage, secureSessionStorage } from './services/secureStorage';
 
 export function AppContent() {
   const { classes, isFeatureEnabled, payments, settings, students } = useSchool();
@@ -60,30 +61,31 @@ export function AppContent() {
   const [externalQrData, setExternalQrData] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      const paramData = 
-        urlParams.get('student_qr') || 
-        urlParams.get('verify_qr') || 
-        urlParams.get('json') || 
-        urlParams.get('scan') || 
-        urlParams.get('data') || 
-        urlParams.get('qr') || 
-        urlParams.get('student') || 
-        urlParams.get('m') || 
-        urlParams.get('matricule') || 
-        urlParams.get('d');
+      const isQrRoute =
+        urlParams.has('verify_student') ||
+        urlParams.has('student_id') ||
+        urlParams.has('student_qr') ||
+        urlParams.has('verify_qr') ||
+        urlParams.has('json') ||
+        urlParams.has('scan') ||
+        urlParams.has('data') ||
+        urlParams.has('qr') ||
+        urlParams.has('student') ||
+        urlParams.has('m') ||
+        urlParams.has('matricule') ||
+        urlParams.has('d') ||
+        urlParams.has('qr_view') ||
+        urlParams.has('scan_mode') ||
+        urlParams.has('verify') ||
+        urlParams.has('carte') ||
+        window.location.hash.includes('student') ||
+        window.location.hash.includes('verify') ||
+        window.location.hash.includes('qr=') ||
+        window.location.hash.includes('m=');
 
-      if (paramData) return decodeURIComponent(paramData);
-      if (window.location.hash.includes('student_qr=')) {
-        return decodeURIComponent(window.location.hash.split('student_qr=')[1]);
-      }
-      if (window.location.hash.includes('data=')) {
-        return decodeURIComponent(window.location.hash.split('data=')[1]);
-      }
-      if (window.location.hash.includes('json=')) {
-        return decodeURIComponent(window.location.hash.split('json=')[1]);
-      }
-      if (urlParams.has('qr_view') || urlParams.has('scan_mode') || urlParams.has('verify')) {
-        return '';
+      if (isQrRoute) {
+        // Return full search query or hash so StandaloneStudentQrView can parse all student fields
+        return window.location.search || window.location.hash || '';
       }
     }
     return null;
@@ -92,7 +94,7 @@ export function AppContent() {
   // Persisted desktop sidebar collapsed state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('kalangest_sidebar_collapsed') === 'true';
+      return secureLocalStorage.getItem('kalangest_sidebar_collapsed') === 'true';
     } catch {
       return false;
     }
@@ -102,19 +104,19 @@ export function AppContent() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
-    return sessionStorage.getItem('somasikolo_unlocked') === 'true';
+    return secureSessionStorage.getItem('somasikolo_unlocked') === 'true';
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem('kalangest_sidebar_collapsed', String(isSidebarCollapsed));
+      secureLocalStorage.setItem('kalangest_sidebar_collapsed', String(isSidebarCollapsed));
     } catch (e) {
-      console.warn('Could not save sidebar preference in localStorage', e);
+      console.warn('Could not save sidebar preference in secure storage', e);
     }
   }, [isSidebarCollapsed]);
 
   const handleLockApp = () => {
-    sessionStorage.removeItem('somasikolo_unlocked');
+    secureSessionStorage.removeItem('somasikolo_unlocked');
     setIsUnlocked(false);
   };
 

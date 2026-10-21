@@ -1,7 +1,7 @@
 /**
  * SomaSikolo - Cartes Scolaires QR & Badges Module (Amélioré)
  */import React, { useState, useEffect } from 'react';
-import { QrCode, Printer, Building2, CheckSquare, Square, Search, RefreshCw, ShieldCheck, Phone, MapPin, Sparkles, Filter, CreditCard, Download, Camera, Droplet } from 'lucide-react';
+import { QrCode, Printer, Building2, CheckSquare, Square, Search, RefreshCw, ShieldCheck, Phone, MapPin, Sparkles, Filter, CreditCard, Download, Camera, Droplet, CheckCircle2 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { PdfService } from '../../services/pdfService';
 import { Student } from '../../types';
@@ -190,9 +190,15 @@ export const CardsModule: React.FC = () => {
             <CreditCard className="w-7 h-7 text-blue-900" />
             <span>Impression des Cartes Scolaires & Badges</span>
           </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
-            Génération HD • Format Badge Élargi Officiel (Recto / Verso) • QR Code de Sécurité
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-xs text-slate-500 font-medium">
+              Génération HD • Format Badge Élargi Officiel (Recto / Verso)
+            </p>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span>QR Code Smartphone Public (Sans blocage 403)</span>
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
@@ -450,13 +456,31 @@ export const CardsModule: React.FC = () => {
                             <QrCode className="w-10 h-10 text-slate-400" />
                           )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStudentForProfile(std)}
-                          className="text-[8px] font-mono font-bold text-amber-300 hover:text-white mt-1 uppercase cursor-pointer underline"
-                        >
-                          Fiche QR
-                        </button>
+                        <div className="flex items-center gap-1.5 mt-1 no-print">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedStudentForProfile(std)}
+                            className="text-[8px] font-mono font-bold text-amber-300 hover:text-white uppercase cursor-pointer underline"
+                            title="Aperçu modal interne KalanGest"
+                          >
+                            Fiche QR
+                          </button>
+                          <span className="text-[8px] text-white/40">·</span>
+                          <a
+                            href={PdfService.buildStudentVerificationUrl(std, {
+                              className: studentClass?.name,
+                              schoolName: settings.schoolName,
+                              academyName: settings.academyName,
+                              directorName: settings.directorName
+                            })}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[8px] font-mono font-bold text-emerald-300 hover:text-white uppercase cursor-pointer underline"
+                            title="Tester la page publique du scan QR (comme sur smartphone)"
+                          >
+                            Tester Page
+                          </a>
+                        </div>
                       </div>
                     </div>
 

@@ -16,6 +16,7 @@ import {
   AttendanceRecord
 } from '../types';
 import { MALI_ACADEMIES, MALI_DEFAULT_CLASSES, MALI_DEFAULT_SUBJECTS, DEFAULT_EVALUATION_MONTHS } from '../constants/maliEducation';
+import { secureLocalStorage } from './secureStorage';
 
 const STORAGE_KEYS = {
   SETTINGS: 'somasikolo_settings',
@@ -466,51 +467,50 @@ const INITIAL_ATTENDANCE: AttendanceRecord[] = [
 class StorageService {
   private getItem<T>(key: string, defaultValue: T): T {
     try {
-      const data = localStorage.getItem(key);
-      return data ? JSON.parse(data) : defaultValue;
+      return secureLocalStorage.getJSON<T>(key, defaultValue);
     } catch (error) {
-      console.error(`Error reading ${key} from storage:`, error);
+      console.error(`Error reading ${key} from secure storage:`, error);
       return defaultValue;
     }
   }
 
   private setItem<T>(key: string, value: T): void {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      secureLocalStorage.setJSON<T>(key, value);
     } catch (error) {
-      console.error(`Error saving ${key} to storage:`, error);
+      console.error(`Error saving ${key} to secure storage:`, error);
     }
   }
 
   public initDatabase(): void {
-    if (!localStorage.getItem(STORAGE_KEYS.SETTINGS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.SETTINGS)) {
       this.setItem(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.USERS)) {
       this.setItem(STORAGE_KEYS.USERS, INITIAL_USERS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.CLASSES)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.CLASSES)) {
       this.setItem(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.SUBJECTS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.SUBJECTS)) {
       this.setItem(STORAGE_KEYS.SUBJECTS, INITIAL_SUBJECTS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.TEACHERS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.TEACHERS)) {
       this.setItem(STORAGE_KEYS.TEACHERS, INITIAL_TEACHERS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.STUDENTS)) {
       this.setItem(STORAGE_KEYS.STUDENTS, INITIAL_STUDENTS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.GRADES)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.GRADES)) {
       this.setItem(STORAGE_KEYS.GRADES, INITIAL_GRADES);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.PAYMENTS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.PAYMENTS)) {
       this.setItem(STORAGE_KEYS.PAYMENTS, INITIAL_PAYMENTS);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.ATTENDANCE)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.ATTENDANCE)) {
       this.setItem(STORAGE_KEYS.ATTENDANCE, INITIAL_ATTENDANCE);
     }
-    if (!localStorage.getItem(STORAGE_KEYS.LOGS)) {
+    if (!secureLocalStorage.hasItem(STORAGE_KEYS.LOGS)) {
       const initialLogs: AuditLog[] = [
         {
           id: 'log-1',

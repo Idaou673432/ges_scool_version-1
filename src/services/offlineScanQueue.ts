@@ -8,6 +8,7 @@ import { Student, AttendanceRecord } from '../types';
 import { db } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { cleanForFirestore } from './cloudSyncService';
+import { secureLocalStorage } from './secureStorage';
 
 export type ScanActionType = 'ATTENDANCE_CHECKIN' | 'BADGE_VERIFY' | 'CARD_SCAN';
 export type ScanQueueStatus = 'QUEUED' | 'SYNCING' | 'SYNCED' | 'FAILED';
@@ -59,10 +60,8 @@ class OfflineScanQueueService {
   public getQueue(): QueuedScanItem[] {
     if (typeof window === 'undefined') return [];
     try {
-      const raw = localStorage.getItem(QUEUE_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      const items = secureLocalStorage.getJSON<QueuedScanItem[]>(QUEUE_STORAGE_KEY, []);
+      return Array.isArray(items) ? items : [];
     } catch (e) {
       console.error('Erreur lecture queue des scans hors-ligne:', e);
       return [];
@@ -75,7 +74,7 @@ class OfflineScanQueueService {
   private saveQueue(queue: QueuedScanItem[]): void {
     if (typeof window === 'undefined') return;
     try {
-      localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      secureLocalStorage.setJSON(QUEUE_STORAGE_KEY, queue);
       window.dispatchEvent(new CustomEvent(QUEUE_EVENT_NAME, { detail: queue }));
     } catch (e) {
       console.error('Erreur sauvegarde queue des scans hors-ligne:', e);
@@ -210,8 +209,8 @@ class OfflineScanQueueService {
     let syncedCount = 0;
     let failedCount = 0;
 
-    const schoolCode = typeof localStorage !== 'undefined' 
-      ? localStorage.getItem('kalangest_cloud_school_code') || 'ECOLE-PRINCIPALE'
+    const schoolCode = typeof window !== 'undefined' 
+      ? secureLocalStorage.getItem('kalangest_cloud_school_code') || 'ECOLE-PRINCIPALE'
       : 'ECOLE-PRINCIPALE';
 
     const updatedQueue = [...queue];

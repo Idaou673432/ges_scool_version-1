@@ -5,6 +5,7 @@
  */
 
 import { Student } from '../types';
+import { secureLocalStorage } from './secureStorage';
 
 export interface ScanHistoryEntry {
   id: string; // unique entry id
@@ -25,9 +26,7 @@ export class ScanHistoryService {
   static getHistory(): ScanHistoryEntry[] {
     if (typeof window === 'undefined') return [];
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
+      const parsed = secureLocalStorage.getJSON<ScanHistoryEntry[]>(STORAGE_KEY, []);
       if (!Array.isArray(parsed)) return [];
       return parsed.slice(0, MAX_HISTORY);
     } catch (e) {
@@ -63,7 +62,7 @@ export class ScanHistoryService {
       };
 
       const updated = [newEntry, ...filtered].slice(0, MAX_HISTORY);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      secureLocalStorage.setJSON(STORAGE_KEY, updated);
 
       // Émettre l'événement pour mettre à jour l'interface instantanément
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: updated }));
@@ -82,7 +81,7 @@ export class ScanHistoryService {
     try {
       const current = this.getHistory();
       const updated = current.filter(item => item.id !== entryId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      secureLocalStorage.setJSON(STORAGE_KEY, updated);
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: updated }));
       return updated;
     } catch (e) {
@@ -97,7 +96,7 @@ export class ScanHistoryService {
   static clearHistory(): void {
     if (typeof window === 'undefined') return;
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      secureLocalStorage.removeItem(STORAGE_KEY);
       window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: [] }));
     } catch (e) {
       console.error('Erreur vidage historique des scans:', e);

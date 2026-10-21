@@ -6,6 +6,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { storageService } from '../services/storageService';
 import { AuthService } from '../services/authService';
+import { secureLocalStorage } from '../services/secureStorage';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -28,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(loadedUsers);
 
     // Default to Admin or Directeur for initial view
-    const savedActiveId = localStorage.getItem('somasikolo_active_user_id');
+    const savedActiveId = secureLocalStorage.getItem('somasikolo_active_user_id');
     const defaultUser = loadedUsers.find(u => u.id === savedActiveId) || loadedUsers[0];
     setCurrentUser(defaultUser);
   }, []);
@@ -37,14 +38,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const found = users.find(u => u.id === userId);
     if (found) {
       setCurrentUser(found);
-      localStorage.setItem('somasikolo_active_user_id', userId);
+      secureLocalStorage.setItem('somasikolo_active_user_id', userId);
       storageService.addAuditLog('CONNEXION', 'AUTHENTIFICATION', `Connexion de ${found.fullName} (${found.role})`);
     }
   };
 
   const logout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('somasikolo_active_user_id');
+    secureLocalStorage.removeItem('somasikolo_active_user_id');
   };
 
   const switchRoleSimulated = (role: UserRole) => {

@@ -89,23 +89,35 @@ export const StudentQrScannerModal: React.FC<StudentQrScannerModalProps> = ({
     let parsed: any = null;
 
     let candidate = decodedText.trim();
-    // Handle URL format: https://.../?student_qr={...}
-    if (candidate.includes('student_qr=') || candidate.includes('verify_qr=')) {
+
+    // Handle full URL format: https://.../?verify_student=1&m=... or student_qr=...
+    if (candidate.startsWith('http://') || candidate.startsWith('https://') || candidate.includes('?') || candidate.includes('&') || candidate.includes('=')) {
       try {
-        const splitPart = (candidate.includes('student_qr=') ? candidate.split('student_qr=')[1] : candidate.split('verify_qr=')[1]).split('&')[0];
-        candidate = decodeURIComponent(splitPart);
+        const queryPart = candidate.includes('?') ? candidate.split('?')[1] : candidate;
+        const searchParams = new URLSearchParams(queryPart);
+        const m = searchParams.get('m') || searchParams.get('matricule') || searchParams.get('mat') || searchParams.get('num_matricule');
+        const id = searchParams.get('id') || searchParams.get('student_id');
+        if (m) targetMatricule = m.trim();
+        if (id && id !== '1' && id !== 'true') targetId = id.trim();
+
+        const sqr = searchParams.get('student_qr') || searchParams.get('verify_qr') || searchParams.get('json') || searchParams.get('data');
+        if (sqr) {
+          candidate = decodeURIComponent(sqr);
+        }
       } catch {}
     }
 
-    // 1. Try parsing JSON
-    try {
-      parsed = JSON.parse(candidate);
-      if (parsed.matricule) targetMatricule = parsed.matricule.trim();
-      else if (parsed.m) targetMatricule = parsed.m.trim();
-      if (parsed.id) targetId = parsed.id.trim();
-    } catch {
-      // 2. Plain text
-      targetMatricule = candidate;
+    if (!targetMatricule && !targetId) {
+      // 1. Try parsing JSON
+      try {
+        parsed = JSON.parse(candidate);
+        if (parsed.matricule) targetMatricule = parsed.matricule.trim();
+        else if (parsed.m) targetMatricule = parsed.m.trim();
+        if (parsed.id) targetId = parsed.id.trim();
+      } catch {
+        // 2. Plain text
+        targetMatricule = candidate;
+      }
     }
 
     // Lookup in students

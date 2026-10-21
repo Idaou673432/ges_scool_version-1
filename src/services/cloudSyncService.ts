@@ -27,6 +27,8 @@ import {
   AuditLog,
   AttendanceRecord
 } from '../types';
+import { secureLocalStorage } from './secureStorage';
+import { getPublicBaseUrl } from './urlService';
 
 /**
  * Strips undefined values recursively so that Firestore setDoc and writeBatch never crash
@@ -93,7 +95,7 @@ class CloudSyncService {
           const clean = codeFromUrl.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
           if (clean) {
             this.activeSchoolCode = clean;
-            localStorage.setItem('kalangest_cloud_school_code', clean);
+            secureLocalStorage.setItem('kalangest_cloud_school_code', clean);
             return clean;
           }
         }
@@ -103,8 +105,8 @@ class CloudSyncService {
     }
 
     if (!this.activeSchoolCode) {
-      if (typeof localStorage !== 'undefined') {
-        this.activeSchoolCode = localStorage.getItem('kalangest_cloud_school_code') || 'ECOLE-PRINCIPALE';
+      if (typeof window !== 'undefined') {
+        this.activeSchoolCode = secureLocalStorage.getItem('kalangest_cloud_school_code') || 'ECOLE-PRINCIPALE';
       } else {
         this.activeSchoolCode = 'ECOLE-PRINCIPALE';
       }
@@ -114,17 +116,15 @@ class CloudSyncService {
 
   public getShareableLink(schoolCode?: string): string {
     const code = schoolCode || this.getActiveSchoolCode();
-    if (typeof window !== 'undefined') {
-      return `${window.location.origin}${window.location.pathname}?school=${encodeURIComponent(code)}`;
-    }
-    return `https://somasikolo.vercel.app/?school=${encodeURIComponent(code)}`;
+    const baseUrl = getPublicBaseUrl();
+    return `${baseUrl}?school=${encodeURIComponent(code)}`;
   }
 
   public setActiveSchoolCode(code: string): void {
     const cleanCode = code.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'ECOLE-PRINCIPALE';
     this.activeSchoolCode = cleanCode;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('kalangest_cloud_school_code', cleanCode);
+    if (typeof window !== 'undefined') {
+      secureLocalStorage.setItem('kalangest_cloud_school_code', cleanCode);
     }
   }
 

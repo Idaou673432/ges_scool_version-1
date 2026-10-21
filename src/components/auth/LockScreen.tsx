@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle, Building2, ArrowRight, QrCode } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { secureSessionStorage } from '../../services/secureStorage';
 
 interface LockScreenProps {
   onUnlock: () => void;
@@ -19,7 +20,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
     e.preventDefault();
     if (passwordInput === expectedPassword) {
       setError(false);
-      sessionStorage.setItem('somasikolo_unlocked', 'true');
+      secureSessionStorage.setItem('somasikolo_unlocked', 'true');
       onUnlock();
     } else {
       setError(true);

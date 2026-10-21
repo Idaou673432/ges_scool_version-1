@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
 import { ReportCard, Payment, Student, SchoolSettings, SchoolClass, TuitionInvoice, AttendanceRecord, DailyCashClosure } from '../types';
 import { formatFCFA, getTermLabel } from '../constants/maliEducation';
+import { getPublicBaseUrl } from './urlService';
 
 export class PdfService {
   /**
@@ -432,9 +433,9 @@ export class PdfService {
     doc.setFontSize(9);
     doc.text(`Reste à Payer : ${formatFCFA(payment.remainingAmount)}`, 110, 76);
 
-    // QR Code Anti-Fraude & Sécurité sur le reçu A5
+    // QR Code Anti-Fraude & Sécurité sur le reçu A5 (URL Publique garantie sans 403)
     try {
-      const baseUrl = typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : 'https://kalangest.somasikolo.ml';
+      const baseUrl = getPublicBaseUrl();
       const verifyUrl = `${baseUrl}?verify_receipt=${encodeURIComponent(payment.receiptNumber)}&mat=${encodeURIComponent(payment.studentMatricule)}`;
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 100 });
       doc.addImage(qrDataUrl, 'PNG', 15, 92, 28, 28);
@@ -748,9 +749,9 @@ export class PdfService {
       y += 2;
     }
 
-    // QR Code Anti-Fraude certifié sur Ticket POS
+    // QR Code Anti-Fraude certifié sur Ticket POS (URL Publique garantie sans 403)
     try {
-      const baseUrl = typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : 'https://kalangest.somasikolo.ml';
+      const baseUrl = getPublicBaseUrl();
       const verifyUrl = `${baseUrl}?verify_receipt=${encodeURIComponent(payment.receiptNumber)}&mat=${encodeURIComponent(payment.studentMatricule)}`;
       const qrDataUrl = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 90 });
       doc.addImage(qrDataUrl, 'PNG', 27, y, 26, 26);
@@ -1105,7 +1106,12 @@ export class PdfService {
     for (let i = 0; i < students.length; i++) {
       const std = students[i];
       const cls = classes.find(c => c.id === std.classId);
-      const qrDataUrl = await PdfService.generateStudentCardQr(std);
+      const qrDataUrl = await PdfService.generateStudentCardQr(std, {
+        className: cls?.name,
+        schoolName: settings.schoolName,
+        academyName: settings.academyName,
+        directorName: settings.directorName
+      });
 
       if (row >= 4) { // 2 colonnes x 4 rangées = 8 cartes par page A4
         doc.addPage();
@@ -1219,7 +1225,68 @@ export class PdfService {
   }
 
   /**
-   * Génère la Carte Scolaire Numérique (Compatible Scanner Mobile Externe & URL Directe)
+   * Construit l'URL web absolue officielle de vérification pour le QR Code de la carte scolaire
+   */
+  public static buildStudentVerificationUrl(
+    student: Student,
+    extra?: {
+      className?: string;
+      average?: number;
+      maxScore?: number;
+      rank?: number | string;
+      totalClassStudents?: number;
+      totalAbsences?: number;
+      justifiedAbsences?: number;
+      unjustifiedAbsences?: number;
+      attendanceRate?: number;
+      annualFee?: number;
+      totalPaid?: number;
+      remainingAmount?: number;
+      schoolName?: string;
+      academyName?: string;
+      directorName?: string;
+    }
+  ): string {
+    // URL publique garantie sans erreur 403 sur mobile
+    const cleanOrigin = getPublicBaseUrl();
+
+    const params = new URLSearchParams();
+    params.set('verify_student', '1');
+    params.set('m', student.matricule);
+    params.set('id', student.id);
+    params.set('name', `${student.lastName.toUpperCase()} ${student.firstName}`);
+    params.set('fn', student.firstName);
+    params.set('ln', student.lastName);
+    if (extra?.className) params.set('c', extra.className);
+    if (student.academicYear) params.set('y', student.academicYear);
+    if (student.gender) params.set('g', student.gender);
+    if (student.bloodType) params.set('bt', student.bloodType);
+    if (student.birthDate) params.set('dob', student.birthDate);
+    if (student.birthPlace) params.set('pob', student.birthPlace);
+    if (extra?.average !== undefined && !isNaN(extra.average)) params.set('avg', String(extra.average));
+    if (extra?.rank !== undefined) params.set('rk', String(extra.rank));
+    if (extra?.totalClassStudents) params.set('tot', String(extra.totalClassStudents));
+    if (extra?.attendanceRate !== undefined) params.set('att', String(extra.attendanceRate));
+    if (extra?.totalAbsences !== undefined) params.set('abs', String(extra.totalAbsences));
+    if (extra?.annualFee !== undefined) params.set('fee', String(extra.annualFee));
+    if (extra?.totalPaid !== undefined) params.set('paid', String(extra.totalPaid));
+    if (extra?.remainingAmount !== undefined) params.set('rem', String(extra.remainingAmount));
+    if (student.parent?.fatherPhone) params.set('fp', student.parent.fatherPhone);
+    if (student.parent?.fatherName) params.set('fnp', student.parent.fatherName);
+    if (student.parent?.motherPhone) params.set('mp', student.parent.motherPhone);
+    if (student.parent?.motherName) params.set('mnp', student.parent.motherName);
+    if (student.emergencyContact) params.set('em', student.emergencyContact);
+    if (student.address || student.parent?.guardianAddress) {
+      params.set('addr', student.address || student.parent?.guardianAddress || '');
+    }
+    if (extra?.schoolName) params.set('ec', extra.schoolName);
+    if (extra?.academyName) params.set('acad', extra.academyName);
+
+    return `${cleanOrigin}?${params.toString()}`;
+  }
+
+  /**
+   * Génère la Carte Scolaire Numérique (Compatible Scanner Mobile Externe, Appareil Photo & URL Directe)
    */
   public static async generateStudentCardQr(
     student: Student,
@@ -1241,59 +1308,12 @@ export class PdfService {
       directorName?: string;
     }
   ): Promise<string> {
-    const origin = typeof window !== 'undefined' && window.location?.origin
-      ? `${window.location.origin}${window.location.pathname}`
-      : '';
+    const qrUrl = this.buildStudentVerificationUrl(student, extra);
 
-    const payload = {
-      id: student.id,
-      matricule: student.matricule,
-      name: `${student.lastName.toUpperCase()} ${student.firstName}`,
-      firstName: student.firstName,
-      lastName: student.lastName,
-      classId: student.classId,
-      className: extra?.className || '',
-      status: student.status,
-      academicYear: student.academicYear,
-      birthDate: student.birthDate,
-      birthPlace: student.birthPlace,
-      gender: student.gender,
-      bloodType: student.bloodType || '',
-      emergencyContact: student.emergencyContact || student.parent?.fatherPhone || student.parent?.motherPhone || '',
-      allergies: student.allergies || '',
-      average: extra?.average,
-      maxScore: extra?.maxScore || 20,
-      rank: extra?.rank,
-      totalClassStudents: extra?.totalClassStudents,
-      totalAbsences: extra?.totalAbsences,
-      justifiedAbsences: extra?.justifiedAbsences,
-      unjustifiedAbsences: extra?.unjustifiedAbsences,
-      attendanceRate: extra?.attendanceRate,
-      annualFee: extra?.annualFee,
-      totalPaid: extra?.totalPaid,
-      remainingAmount: extra?.remainingAmount,
-      fatherName: student.parent?.fatherName,
-      fatherPhone: student.parent?.fatherPhone,
-      fatherProfession: student.parent?.fatherProfession,
-      motherName: student.parent?.motherName,
-      motherPhone: student.parent?.motherPhone,
-      motherProfession: student.parent?.motherProfession,
-      address: student.address || student.parent?.guardianAddress,
-      schoolName: extra?.schoolName,
-      academyName: extra?.academyName,
-      directorName: extra?.directorName
-    };
-
-    const jsonString = JSON.stringify(payload);
-    // Encode as web URL so mobile phones outside the app open the classy card view directly in their browser
-    const qrValue = origin 
-      ? `${origin}?student_qr=${encodeURIComponent(jsonString)}`
-      : jsonString;
-
-    return QRCode.toDataURL(qrValue, {
+    return QRCode.toDataURL(qrUrl, {
       errorCorrectionLevel: 'M',
       margin: 1,
-      width: 256
+      width: 280
     });
   }
 

@@ -53,12 +53,16 @@ import {
 import { Student, AttendanceRecord } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
 import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation } from '../../constants/maliEducation';
+import { secureLocalStorage } from '../../services/secureStorage';
+import { sanitizePublicUrl } from '../../services/urlService';
 import { StudentQrScannerModal } from './StudentQrScannerModal';
 import { ScanHistoryService } from '../../services/scanHistoryService';
 
 interface StandaloneStudentQrViewProps {
   initialRawData?: string;
+  rawQrData?: string;
   onExitToApp?: () => void;
+  onClose?: () => void;
 }
 
 export type PresentationTheme = 'MALI_GOLD' | 'ROYAL_AZUR' | 'EMERALD_PRESTIGE' | 'OBSIDIAN_LUXURY';
@@ -106,15 +110,18 @@ export interface ExtractedStudentData {
 
 export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = ({
   initialRawData,
-  onExitToApp
+  rawQrData,
+  onExitToApp,
+  onClose
 }) => {
+  const exitHandler = onExitToApp || onClose;
   const { students, classes, settings, generateReportCard, attendanceRecords, payments, saveAttendanceBatch } = useSchool();
   
   // Theme state: allows switching the luxury style on screen
   const [activeTheme, setActiveTheme] = useState<PresentationTheme>('MALI_GOLD');
 
-  // Display Mode: 'ID_CARD' (Professional Plastic Card Preview) vs 'DOSSIER' (Full 4-pillars dossier)
-  const [viewMode, setViewMode] = useState<'ID_CARD' | 'DOSSIER'>('ID_CARD');
+  // Display Mode: 'DOSSIER' (Full ultra-stylish verified dossier by default) vs 'ID_CARD' (Realistic PVC Plastic Badge)
+  const [viewMode, setViewMode] = useState<'ID_CARD' | 'DOSSIER'>('DOSSIER');
 
   // Plastic Card Flip state: 'RECTO' (Front) or 'VERSO' (Back)
   const [cardSide, setCardSide] = useState<'RECTO' | 'VERSO'>('RECTO');
@@ -123,48 +130,32 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
   const [printFormat, setPrintFormat] = useState<'BADGE_PVC' | 'ATTESTATION_A4'>('BADGE_PVC');
 
   const [rawData, setRawData] = useState<string>(() => {
-    if (initialRawData) return initialRawData;
+    const candidate = rawQrData || initialRawData;
+    if (candidate && candidate.trim().length > 0) return candidate.trim();
     if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      const paramData = 
-        urlParams.get('student_qr') || 
-        urlParams.get('verify_qr') || 
-        urlParams.get('json') || 
-        urlParams.get('scan') || 
-        urlParams.get('data') || 
-        urlParams.get('qr') || 
-        urlParams.get('student') || 
-        urlParams.get('m') || 
-        urlParams.get('matricule') || 
-        urlParams.get('d');
-
-      if (paramData) return decodeURIComponent(paramData);
-      if (window.location.hash.includes('student_qr=')) {
-        return decodeURIComponent(window.location.hash.split('student_qr=')[1]);
+      if (window.location.search && window.location.search.length > 1) {
+        return window.location.search;
       }
-      if (window.location.hash.includes('data=')) {
-        return decodeURIComponent(window.location.hash.split('data=')[1]);
-      }
-      if (window.location.hash.includes('json=')) {
-        return decodeURIComponent(window.location.hash.split('json=')[1]);
+      if (window.location.hash && window.location.hash.length > 1) {
+        return window.location.hash;
       }
     }
     return '';
   });
 
-  // Auto-print toggle & configuration (persisted in localStorage, enabled by default)
+  // Auto-print toggle & configuration (persisted in localStorage, DISABLED by default so mobile camera scans never trigger print modal)
   const [autoPrintEnabled, setAutoPrintEnabled] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('autoprint') === '0' || urlParams.get('print') === '0') {
-        return false;
+      if (urlParams.get('autoprint') === '1' || urlParams.get('print') === '1') {
+        return true;
       }
       try {
-        const saved = localStorage.getItem('kalangest_qr_autoprint');
+        const saved = secureLocalStorage.getItem('kalangest_qr_autoprint');
         if (saved !== null) return saved === 'true';
       } catch {}
     }
-    return true; // Default auto-print enabled
+    return false; // Default auto-print disabled for smartphone camera scans
   });
 
   const [copiedMatricule, setCopiedMatricule] = useState(false);
@@ -185,7 +176,7 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
   // Save autoPrint preference in localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('kalangest_qr_autoprint', String(autoPrintEnabled));
+      secureLocalStorage.setItem('kalangest_qr_autoprint', String(autoPrintEnabled));
     } catch {}
   }, [autoPrintEnabled]);
 
@@ -215,40 +206,116 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
     let parsedJson: any = null;
     let dataDetected = false;
 
-    if (rawData && rawData.trim().length > 0) {
-      let candidate = rawData.trim();
-      
-      // Handle URL format: https://.../?student_qr={...}
-      if (candidate.includes('student_qr=') || candidate.includes('verify_qr=') || candidate.includes('data=')) {
+    // Check rawData first, or fallback to current window URL search
+    let candidate = (rawData && rawData.trim().length > 0) 
+      ? rawData.trim() 
+      : (typeof window !== 'undefined' ? window.location.search || window.location.hash || '' : '');
+
+    if (candidate && candidate.length > 0) {
+      // 1. Handle URL query parameters (?verify_student=... or m=... or student_qr=...)
+      if (candidate.startsWith('?') || candidate.startsWith('http://') || candidate.startsWith('https://') || candidate.includes('&') || candidate.includes('=')) {
         try {
-          const matched = candidate.match(/(?:student_qr|verify_qr|data|json)=([^&]+)/);
-          if (matched && matched[1]) {
-            candidate = decodeURIComponent(matched[1]);
+          const queryPart = candidate.includes('?') ? candidate.split('?')[1] : (candidate.startsWith('#') ? candidate.substring(1) : candidate);
+          const searchParams = new URLSearchParams(queryPart);
+
+          // Check if wrapped in student_qr or verify_qr or data or json
+          const wrapped = searchParams.get('student_qr') || searchParams.get('verify_qr') || searchParams.get('data') || searchParams.get('json');
+          if (wrapped) {
+            try {
+              parsedJson = JSON.parse(decodeURIComponent(wrapped));
+              dataDetected = true;
+            } catch {}
           }
-        } catch {}
+
+          if (!parsedJson) {
+            parsedJson = {};
+            const m = searchParams.get('m') || searchParams.get('matricule') || searchParams.get('mat') || searchParams.get('num_matricule');
+            if (m) { parsedJson.matricule = decodeURIComponent(m.trim()); dataDetected = true; }
+            const id = searchParams.get('id') || searchParams.get('student_id');
+            if (id && id !== '1' && id !== 'true') { parsedJson.id = decodeURIComponent(id.trim()); dataDetected = true; }
+            const name = searchParams.get('name') || searchParams.get('n');
+            if (name) { parsedJson.name = decodeURIComponent(name.trim()); dataDetected = true; }
+            const fn = searchParams.get('fn') || searchParams.get('prenom') || searchParams.get('firstName');
+            if (fn) { parsedJson.firstName = decodeURIComponent(fn.trim()); dataDetected = true; }
+            const ln = searchParams.get('ln') || searchParams.get('nom') || searchParams.get('lastName');
+            if (ln) { parsedJson.lastName = decodeURIComponent(ln.trim()); dataDetected = true; }
+            const c = searchParams.get('c') || searchParams.get('classe') || searchParams.get('className') || searchParams.get('class');
+            if (c) { parsedJson.className = decodeURIComponent(c.trim()); dataDetected = true; }
+            const y = searchParams.get('y') || searchParams.get('annee') || searchParams.get('year') || searchParams.get('academicYear');
+            if (y) parsedJson.academicYear = decodeURIComponent(y.trim());
+            const g = searchParams.get('g') || searchParams.get('sexe') || searchParams.get('gender');
+            if (g) parsedJson.gender = decodeURIComponent(g.trim());
+            const bt = searchParams.get('bt') || searchParams.get('blood') || searchParams.get('groupeSanguin');
+            if (bt) parsedJson.bloodType = decodeURIComponent(bt.trim());
+            const dob = searchParams.get('dob') || searchParams.get('birthDate');
+            if (dob) parsedJson.birthDate = decodeURIComponent(dob.trim());
+            const pob = searchParams.get('pob') || searchParams.get('birthPlace');
+            if (pob) parsedJson.birthPlace = decodeURIComponent(pob.trim());
+            const avg = searchParams.get('avg') || searchParams.get('moyenne') || searchParams.get('average');
+            if (avg && !isNaN(Number(avg))) parsedJson.average = Number(avg);
+            const rk = searchParams.get('rk') || searchParams.get('rang') || searchParams.get('rank');
+            if (rk) parsedJson.rank = isNaN(Number(rk)) ? decodeURIComponent(rk) : Number(rk);
+            const tot = searchParams.get('tot') || searchParams.get('totalClassStudents') || searchParams.get('eff');
+            if (tot && !isNaN(Number(tot))) parsedJson.totalClassStudents = Number(tot);
+            const att = searchParams.get('att') || searchParams.get('attendanceRate') || searchParams.get('assiduite');
+            if (att && !isNaN(Number(att))) parsedJson.attendanceRate = Number(att);
+            const abs = searchParams.get('abs') || searchParams.get('totalAbsences') || searchParams.get('absences');
+            if (abs && !isNaN(Number(abs))) parsedJson.totalAbsences = Number(abs);
+            const fee = searchParams.get('fee') || searchParams.get('annualFee') || searchParams.get('scolarite');
+            if (fee && !isNaN(Number(fee))) parsedJson.annualFee = Number(fee);
+            const paid = searchParams.get('paid') || searchParams.get('totalPaid') || searchParams.get('paye');
+            if (paid && !isNaN(Number(paid))) parsedJson.totalPaid = Number(paid);
+            const rem = searchParams.get('rem') || searchParams.get('remainingAmount') || searchParams.get('reste');
+            if (rem && !isNaN(Number(rem))) parsedJson.remainingAmount = Number(rem);
+            const fp = searchParams.get('fp') || searchParams.get('fatherPhone') || searchParams.get('tel_pere');
+            if (fp) parsedJson.fatherPhone = decodeURIComponent(fp.trim());
+            const fnp = searchParams.get('fnp') || searchParams.get('fatherName') || searchParams.get('pere');
+            if (fnp) parsedJson.fatherName = decodeURIComponent(fnp.trim());
+            const mp = searchParams.get('mp') || searchParams.get('motherPhone') || searchParams.get('tel_mere');
+            if (mp) parsedJson.motherPhone = decodeURIComponent(mp.trim());
+            const mnp = searchParams.get('mnp') || searchParams.get('motherName') || searchParams.get('mere');
+            if (mnp) parsedJson.motherName = decodeURIComponent(mnp.trim());
+            const em = searchParams.get('em') || searchParams.get('emergencyContact') || searchParams.get('urgence');
+            if (em) parsedJson.emergencyContact = decodeURIComponent(em.trim());
+            const addr = searchParams.get('addr') || searchParams.get('address') || searchParams.get('adresse');
+            if (addr) parsedJson.address = decodeURIComponent(addr.trim());
+            const ec = searchParams.get('ec') || searchParams.get('schoolName') || searchParams.get('school') || searchParams.get('ecole');
+            if (ec) parsedJson.schoolName = decodeURIComponent(ec.trim());
+            const acad = searchParams.get('acad') || searchParams.get('academyName') || searchParams.get('academie');
+            if (acad) parsedJson.academyName = decodeURIComponent(acad.trim());
+
+            if (Object.keys(parsedJson).length > 0) {
+              dataDetected = true;
+            }
+          }
+        } catch (e) {
+          console.warn('URL parsing error in StandaloneStudentQrView', e);
+        }
       }
 
-      // Try 1: standard JSON parse
-      try {
-        parsedJson = JSON.parse(candidate);
-        dataDetected = true;
-      } catch {
-        // Try 2: base64 decoding then JSON parse
+      // 2. If not parsed as URL, try raw JSON parse
+      if (!parsedJson) {
         try {
-          const decoded = atob(candidate);
-          parsedJson = JSON.parse(decoded);
+          parsedJson = JSON.parse(candidate);
           dataDetected = true;
         } catch {
-          // Try 3: URL-decoded once more
+          // Try base64 decoding then JSON parse
           try {
-            const doubleDecoded = decodeURIComponent(candidate);
-            parsedJson = JSON.parse(doubleDecoded);
+            const decoded = atob(candidate);
+            parsedJson = JSON.parse(decoded);
             dataDetected = true;
           } catch {
-            // Try 4: Plain text / matricule passed
-            if (candidate.length > 2) {
-              parsedJson = { matricule: candidate };
+            // Try URL-decoded once more
+            try {
+              const doubleDecoded = decodeURIComponent(candidate);
+              parsedJson = JSON.parse(doubleDecoded);
               dataDetected = true;
+            } catch {
+              // Plain text / matricule passed
+              if (candidate.length > 2) {
+                parsedJson = { matricule: candidate };
+                dataDetected = true;
+              }
             }
           }
         }
@@ -543,16 +610,24 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
       scanTimestamp
     };
 
+    const hasData = Boolean(
+      (rawData && rawData.trim().length > 0) ||
+      dataDetected ||
+      dbStudent ||
+      Boolean(targetMatricule && targetMatricule !== 'NON RENSEIGNÉ')
+    );
+
     return {
       studentData: data,
-      isRealDataLoaded: Boolean(rawData && rawData.trim().length > 0)
+      isRealDataLoaded: hasData
     };
   }, [rawData, students, classes, settings, generateReportCard, attendanceRecords, payments]);
 
   // Generate high-resolution scannable QR code for the plastic ID card & document
   useEffect(() => {
     if (studentData?.matricule) {
-      const qrTarget = typeof window !== 'undefined' ? window.location.href : studentData.matricule;
+      const rawTarget = typeof window !== 'undefined' ? window.location.href : studentData.matricule;
+      const qrTarget = sanitizePublicUrl(rawTarget);
       QRCode.toDataURL(qrTarget, { width: 220, margin: 1, errorCorrectionLevel: 'M' })
         .then(url => setPrintableQrCodeUrl(url))
         .catch(() => {});
@@ -594,7 +669,8 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
 
   const handleCopyLink = () => {
     if (typeof window !== 'undefined') {
-      navigator.clipboard.writeText(window.location.href);
+      const publicLink = sanitizePublicUrl(window.location.href);
+      navigator.clipboard.writeText(publicLink);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     }
@@ -603,10 +679,11 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
   const handleShareMobile = async () => {
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
+        const publicLink = sanitizePublicUrl(window.location.href);
         await navigator.share({
           title: `Fiche Élève - ${studentData.name}`,
           text: `Contrôle Scolaire KalanGest • Élève : ${studentData.name} (${studentData.className}) • Matricule : ${studentData.matricule} • Statut : ${studentData.status}`,
-          url: window.location.href
+          url: publicLink
         });
       } catch {
         handleCopyLink();
@@ -1168,9 +1245,9 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
               <span className="hidden sm:inline">Scanner QR</span>
             </button>
 
-            {onExitToApp && (
+            {exitHandler && (
               <button
-                onClick={onExitToApp}
+                onClick={exitHandler}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition-colors cursor-pointer"
                 title="Retourner au portail de l'école"
               >
