@@ -298,18 +298,26 @@ export class PdfService {
   ): Promise<void> {
     if (reportCards.length === 0) return;
 
+    // Trier impérativement du 1er au dernier élève de la classe selon le rang et la moyenne
+    const sortedReportCards = [...reportCards].sort((a, b) => {
+      if (a.rankInClass !== b.rankInClass) {
+        return a.rankInClass - b.rankInClass;
+      }
+      return b.generalAverage - a.generalAverage;
+    });
+
     const doc = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
 
-    for (let i = 0; i < reportCards.length; i += 2) {
+    for (let i = 0; i < sortedReportCards.length; i += 2) {
       if (i > 0) {
         doc.addPage('a4', 'landscape');
       }
-      const rc1 = reportCards[i];
-      const rc2 = reportCards[i + 1] || reportCards[i];
+      const rc1 = sortedReportCards[i];
+      const rc2 = sortedReportCards[i + 1] || sortedReportCards[i];
       this.renderSingleBulletinOnDoc(doc, rc1, settings, 6, 6, 138, 198);
       this.renderSingleBulletinOnDoc(doc, rc2, settings, 153, 6, 138, 198);
     }

@@ -25,7 +25,8 @@ import {
   X,
   Filter,
   FileSpreadsheet,
-  Edit3
+  Edit3,
+  ArrowUpDown
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { ReportCard, StudentSubjectAverage, EvaluationGrade, EvaluationTerm } from '../../types';
@@ -40,6 +41,7 @@ export const BulletinsModule: React.FC = () => {
   const [activeStudentId, setActiveStudentId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [scoreFilter, setScoreFilter] = useState<'ALL' | 'PASSING' | 'FAILING'>('ALL');
+  const [studentSortMode, setStudentSortMode] = useState<'RANK' | 'ALPHA'>('RANK');
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [isPrintAllMode, setIsPrintAllMode] = useState<boolean>(false);
   const [teacherComments, setTeacherComments] = useState<Record<string, string>>({});
@@ -54,7 +56,7 @@ export const BulletinsModule: React.FC = () => {
   }, [students, selectedClassId]);
 
   const classStudents = useMemo(() => {
-    return totalClassStudents.filter(s => {
+    const filtered = totalClassStudents.filter(s => {
       // Search query filter
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
@@ -77,7 +79,23 @@ export const BulletinsModule: React.FC = () => {
 
       return true;
     });
-  }, [totalClassStudents, searchQuery, scoreFilter, selectedTerm, generateReportCard]);
+
+    if (studentSortMode === 'ALPHA') {
+      return [...filtered].sort((a, b) => a.lastName.localeCompare(b.lastName, 'fr') || a.firstName.localeCompare(b.firstName, 'fr'));
+    }
+
+    // Default: Tri du 1er au dernier selon le rang officiel et la moyenne
+    return [...filtered].sort((a, b) => {
+      const cardA = generateReportCard(a.id, selectedTerm);
+      const cardB = generateReportCard(b.id, selectedTerm);
+      const rankA = cardA ? cardA.rankInClass : 999;
+      const rankB = cardB ? cardB.rankInClass : 999;
+      if (rankA !== rankB) return rankA - rankB;
+      const avgA = cardA ? cardA.generalAverage : 0;
+      const avgB = cardB ? cardB.generalAverage : 0;
+      return avgB - avgA;
+    });
+  }, [totalClassStudents, searchQuery, scoreFilter, selectedTerm, generateReportCard, studentSortMode, grades]);
 
   // Ensure an active student is selected
   const activeStudent = useMemo(() => {
@@ -91,11 +109,19 @@ export const BulletinsModule: React.FC = () => {
   }, [activeStudent, selectedTerm, generateReportCard, grades]);
 
   // All report cards for the class (used for bulk printing/download)
+  // Strictement triés du 1er au dernier élève de la classe selon le rang officiel et la moyenne
   const allClassReportCards: ReportCard[] = useMemo(() => {
     const activeClassStudents = students.filter(s => s.classId === selectedClassId && s.status === 'ACTIF');
-    return activeClassStudents
+    const cards = activeClassStudents
       .map(s => generateReportCard(s.id, selectedTerm))
       .filter((r): r is ReportCard => r !== null);
+
+    return cards.sort((a, b) => {
+      if (a.rankInClass !== b.rankInClass) {
+        return a.rankInClass - b.rankInClass;
+      }
+      return b.generalAverage - a.generalAverage;
+    });
   }, [students, selectedClassId, selectedTerm, generateReportCard, grades]);
 
   // Direct grade update logic right inside bulletin
@@ -453,10 +479,10 @@ export const BulletinsModule: React.FC = () => {
               onClick={handlePrintClass}
               disabled={allClassReportCards.length === 0}
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-              title="Imprimer tous les bulletins de la classe"
+              title="Imprimer tous les bulletins de la classe ordonnés du 1er au dernier élève"
             >
               <Printer className="w-4 h-4 text-amber-400" />
-              <span>Imprimer Classe ({allClassReportCards.length})</span>
+              <span>Imprimer Classe ({allClassReportCards.length}) • 1er au dernier</span>
             </button>
 
             <button
@@ -473,10 +499,10 @@ export const BulletinsModule: React.FC = () => {
               onClick={handleDownloadAllClassPdfs}
               disabled={allClassReportCards.length === 0}
               className="flex items-center gap-2 px-4 py-2.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-              title="Exporter tous les bulletins de la classe en 1 seul fichier PDF multi-pages"
+              title="Exporter tous les bulletins de la classe en 1 seul fichier PDF multi-pages (triés du 1er au dernier)"
             >
               <Download className="w-4 h-4 text-blue-200" />
-              <span>PDF Classe</span>
+              <span>PDF Classe (1er au dernier)</span>
             </button>
 
             <button
@@ -639,16 +665,27 @@ export const BulletinsModule: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Student List Sidebar */}
           <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-500" />
-                <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Users className="w-4 h-4 text-slate-500 shrink-0" />
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate">
                   Élèves ({classStudents.length}/{totalClassStudents.length})
                 </h2>
               </div>
-              <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                {currentClass?.name}
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setStudentSortMode(prev => prev === 'RANK' ? 'ALPHA' : 'RANK')}
+                  className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 transition-colors cursor-pointer"
+                  title="Basculer entre le classement par rang (1er au dernier) et le classement alphabétique"
+                >
+                  <ArrowUpDown className="w-3 h-3 text-blue-700 shrink-0" />
+                  <span>{studentSortMode === 'RANK' ? '1er au dernier' : 'A-Z'}</span>
+                </button>
+                <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                  {currentClass?.name}
+                </span>
+              </div>
             </div>
 
             {/* Quick Search bar */}
@@ -711,7 +748,7 @@ export const BulletinsModule: React.FC = () => {
                 const isSelected = activeStudent?.id === std.id;
                 const card = generateReportCard(std.id, selectedTerm);
                 const avg = card ? card.generalAverage : 0;
-                const rank = card ? card.rankInClass : '-';
+                const rank = card ? card.rankInClass : null;
                 const cardMax = card?.maxScore || 20;
                 const passThreshold = cardMax === 10 ? 5 : 10;
 
@@ -726,21 +763,51 @@ export const BulletinsModule: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
+                      {/* Rank Medal or Badge */}
+                      <div className="shrink-0">
+                        {rank === 1 ? (
+                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md font-black text-[10px] shadow-2xs ${
+                            isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900 border border-amber-300'
+                          }`}>
+                            🥇 1er
+                          </span>
+                        ) : rank === 2 ? (
+                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                            isSelected ? 'bg-slate-700 text-slate-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
+                          }`}>
+                            🥈 2e
+                          </span>
+                        ) : rank === 3 ? (
+                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                            isSelected ? 'bg-amber-800 text-amber-100' : 'bg-amber-50 text-amber-800 border border-amber-300'
+                          }`}>
+                            🥉 3e
+                          </span>
+                        ) : rank !== null ? (
+                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                            isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}>
+                            {rank}e
+                          </span>
+                        ) : null}
+                      </div>
+
                       {std.photoUrl ? (
                         <img
                           src={std.photoUrl}
                           alt={std.firstName}
-                          className="w-8 h-8 rounded-lg object-cover border border-white/20 shrink-0"
+                          className="w-7 h-7 rounded-lg object-cover border border-white/20 shrink-0"
                         />
                       ) : (
                         <div
-                          className={`w-8 h-8 rounded-lg font-bold flex items-center justify-center text-[11px] shrink-0 ${
+                          className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center text-[10px] shrink-0 ${
                             isSelected ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'
                           }`}
                         >
                           {std.firstName.charAt(0)}{std.lastName.charAt(0)}
                         </div>
                       )}
+
                       <div className="min-w-0">
                         <p className="truncate font-semibold text-xs">{std.lastName} {std.firstName}</p>
                         <p className={`text-[10px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} font-mono`}>
@@ -749,15 +816,12 @@ export const BulletinsModule: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 ml-2">
                       <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold font-mono ${
                         isSelected ? 'bg-white/20 text-white' : avg >= passThreshold ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
                         {avg.toFixed(2)} / {cardMax}
                       </span>
-                      <p className={`text-[9px] font-medium ${isSelected ? 'text-slate-300' : 'text-slate-400'} mt-0.5`}>
-                        {rank}{rank === 1 ? 'er' : 'e'} rang
-                      </p>
                     </div>
                   </button>
                 );

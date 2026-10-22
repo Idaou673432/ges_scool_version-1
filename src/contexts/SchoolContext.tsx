@@ -521,16 +521,19 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     refreshData();
   };
 
-  // Generate Report Card Algorithm
-  const generateReportCard = (
-    studentId: string,
+  // Helper to compute a single student's performance metrics for a term
+  const calculateStudentPerformanceForTerm = (
+    targetStudentId: string,
+    targetClassId: string,
     term: EvaluationTerm
-  ): ReportCard | null => {
-    const student = students.find(s => s.id === studentId);
-    if (!student) return null;
-
-    const studentClass = classes.find(c => c.id === student.classId);
-    const className = studentClass ? studentClass.name : 'Classe Inconnue';
+  ): {
+    subjectAverages: StudentSubjectAverage[];
+    totalPoints: number;
+    totalCoefficients: number;
+    generalAverage: number;
+    maxScore: number;
+  } => {
+    const studentClass = classes.find(c => c.id === targetClassId);
     const isFirstCycle = studentClass?.category === 'FONDAMENTAL_1';
     const maxScore = isFirstCycle ? 10 : 20;
 
@@ -541,7 +544,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const targetTerms = getRelatedTermsForPeriod(term, settings.evaluationCount || 9);
 
     const studentGrades = grades.filter(
-      g => g.studentId === studentId && targetTerms.includes(g.term)
+      g => g.studentId === targetStudentId && targetTerms.includes(g.term)
     );
 
     const subjectAverages: StudentSubjectAverage[] = [];
@@ -663,14 +666,75 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const generalAverage = totalCoefficients > 0 ? totalPoints / totalCoefficients : 0;
 
+    return {
+      subjectAverages,
+      totalPoints,
+      totalCoefficients,
+      generalAverage,
+      maxScore
+    };
+  };
+
+  // Generate Report Card Algorithm with Dynamic Class Ranking
+  const generateReportCard = (
+    studentId: string,
+    term: EvaluationTerm
+  ): ReportCard | null => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return null;
+
+    const studentClass = classes.find(c => c.id === student.classId);
+    const className = studentClass ? studentClass.name : 'Classe Inconnue';
+    const isFirstCycle = studentClass?.category === 'FONDAMENTAL_1';
+    const maxScore = isFirstCycle ? 10 : 20;
+
+    // 1. Performance of the target student
+    const activePerf = calculateStudentPerformanceForTerm(student.id, student.classId, term);
+
+    // 2. Active students in the same class for comparative ranking
     const classStudents = students.filter(s => s.classId === student.classId && s.status === 'ACTIF');
     const classSize = classStudents.length || 1;
-    
+
+    // 3. Compute and sort all class averages descending (1er to last)
+    const classPerformances = classStudents.map(s => {
+      if (s.id === student.id) {
+        return { studentId: s.id, average: activePerf.generalAverage };
+      }
+      const perf = calculateStudentPerformanceForTerm(s.id, s.classId, term);
+      return { studentId: s.id, average: perf.generalAverage };
+    }).sort((a, b) => b.average - a.average);
+
+    // 4. Calculate exact class statistical extremes & mean
+    const classMaxAverage = classPerformances.length > 0 
+      ? Math.round(classPerformances[0].average * 100) / 100 
+      : (isFirstCycle ? 8.5 : 17.0);
+    const classMinAverage = classPerformances.length > 0 
+      ? Math.round(classPerformances[classPerformances.length - 1].average * 100) / 100 
+      : (isFirstCycle ? 4.5 : 9.0);
+    const sumAverages = classPerformances.reduce((acc, x) => acc + x.average, 0);
+    const classOverallAverage = classPerformances.length > 0 
+      ? Math.round((sumAverages / classPerformances.length) * 100) / 100 
+      : (isFirstCycle ? 6.5 : 13.0);
+
+    // 5. Determine exact competitive rank (handling ties / ex-aequo)
     let rankInClass = 1;
-    const thresholdHigh = isFirstCycle ? 7 : 14;
-    const thresholdMid = isFirstCycle ? 6 : 12;
-    if (generalAverage < thresholdHigh) rankInClass = Math.min(classSize, 2);
-    if (generalAverage < thresholdMid) rankInClass = Math.min(classSize, 3);
+    let currentRank = 1;
+    for (let i = 0; i < classPerformances.length; i++) {
+      if (i > 0 && Math.abs(classPerformances[i].average - classPerformances[i - 1].average) < 0.001) {
+        // Ex-aequo : même rang que l'élève précédent
+      } else {
+        currentRank = i + 1;
+      }
+      if (classPerformances[i].studentId === student.id) {
+        rankInClass = currentRank;
+        break;
+      }
+    }
+
+    // 6. Real student attendance & absences
+    const studentAttendance = attendanceRecords.filter(r => r.studentId === student.id);
+    const absencesCount = studentAttendance.filter(r => r.status === 'ABSENT_UNJUSTIFIED' || r.status === 'ABSENT_JUSTIFIED').length;
+    const lateCount = studentAttendance.filter(r => r.status === 'LATE').length;
 
     const passMark = isFirstCycle ? 5 : 10;
     const goodMark = isFirstCycle ? 6 : 12;
@@ -684,19 +748,19 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       term,
       academicYear: settings.currentAcademicYear,
       maxScore,
-      subjectAverages,
-      totalPoints,
-      totalCoefficients,
-      generalAverage,
+      subjectAverages: activePerf.subjectAverages,
+      totalPoints: activePerf.totalPoints,
+      totalCoefficients: activePerf.totalCoefficients,
+      generalAverage: activePerf.generalAverage,
       rankInClass,
       totalClassStudents: classSize,
-      classMinAverage: isFirstCycle ? 4.25 : 8.50,
-      classMaxAverage: isFirstCycle ? 9.25 : 18.25,
-      classOverallAverage: isFirstCycle ? 6.30 : 12.60,
-      absencesCount: 2,
-      lateCount: 0,
-      principalTeacherComment: generalAverage >= goodMark ? 'Bons résultats, élève assidu(e).' : 'Doit fournir plus d\'efforts.',
-      directorDecision: generalAverage >= passMark ? 'ADMIS' : 'A_AVERTISSEMENT'
+      classMinAverage,
+      classMaxAverage,
+      classOverallAverage,
+      absencesCount,
+      lateCount,
+      principalTeacherComment: activePerf.generalAverage >= goodMark ? 'Bons résultats, élève assidu(e).' : 'Doit fournir plus d\'efforts.',
+      directorDecision: activePerf.generalAverage >= passMark ? 'ADMIS' : 'A_AVERTISSEMENT'
     };
   };
 
