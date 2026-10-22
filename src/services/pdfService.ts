@@ -1110,7 +1110,8 @@ export class PdfService {
         className: cls?.name,
         schoolName: settings.schoolName,
         academyName: settings.academyName,
-        directorName: settings.directorName
+        directorName: settings.directorName,
+        schoolUrl: settings.website
       });
 
       if (row >= 4) { // 2 colonnes x 4 rangées = 8 cartes par page A4
@@ -1245,10 +1246,11 @@ export class PdfService {
       schoolName?: string;
       academyName?: string;
       directorName?: string;
+      schoolUrl?: string;
     }
   ): string {
-    // URL publique garantie sans erreur 403 sur mobile
-    const cleanOrigin = getPublicBaseUrl();
+    // URL web officielle joignable sans erreur 404
+    const cleanOrigin = getPublicBaseUrl(extra?.schoolUrl);
 
     const params = new URLSearchParams();
     params.set('verify_student', '1');
@@ -1279,8 +1281,13 @@ export class PdfService {
     if (student.address || student.parent?.guardianAddress) {
       params.set('addr', student.address || student.parent?.guardianAddress || '');
     }
+    if (student.allergies) params.set('al', student.allergies);
+    if (student.parent?.fatherProfession) params.set('fprof', student.parent.fatherProfession);
+    if (student.parent?.motherProfession) params.set('mprof', student.parent.motherProfession);
+    if (student.status) params.set('stat', student.status);
     if (extra?.schoolName) params.set('ec', extra.schoolName);
     if (extra?.academyName) params.set('acad', extra.academyName);
+    if (extra?.directorName) params.set('dir', extra.directorName);
 
     return `${cleanOrigin}?${params.toString()}`;
   }
@@ -1306,6 +1313,7 @@ export class PdfService {
       schoolName?: string;
       academyName?: string;
       directorName?: string;
+      schoolUrl?: string;
     }
   ): Promise<string> {
     const qrUrl = this.buildStudentVerificationUrl(student, extra);

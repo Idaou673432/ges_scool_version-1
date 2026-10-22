@@ -83,7 +83,8 @@ export const CardsModule: React.FC = () => {
           remainingAmount: remaining,
           schoolName: settings.schoolName,
           academyName: settings.academyName,
-          directorName: settings.directorName
+          directorName: settings.directorName,
+          schoolUrl: settings.website
         });
       }
       setStudentQrs(map);

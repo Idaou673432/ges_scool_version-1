@@ -108,6 +108,39 @@ export interface ExtractedStudentData {
   scanTimestamp?: string;
 }
 
+/**
+ * Formate élégamment la date et le lieu de naissance pour un affichage parfait sur tout appareil
+ */
+export function formatBirthDateDisplay(dateStr?: string, placeStr?: string): string {
+  const cleanPlace = placeStr && placeStr.trim() ? placeStr.trim() : '';
+  if (!dateStr || !dateStr.trim()) {
+    return cleanPlace ? `À ${cleanPlace}` : 'Non renseignée';
+  }
+  const cleanDate = dateStr.trim();
+  let dateFormatted = cleanDate;
+
+  if (cleanDate.includes('/')) {
+    dateFormatted = cleanDate;
+  } else {
+    try {
+      const parts = cleanDate.split('T')[0].split('-');
+      if (parts.length === 3 && parts[0].length === 4) {
+        // YYYY-MM-DD -> DD/MM/YYYY
+        dateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+      } else {
+        const d = new Date(cleanDate);
+        if (!isNaN(d.getTime())) {
+          dateFormatted = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+      }
+    } catch {
+      dateFormatted = cleanDate;
+    }
+  }
+
+  return cleanPlace ? `${dateFormatted} à ${cleanPlace}` : dateFormatted;
+}
+
 export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = ({
   initialRawData,
   rawQrData,
@@ -247,9 +280,9 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
             if (g) parsedJson.gender = decodeURIComponent(g.trim());
             const bt = searchParams.get('bt') || searchParams.get('blood') || searchParams.get('groupeSanguin');
             if (bt) parsedJson.bloodType = decodeURIComponent(bt.trim());
-            const dob = searchParams.get('dob') || searchParams.get('birthDate');
+            const dob = searchParams.get('dob') || searchParams.get('birthDate') || searchParams.get('dn') || searchParams.get('dateNaissance');
             if (dob) parsedJson.birthDate = decodeURIComponent(dob.trim());
-            const pob = searchParams.get('pob') || searchParams.get('birthPlace');
+            const pob = searchParams.get('pob') || searchParams.get('birthPlace') || searchParams.get('lieu') || searchParams.get('lieuNaissance');
             if (pob) parsedJson.birthPlace = decodeURIComponent(pob.trim());
             const avg = searchParams.get('avg') || searchParams.get('moyenne') || searchParams.get('average');
             if (avg && !isNaN(Number(avg))) parsedJson.average = Number(avg);
@@ -271,10 +304,18 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
             if (fp) parsedJson.fatherPhone = decodeURIComponent(fp.trim());
             const fnp = searchParams.get('fnp') || searchParams.get('fatherName') || searchParams.get('pere');
             if (fnp) parsedJson.fatherName = decodeURIComponent(fnp.trim());
+            const fprof = searchParams.get('fprof') || searchParams.get('fatherProfession');
+            if (fprof) parsedJson.fatherProfession = decodeURIComponent(fprof.trim());
             const mp = searchParams.get('mp') || searchParams.get('motherPhone') || searchParams.get('tel_mere');
             if (mp) parsedJson.motherPhone = decodeURIComponent(mp.trim());
             const mnp = searchParams.get('mnp') || searchParams.get('motherName') || searchParams.get('mere');
             if (mnp) parsedJson.motherName = decodeURIComponent(mnp.trim());
+            const mprof = searchParams.get('mprof') || searchParams.get('motherProfession');
+            if (mprof) parsedJson.motherProfession = decodeURIComponent(mprof.trim());
+            const al = searchParams.get('al') || searchParams.get('allergies');
+            if (al) parsedJson.allergies = decodeURIComponent(al.trim());
+            const stat = searchParams.get('stat') || searchParams.get('status') || searchParams.get('statut');
+            if (stat) parsedJson.status = decodeURIComponent(stat.trim());
             const em = searchParams.get('em') || searchParams.get('emergencyContact') || searchParams.get('urgence');
             if (em) parsedJson.emergencyContact = decodeURIComponent(em.trim());
             const addr = searchParams.get('addr') || searchParams.get('address') || searchParams.get('adresse');
@@ -283,6 +324,8 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
             if (ec) parsedJson.schoolName = decodeURIComponent(ec.trim());
             const acad = searchParams.get('acad') || searchParams.get('academyName') || searchParams.get('academie');
             if (acad) parsedJson.academyName = decodeURIComponent(acad.trim());
+            const dir = searchParams.get('dir') || searchParams.get('directorName') || searchParams.get('directeur');
+            if (dir) parsedJson.directorName = decodeURIComponent(dir.trim());
 
             if (Object.keys(parsedJson).length > 0) {
               dataDetected = true;
@@ -578,9 +621,9 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
       className,
       academicYear,
       status,
-      birthDate: dbStudent?.birthDate || parsedJson?.birthDate || '',
-      birthPlace: dbStudent?.birthPlace || parsedJson?.birthPlace || '',
-      gender: dbStudent?.gender || parsedJson?.gender || '',
+      birthDate: dbStudent?.birthDate || parsedJson?.birthDate || parsedJson?.dob || '',
+      birthPlace: dbStudent?.birthPlace || parsedJson?.birthPlace || parsedJson?.pob || '',
+      gender: dbStudent?.gender || parsedJson?.gender || parsedJson?.g || '',
       photoUrl: dbStudent?.photoUrl || parsedJson?.photoUrl,
       bloodType: bloodType || undefined,
       allergies: allergies || undefined,
@@ -1494,6 +1537,13 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
                         </div>
 
                         <div>
+                          <p className="text-[7.5px] uppercase font-black text-slate-400 tracking-wider">NÉ(E) LE</p>
+                          <p className="text-[10px] font-semibold text-slate-200 truncate">
+                            {formatBirthDateDisplay(studentData.birthDate, studentData.birthPlace)}
+                          </p>
+                        </div>
+
+                        <div>
                           <p className="text-[7.5px] uppercase font-black text-slate-400 tracking-wider">MATRICULE</p>
                           <p className="text-xs font-mono font-black text-amber-300">
                             {studentData.matricule}
@@ -1694,42 +1744,86 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
                     </span>
                   </div>
 
-                  <div className="flex-1 text-center sm:text-left space-y-2.5">
+                  <div className="flex-1 text-center sm:text-left space-y-3">
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        Élève Régulier · {studentData.gender === 'F' ? 'Féminin' : 'Masculin'}
-                      </p>
-                      <h1 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                          ÉLÈVE OFFICIEL · {studentData.gender === 'F' ? 'FÉMININ (F)' : (studentData.gender === 'M' ? 'MASCULIN (M)' : studentData.gender || 'INSCRIT')}
+                        </span>
+                        <span className="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          {studentData.status}
+                        </span>
+                      </div>
+                      <h1 className="text-2xl sm:text-4xl font-black text-white uppercase tracking-tight">
                         {studentData.lastName}
                       </h1>
-                      <p className={`text-lg sm:text-xl font-bold ${theme.accentColor} -mt-0.5`}>
+                      <p className={`text-xl sm:text-2xl font-black ${theme.accentColor} -mt-0.5`}>
                         {studentData.firstName}
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-slate-200 text-xs font-mono font-bold">
-                        <span className="text-slate-400 text-[10px]">N° MLE :</span>
-                        <span className="text-amber-400 tracking-wider">{studentData.matricule}</span>
+                    {/* Key Identity Badges Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+                      {/* Classe */}
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <BookOpen className="w-4 h-4 text-sky-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[9px] uppercase font-bold text-slate-400">Classe</p>
+                          <p className="font-extrabold text-white truncate text-xs sm:text-sm">{studentData.className}</p>
+                        </div>
+                      </div>
+
+                      {/* Matricule */}
+                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CreditCard className="w-4 h-4 text-amber-400 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-[9px] uppercase font-bold text-slate-400">N° Matricule</p>
+                            <p className="font-mono font-black text-amber-300 truncate text-xs sm:text-sm">{studentData.matricule}</p>
+                          </div>
+                        </div>
                         <button
                           onClick={handleCopyMatricule}
-                          className="ml-1 text-slate-400 hover:text-white cursor-pointer p-0.5"
+                          className="text-slate-400 hover:text-white cursor-pointer p-1 rounded-lg hover:bg-slate-800 transition-colors"
                           title="Copier le matricule"
                         >
-                          {copiedMatricule ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedMatricule ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                         </button>
                       </div>
 
-                      <div className="px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-bold">
-                        CLASSE : <span className="text-white font-extrabold">{studentData.className}</span>
-                      </div>
-
-                      {studentData.birthDate && (
-                        <div className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-slate-300 text-xs">
-                          Né(e) le <span className="font-semibold text-white">{new Date(studentData.birthDate).toLocaleDateString('fr-FR')}</span> {studentData.birthPlace ? `à ${studentData.birthPlace}` : ''}
+                      {/* Date et Lieu de Naissance */}
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 sm:col-span-2">
+                        <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[9px] uppercase font-bold text-slate-400">Date & Lieu de Naissance</p>
+                          <p className="font-semibold text-white truncate text-xs sm:text-sm">
+                            {formatBirthDateDisplay(studentData.birthDate, studentData.birthPlace)}
+                          </p>
                         </div>
-                      )}
+                      </div>
                     </div>
+
+                    {/* Quick Parent Contact Strip if phone numbers available */}
+                    {(studentData.fatherPhone || studentData.motherPhone || studentData.emergencyContact) && (
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                        <a
+                          href={`tel:${studentData.fatherPhone || studentData.motherPhone || studentData.emergencyContact}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-xs font-bold transition-colors"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Appeler Parent</span>
+                        </a>
+                        <a
+                          href={`https://wa.me/${(studentData.fatherPhone || studentData.motherPhone || studentData.emergencyContact || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Bonjour, nous vous contactons concernant votre enfant ${studentData.name} (${studentData.className}) au ${studentData.schoolName}.`)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-colors"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>WhatsApp Parent</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
 
