@@ -429,27 +429,33 @@ export const BulletinsModule: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* ----------------- SCREEN ONLY HEADER & CONTROLS ----------------- */}
-      <div className="no-print space-y-5">
-        {/* Header Banner */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider mb-2.5 border border-slate-200">
-              <Sparkles className="w-3.5 h-3.5 text-blue-700" />
-              <span>Conforme MEN Mali • Année {settings.academicYear}</span>
+    <div className="space-y-4 pb-12">
+      {/* ----------------- SCREEN ONLY HEADER & CONTROLS (COMPACT) ----------------- */}
+      <div className="no-print space-y-3">
+        {/* 1. Slim Header Bar & Action Buttons */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-blue-50 text-blue-900 border border-blue-200/60 rounded-lg shrink-0">
+              <FileText className="w-5 h-5 text-blue-900" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-              <FileText className="w-7 h-7 text-blue-900 shrink-0" />
-              <span>Bulletins de Notes Trimestriels</span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              Modifiez les notes en direct dans la grille • Calcul automatique des moyennes & rangs • Impression A4 normalisée
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
+                  Bulletins de Notes Trimestriels
+                </h1>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">
+                  <Sparkles className="w-3 h-3 text-blue-700" />
+                  MEN Mali • {settings.academicYear}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium hidden lg:block">
+                Saisie directe des notes • Classement automatique (1er au dernier) • Impression A4 normalisée
+              </p>
+            </div>
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => {
                 setShowBatchModal(true);
@@ -458,208 +464,190 @@ export const BulletinsModule: React.FC = () => {
                   if (classSubj.length > 0) setBatchSubjectId(classSubj[0].id);
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
               title="Saisir directement les notes de classe et de composition pour tous les élèves de la classe"
             >
-              <Edit3 className="w-4 h-4 text-amber-100" />
-              <span>Saisie Rapide Classe</span>
+              <Edit3 className="w-3.5 h-3.5 text-amber-100" />
+              <span>Saisie Classe</span>
             </button>
 
             <button
               onClick={handlePrintSingle}
               disabled={!activeReportCard}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
               title="Imprimer ce bulletin directement sur imprimante A4"
             >
-              <Printer className="w-4 h-4 text-slate-300" />
+              <Printer className="w-3.5 h-3.5 text-slate-300" />
               <span>Imprimer</span>
             </button>
 
             <button
               onClick={handlePrintClass}
               disabled={allClassReportCards.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
               title="Imprimer tous les bulletins de la classe ordonnés du 1er au dernier élève"
             >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>Imprimer Classe ({allClassReportCards.length}) • 1er au dernier</span>
+              <Printer className="w-3.5 h-3.5 text-amber-400" />
+              <span>Imprimer Classe ({allClassReportCards.length})</span>
             </button>
 
             <button
               onClick={handleDownloadPdf}
               disabled={!activeReportCard}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
               title="Exporter le bulletin actif au format PDF officiel"
             >
-              <Download className="w-4 h-4 text-emerald-200" />
-              <span>Exporter en PDF</span>
+              <Download className="w-3.5 h-3.5 text-emerald-200" />
+              <span>PDF</span>
             </button>
 
             <button
               onClick={handleDownloadAllClassPdfs}
               disabled={allClassReportCards.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
               title="Exporter tous les bulletins de la classe en 1 seul fichier PDF multi-pages (triés du 1er au dernier)"
             >
-              <Download className="w-4 h-4 text-blue-200" />
-              <span>PDF Classe (1er au dernier)</span>
+              <Download className="w-3.5 h-3.5 text-blue-200" />
+              <span>PDF Classe</span>
             </button>
 
             <button
               onClick={handleExportClassCsv}
               disabled={allClassReportCards.length === 0}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-lg border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
               title="Exporter le récapitulatif des résultats en fichier CSV / Excel"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Export CSV</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">CSV</span>
             </button>
           </div>
         </div>
 
         {/* Saved Toast Notification */}
         {savedNotice && (
-          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{savedNotice} — Re-calcul automatique effectué.</span>
           </div>
         )}
 
-        {/* Class, Term and Quick Search Selector Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="sm:col-span-5">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>1. Classe *</span>
-            </label>
-            <select
-              value={selectedClassId}
-              onChange={e => {
-                setSelectedClassId(e.target.value);
-                setActiveStudentId('');
-              }}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
-            >
-              {classes.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.studentCount || 0} élèves)
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* 2. Compact Selectors & Inline Class Stats Card */}
+        <div className="bg-white px-4 py-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            {/* Classe */}
+            <div className="md:col-span-4 flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0 flex items-center gap-1">
+                <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                <span>Classe :</span>
+              </span>
+              <select
+                value={selectedClassId}
+                onChange={e => {
+                  setSelectedClassId(e.target.value);
+                  setActiveStudentId('');
+                }}
+                className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
+              >
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.studentCount || 0} élèves)
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="sm:col-span-4">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-500" />
-              <span>2. Période / Évaluation *</span>
-            </label>
-            <select
-              value={selectedTerm}
-              onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
-            >
-              <optgroup label="Évaluations Mensuelles (1er Cycle & Devoirs)">
-                {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                  .filter(t => t.category === 'EVALUATION_MENSUELLE')
-                  .map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-              </optgroup>
-              <optgroup label="Trimestres (2ème Cycle & Lycée)">
-                {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                  .filter(t => t.category === 'TRIMESTRE')
-                  .map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-              </optgroup>
-              <optgroup label="Semestres">
-                {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                  .filter(t => t.category === 'SEMESTRE')
-                  .map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-              </optgroup>
-            </select>
-          </div>
+            {/* Période / Évaluation */}
+            <div className="md:col-span-4 flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>Période :</span>
+              </span>
+              <select
+                value={selectedTerm}
+                onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
+                className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
+              >
+                <optgroup label="Évaluations Mensuelles (1er Cycle & Devoirs)">
+                  {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
+                    .filter(t => t.category === 'EVALUATION_MENSUELLE')
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                </optgroup>
+                <optgroup label="Trimestres (2ème Cycle & Lycée)">
+                  {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
+                    .filter(t => t.category === 'TRIMESTRE')
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                </optgroup>
+                <optgroup label="Semestres">
+                  {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
+                    .filter(t => t.category === 'SEMESTRE')
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                </optgroup>
+              </select>
+            </div>
 
-          <div className="sm:col-span-3">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5 text-slate-500" />
-              <span>3. Recherche Élève</span>
-            </label>
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* Recherche rapide */}
+            <div className="md:col-span-4 relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Nom, prénom, matricule..."
-                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                placeholder="Rechercher élève (nom, matricule)..."
+                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-md bg-slate-200 hover:bg-slate-300 transition-colors"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded bg-slate-200"
                 >
                   <X className="w-3 h-3" />
                 </button>
               )}
             </div>
           </div>
+
+          {/* Slim Inline Performance Metrics */}
+          {classStats.total > 0 && (
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200/80">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase text-emerald-800">Admission :</span>
+                  <span className="font-mono font-black text-emerald-700 text-xs">{classStats.passRate}%</span>
+                  <span className="text-[10px] text-emerald-600 font-medium">({classStats.passing}/{classStats.total})</span>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-900 border border-blue-200/80">
+                  <TrendingUp className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase text-blue-800">Moy. Classe :</span>
+                  <span className="font-mono font-black text-blue-700 text-xs">{classStats.avg.toFixed(2)}/20</span>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80">
+                  <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase text-amber-800">Plus forte :</span>
+                  <span className="font-mono font-black text-amber-700 text-xs">{classStats.maxAvg.toFixed(2)}/20</span>
+                </div>
+
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-900 border border-rose-200/80">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="text-[10px] font-bold uppercase text-rose-800">Plus faible :</span>
+                  <span className="font-mono font-black text-rose-700 text-xs">{classStats.minAvg.toFixed(2)}/20</span>
+                </div>
+              </div>
+
+              <span className="text-[11px] font-mono font-semibold text-slate-500 hidden xl:inline">
+                {classStats.total} élève{classStats.total > 1 ? 's' : ''} classé{classStats.total > 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
         </div>
-
-        {/* Class Performance Summary Banner */}
-        {classStats.total > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900 text-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-800">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/10 rounded-2xl border border-white/10 shrink-0">
-                <UserCheck className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 block">Taux d'Admission</span>
-                <p className="text-xl font-black text-emerald-400 font-mono">
-                  {classStats.passRate}% <span className="text-[10px] text-white/70 font-sans font-bold">({classStats.passing}/{classStats.total})</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/10 rounded-2xl border border-white/10 shrink-0">
-                <TrendingUp className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 block">Moyenne de Classe</span>
-                <p className="text-xl font-black text-blue-300 font-mono">
-                  {classStats.avg.toFixed(2)} <span className="text-[10px] text-white/70 font-sans">/20</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/10 rounded-2xl border border-white/10 shrink-0">
-                <Award className="w-5 h-5 text-amber-400" />
-              </div>
-              <div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 block">Plus Forte Moyenne</span>
-                <p className="text-xl font-black text-amber-400 font-mono">
-                  {classStats.maxAvg.toFixed(2)} <span className="text-[10px] text-white/70 font-sans">/20</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-white/10 rounded-2xl border border-white/10 shrink-0">
-                <AlertCircle className="w-5 h-5 text-rose-400" />
-              </div>
-              <div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 block">Plus Faible Moyenne</span>
-                <p className="text-xl font-black text-rose-300 font-mono">
-                  {classStats.minAvg.toFixed(2)} <span className="text-[10px] text-white/70 font-sans">/20</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Main Interactive Screen Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
