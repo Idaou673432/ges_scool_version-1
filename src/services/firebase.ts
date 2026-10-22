@@ -2,8 +2,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   initializeFirestore, 
   getFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
+  memoryLocalCache 
 } from 'firebase/firestore';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import configData from '../../firebase-applet-config.json';
@@ -19,21 +18,21 @@ const firebaseConfig = {
 
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with persistent IndexedDB multi-tab caching for offline consultation
+// Initialize Firestore with robust memory caching to avoid IndexedDbTransactionError in iframes,
+// private browsing, and partitioned storage environments
 let firestoreInstance: any;
+const dbId = configData.firestoreDatabaseId && configData.firestoreDatabaseId !== '(default)' 
+  ? configData.firestoreDatabaseId 
+  : undefined;
+
 try {
-  const dbId = configData.firestoreDatabaseId && configData.firestoreDatabaseId !== '(default)' 
-    ? configData.firestoreDatabaseId 
-    : undefined;
   firestoreInstance = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
+    localCache: memoryLocalCache()
   }, dbId);
 } catch (e) {
   // If already initialized or fallback
-  firestoreInstance = configData.firestoreDatabaseId && configData.firestoreDatabaseId !== '(default)'
-    ? getFirestore(app, configData.firestoreDatabaseId)
+  firestoreInstance = dbId
+    ? getFirestore(app, dbId)
     : getFirestore(app);
 }
 
