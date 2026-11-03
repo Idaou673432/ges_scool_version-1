@@ -729,54 +729,52 @@ export const PaymentsModule: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
       {/* 1. Entête Épuré de la Caisse */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
-              <CreditCard className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Caisse & Scolarités
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">
-                Encaissements directs · Reçus officiels · Situation des scolarités · Dépenses
-              </p>
-            </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <CreditCard className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+              Caisse & Scolarités
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Encaissements · Reçus officiels · Situation des mensualités · Dépenses
+            </p>
           </div>
         </div>
 
         {/* Actions Rapides de la Caisse */}
-        <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           {/* Bouton Encaisser (Action N°1 du caissier) */}
           <button
             type="button"
             onClick={() => handleOpenAddForStudent()}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Encaisser un Élève</span>
           </button>
 
-          {/* Bouton Clôture de Caisse Journalière (Procédure Anti-Fraude) */}
+          {/* Bouton Clôture de Caisse Journalière */}
           <button
             type="button"
             onClick={() => setIsClosureModalOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer"
-            title="Effectuer le contrôle et le PV de clôture journalière à l'aveugle"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            title="Effectuer le contrôle et le PV de clôture journalière"
           >
-            <Lock className="w-4 h-4 text-slate-950" />
-            <span>Clôture Journalière (PV)</span>
+            <Lock className="w-4 h-4" />
+            <span>Clôture PV</span>
           </button>
 
           {/* Bouton Dépense */}
           <button
             type="button"
             onClick={() => setIsExpenseModalOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
           >
             <MinusCircle className="w-4 h-4 text-rose-600" />
-            <span>Nouvelle Dépense</span>
+            <span>Dépense</span>
           </button>
 
           {/* Export CSV contextualisé */}
@@ -788,11 +786,11 @@ export const PaymentsModule: React.FC = () => {
               else if (activeTab === 'EXPENSES') handleExportExpensesCsv();
               else handleExportInvoicesCsv();
             }}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
             title="Exporter les données actuelles en CSV"
           >
             <Download className="w-4 h-4 text-slate-600" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <span>Export CSV</span>
           </button>
 
           {/* Réinitialisation sécurisée si paiements existants */}
@@ -800,7 +798,7 @@ export const PaymentsModule: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowDeleteAllModal(true)}
-              className="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-colors cursor-pointer"
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
               title="Vider tous les reçus de paiement enregistrés"
             >
               <Trash2 className="w-4 h-4" />

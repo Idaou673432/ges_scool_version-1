@@ -185,20 +185,18 @@ export const CardsModule: React.FC = () => {
       `}</style>
 
       {/* Header Banner - Screen Only */}
-      <div className="no-print flex flex-col xl:flex-row items-start xl:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-            <CreditCard className="w-7 h-7 text-blue-900" />
-            <span>Impression des Cartes Scolaires & Badges</span>
-          </h1>
-          <div className="flex flex-wrap items-center gap-2 mt-1">
+      <div className="no-print flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <CreditCard className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
+              Cartes Scolaires & Badges
+            </h1>
             <p className="text-xs text-slate-500 font-medium">
-              Génération HD • Format Badge Élargi Officiel (Recto / Verso)
+              Format officiel · QR code d'identification · Impression A4
             </p>
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-              <span>QR Code Smartphone Public (Sans blocage 403)</span>
-            </span>
           </div>
         </div>
 

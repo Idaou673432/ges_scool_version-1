@@ -202,73 +202,66 @@ export const StudentsModule: React.FC = () => {
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
       
       {/* 1. Entête Épuré du Répertoire des Élèves */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-900 text-white flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                Répertoire des Élèves
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">
-                Inscriptions scolaires · Fiches d'identité · Classes · Badges QR
-              </p>
-            </div>
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
+              Répertoire des Élèves
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              {students.length} inscrits · {activeStudents.length} actifs · {maleCount}G · {femaleCount}F · {classes.length} classes
+            </p>
           </div>
         </div>
 
         {/* Actions Rapides */}
-        <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto">
-          {/* Inscrire Élève */}
+        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-900 hover:bg-blue-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Inscrire un Élève</span>
           </button>
 
-          {/* Importer Excel */}
           <button
             type="button"
             onClick={() => setIsExcelImportOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4" />
+            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
             <span>Importer Excel</span>
           </button>
 
-          {/* Fiche Statistique CAP / MEN */}
           <button
             type="button"
             onClick={() => setIsMenStatsOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
             title="Générer la fiche officielle statistique demandée par le CAP et l'Académie"
           >
-            <Building2 className="w-4 h-4 text-slate-950" />
-            <span>Fiche CAP / MEN</span>
+            <Building2 className="w-4 h-4 text-slate-600" />
+            <span>Fiche MEN</span>
           </button>
 
-          {/* Exporter CSV */}
           <button
             type="button"
             onClick={handleExportCsv}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all cursor-pointer"
+            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
             title="Exporter la liste actuelle en fichier CSV"
           >
             <Download className="w-4 h-4 text-slate-600" />
-            <span className="hidden sm:inline">Export CSV</span>
+            <span>Export CSV</span>
           </button>
 
-          {/* Supprimer tout (discret) */}
           {students.length > 0 && (
             <button
               type="button"
               onClick={() => setShowDeleteAllModal(true)}
-              className="p-2.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
               title="Supprimer tous les élèves"
             >
               <Trash2 className="w-4 h-4" />
@@ -289,43 +282,6 @@ export const StudentsModule: React.FC = () => {
           </button>
         </div>
       )}
-
-      {/* 2. 4 Indicateurs Clairs d'Effectif */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200">
-          <span className="text-xs font-semibold text-slate-500">Total Inscrits</span>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-1">
-            {students.length}
-          </p>
-          <span className="text-[11px] text-slate-400 font-medium">Élèves enregistrés</span>
-        </div>
-
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200">
-          <span className="text-xs font-semibold text-slate-500">Élèves Actifs</span>
-          <p className="text-2xl font-bold text-emerald-700 tabular-nums font-mono mt-1">
-            {activeStudents.length}
-          </p>
-          <span className="text-[11px] text-emerald-600 font-medium">Fréquentation régulière</span>
-        </div>
-
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200">
-          <span className="text-xs font-semibold text-slate-500">Garçons / Filles</span>
-          <p className="text-lg font-bold text-slate-800 tabular-nums font-mono mt-1">
-            {maleCount} G · {femaleCount} F
-          </p>
-          <span className="text-[11px] text-slate-400 font-medium">
-            {students.length > 0 ? Math.round((femaleCount / students.length) * 100) : 0}% de filles
-          </span>
-        </div>
-
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200">
-          <span className="text-xs font-semibold text-slate-500">Classes Assignées</span>
-          <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-1">
-            {classes.length}
-          </p>
-          <span className="text-[11px] text-slate-400 font-medium">Salles de classe</span>
-        </div>
-      </div>
 
       {/* 3. Barre de Recherche et Filtres par Classe */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">

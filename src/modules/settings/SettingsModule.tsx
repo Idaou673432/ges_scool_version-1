@@ -3,12 +3,11 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Cloud, Smartphone, Laptop, Copy, Check, Share2, UploadCloud, RefreshCw } from 'lucide-react';
+import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Check } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
 import { SchoolEnabledFeatures } from '../../types';
-import { securityShield } from '../../security/securityShield';
 
 const MONTH_OPTIONS = [
   'Septembre', 'Octobre', 'Novembre', 'Décembre', 
@@ -17,20 +16,14 @@ const MONTH_OPTIONS = [
 ];
 
 export interface SettingsModuleProps {
-  initialTab?: 'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA' | 'CLOUD_SYNC';
+  initialTab?: 'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA';
 }
 
 export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'INFO' }) => {
   const { 
     settings, 
     updateSettings, 
-    cloudSchoolCode, 
-    syncStatus, 
-    syncStatusMessage, 
-    switchOrJoinSchool, 
-    forceCloudPush,
-    students,
-    classes
+    cloudSchoolCode 
   } = useSchool();
   const [formData, setFormData] = useState({
     ...settings,
@@ -60,7 +53,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   const [testResult, setTestResult] = useState<'IDLE' | 'SUCCESS' | 'FAIL'>('IDLE');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA' | 'CLOUD_SYNC'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>(initialTab || 'INFO');
   
   useEffect(() => {
     if (initialTab) {
@@ -111,11 +104,6 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   // Filter for features tab
   const [featureCategoryFilter, setFeatureCategoryFilter] = useState<'TOUS' | 'Scolarité' | 'Pédagogie' | 'Évaluations' | 'Finance' | 'Sécurité & Scan'>('TOUS');
 
-  // Cloud Sync form state
-  const [targetCode, setTargetCode] = useState(cloudSchoolCode);
-  const [isCloudBusy, setIsCloudBusy] = useState(false);
-  const [codeCopied, setCodeCopied] = useState(false);
-  const [cloudMessage, setCloudMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -430,15 +418,6 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
           >
             <Calculator className="w-3.5 h-3.5" />
             <span>Formules</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('CLOUD_SYNC')}
-            className={`px-3.5 py-2 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'CLOUD_SYNC' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Cloud className="w-3.5 h-3.5" />
-            <span>Cloud & Sync</span>
           </button>
         </div>
       </div>
@@ -938,145 +917,6 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </form>
           </div>
 
-          {/* BOUCLIER DE SÉCURITÉ & ANTI-PIRATAGE DU CLIENT WEB */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-4 border-b border-slate-800/80 pb-5">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-2xl flex items-center justify-center font-black">
-                  <ShieldCheck className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base sm:text-lg font-black uppercase tracking-wide text-white">
-                      Bouclier Anti-Piratage & Protection du Code Source
-                    </h2>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-black uppercase tracking-wider">
-                      Actif à 100%
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Sécurité multicouche active contre l'espionnage, le vol de code et l'altération sur les navigateurs web.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Feature 1 */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 shrink-0">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Anti-Inspecteur & DevTools</h3>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Blocage strict de F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C et Ctrl+U. L'accès au panneau de développement est intercepté.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Raccourcis verrouillés</span>
-                </div>
-              </div>
-
-              {/* Feature 2 */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Code Source Manglé & Minifié</h3>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Source Maps totalement désactivées en production. Les composants React, TypeScript et algorithmes sont illisibles et protégés.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Sourcemaps supprimées</span>
-                </div>
-              </div>
-
-              {/* Feature 3 */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
-                    <ShieldAlert className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Anti Clic-Droit & Téléchargement</h3>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Menu contextuel de piratage désactivé. Glisser-déposer de photos d'élèves, cachets officiels et logos bloqué.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Actifs et photos sécurisés</span>
-                </div>
-              </div>
-
-              {/* Feature 4 */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Règles Firestore Renforcées</h3>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Cloisonnement étanche par établissement. Authentification obligatoire pour toute écriture et lecture de données.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>firestore.rules déployées</span>
-                </div>
-              </div>
-
-              {/* Feature 5 */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 shrink-0">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Console & Headers Sécurisés</h3>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      En-têtes X-Content-Type nosniff, protection XSS, politique de référent stricte et suppression automatique des débogueurs.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>En-têtes HTTP & CSP configurés</span>
-                </div>
-              </div>
-
-              {/* Feature 6 */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 flex flex-col justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 shrink-0">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Anti-Scraping & Copie Massive</h3>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                      Empêche la sélection globale ou l'aspiration automatisée des données de scolarité, tout en permettant la saisie dans les formulaires.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 pt-2.5 border-t border-slate-700/40 flex items-center gap-1.5 text-[10px] font-bold text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Protection sélective active</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -1518,10 +1358,10 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             <div>
               <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
                 <Calculator className="w-5 h-5 text-blue-900" />
-                <span>Formules & Config. des Évaluations par Trimestre</span>
+                <span>Formules de Calcul des Moyennes</span>
               </h2>
               <p className="text-xs font-bold text-slate-400 mt-1">
-                Définissez le nombre d'évaluations par trimestre et par cycle (Fondamental vs Secondaire) et choisissez la formule exacte de calcul des moyennes.
+                Choisissez le mode de calcul des moyennes pour le premier cycle fondamental et le cycle secondaire.
               </p>
             </div>
 
@@ -1532,169 +1372,6 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
               <Save className="w-4 h-4" />
               <span>Enregistrer la Configuration</span>
             </button>
-          </div>
-
-          {/* PANNEAU DÉDIÉ: NOMBRE D'ÉVALUATIONS PAR TRIMESTRE ET PAR CYCLE */}
-          <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 rounded-3xl text-white space-y-6 shadow-xl">
-            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-              <div className="p-2.5 bg-blue-500/20 rounded-2xl border border-blue-400/30">
-                <Sliders className="w-6 h-6 text-blue-300" />
-              </div>
-              <div>
-                <h3 className="text-sm font-black uppercase tracking-wider text-white">
-                  Panneau de Configuration : Nombre d'Évaluations par Trimestre
-                </h3>
-                <p className="text-xs text-blue-200/80 font-medium mt-0.5">
-                  Ajustez le nombre de devoirs / interrogations comptabilisés dans le calcul de la Note de Classe chaque trimestre.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Card Cycle Fondamental */}
-              <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 bg-amber-400/20 border border-amber-300/30 text-amber-300 rounded-full font-black text-[10px] uppercase tracking-wider">
-                    Cycle Fondamental (Notes / 10)
-                  </span>
-                  <span className="text-[10px] font-bold text-blue-200 bg-blue-900/60 px-2.5 py-1 rounded-full border border-blue-400/30">
-                    {(formData.evaluationsPerTrimester1stCycle || 3) * 3} devoirs/an
-                  </span>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-white block mb-1">
-                    Évaluations / Devoirs retenus par trimestre :
-                  </label>
-                  <p className="text-[11px] text-blue-200/70 mb-3">
-                    Nombre d'interrogations / devoirs dont la moyenne forme la Note de Classe du trimestre.
-                  </p>
-
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {[1, 2, 3, 4].map(num => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setFormData(prev => ({
-                          ...prev,
-                          evaluationsPerTrimester1stCycle: num,
-                          evaluationCount1stCycle: num * 3
-                        }))}
-                        className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer border ${
-                          (formData.evaluationsPerTrimester1stCycle || 3) === num
-                            ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-black scale-105'
-                            : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
-                        }`}
-                      >
-                        {num} / Trim.
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-300">Saisie sur mesure :</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="6"
-                      value={formData.evaluationsPerTrimester1stCycle || 3}
-                      onChange={e => {
-                        const val = Math.max(1, Math.min(6, parseInt(e.target.value) || 1));
-                        setFormData(prev => ({
-                          ...prev,
-                          evaluationsPerTrimester1stCycle: val,
-                          evaluationCount1stCycle: val * 3
-                        }));
-                      }}
-                      className="w-20 p-2 bg-slate-900/80 border border-white/20 rounded-xl text-xs font-black text-white text-center outline-none focus:border-amber-400"
-                    />
-                    <span className="text-[11px] font-semibold text-blue-200">évaluations / trimestre</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/60 p-3.5 rounded-xl border border-white/10 text-[11px] space-y-1.5 font-mono">
-                  <p className="text-amber-300 font-bold">📐 Impact sur la Note de Classe (Fondamental) :</p>
-                  <p className="text-slate-300">
-                    Note de Classe = (Devoir 1 + ... + Devoir {formData.evaluationsPerTrimester1stCycle || 3}) / {formData.evaluationsPerTrimester1stCycle || 3}
-                  </p>
-                  <p className="text-slate-400 text-[10px]">
-                    Scolarité annuelle = {(formData.evaluationsPerTrimester1stCycle || 3) * 3} mensualités dues.
-                  </p>
-                </div>
-              </div>
-
-              {/* Card Cycle Secondaire / Lycée */}
-              <div className="bg-white/10 backdrop-blur-md p-5 rounded-2xl border border-white/15 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 bg-emerald-400/20 border border-emerald-300/30 text-emerald-300 rounded-full font-black text-[10px] uppercase tracking-wider">
-                    Cycle Secondaire & Lycée (Notes / 20)
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-200 bg-emerald-950/60 px-2.5 py-1 rounded-full border border-emerald-400/30">
-                    {(formData.evaluationsPerTrimester2ndCycle || 2) * 3} devoirs/an
-                  </span>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-white block mb-1">
-                    Évaluations / Devoirs retenus par trimestre :
-                  </label>
-                  <p className="text-[11px] text-blue-200/70 mb-3">
-                    Nombre d'interrogations / devoirs dont la moyenne forme la Note de Classe du trimestre.
-                  </p>
-
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    {[1, 2, 3, 4].map(num => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setFormData(prev => ({
-                          ...prev,
-                          evaluationsPerTrimester2ndCycle: num,
-                          evaluationCount2ndCycle: num * 3
-                        }))}
-                        className={`py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer border ${
-                          (formData.evaluationsPerTrimester2ndCycle || 2) === num
-                            ? 'bg-emerald-400 text-slate-950 border-emerald-300 shadow-md font-black scale-105'
-                            : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
-                        }`}
-                      >
-                        {num} / Trim.
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-300">Saisie sur mesure :</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="6"
-                      value={formData.evaluationsPerTrimester2ndCycle || 2}
-                      onChange={e => {
-                        const val = Math.max(1, Math.min(6, parseInt(e.target.value) || 1));
-                        setFormData(prev => ({
-                          ...prev,
-                          evaluationsPerTrimester2ndCycle: val,
-                          evaluationCount2ndCycle: val * 3
-                        }));
-                      }}
-                      className="w-20 p-2 bg-slate-900/80 border border-white/20 rounded-xl text-xs font-black text-white text-center outline-none focus:border-emerald-400"
-                    />
-                    <span className="text-[11px] font-semibold text-blue-200">évaluations / trimestre</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-950/60 p-3.5 rounded-xl border border-white/10 text-[11px] space-y-1.5 font-mono">
-                  <p className="text-emerald-300 font-bold">📐 Impact sur la Note de Classe (Secondaire) :</p>
-                  <p className="text-slate-300">
-                    Note de Classe = (Devoir 1 + ... + Devoir {formData.evaluationsPerTrimester2ndCycle || 2}) / {formData.evaluationsPerTrimester2ndCycle || 2}
-                  </p>
-                  <p className="text-slate-400 text-[10px]">
-                    Scolarité annuelle = {(formData.evaluationsPerTrimester2ndCycle || 2) * 3} mensualités dues.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Section 1er Cycle */}
@@ -1898,194 +1575,6 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </button>
           </div>
         </form>
-      )}
-
-      {/* TAB: CLOUD_SYNC */}
-      {activeTab === 'CLOUD_SYNC' && (
-        <div className="space-y-8">
-          {/* Status & Overview */}
-          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-100 text-blue-900 rounded-2xl flex items-center justify-center font-black">
-                  <Cloud className="w-6 h-6 text-blue-900" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 uppercase">
-                    Synchronisation Multi-Établissements & Multi-Appareils
-                  </h2>
-                  <p className="text-xs font-bold text-slate-400 mt-0.5">
-                    Permet d'utiliser KalanGest sur plusieurs téléphones et ordinateurs simultanément avec les mêmes données.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-2 ${
-                  syncStatus === 'CONNECTED' 
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                    : 'bg-amber-50 text-amber-800 border border-amber-200'
-                }`}>
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{syncStatus === 'CONNECTED' ? 'Synchronisé en Direct' : syncStatus}</span>
-                </span>
-              </div>
-            </div>
-
-            {/* School Code Highlight Card */}
-            <div className="p-6 rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white space-y-4 shadow-xl">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span className="text-xs font-black uppercase tracking-widest text-sky-300">
-                  Code Établissement Partagé (Identifiant Cloud Unique)
-                </span>
-                <span className="text-[11px] font-bold text-slate-300">
-                  {students.length} Élève(s) • {classes.length} Classe(s)
-                </span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <div className="flex-1 bg-black/50 border border-white/20 px-5 py-3.5 rounded-2xl font-mono text-xl font-black text-amber-300 tracking-wider select-all">
-                  {cloudSchoolCode}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(cloudSchoolCode);
-                    setCodeCopied(true);
-                    setTimeout(() => setCodeCopied(false), 2500);
-                  }}
-                  className="px-6 py-3.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer shrink-0"
-                >
-                  {codeCopied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-                  <span>{codeCopied ? 'Code Copié !' : 'Copier le Code'}</span>
-                </button>
-              </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed">
-                👉 <strong>Pour connecter votre téléphone ou un autre PC :</strong> Ouvrez l'application sur l'appareil, accédez à cet écran (ou cliquez sur le bouton Cloud dans l'en-tête), collez le code <strong className="text-amber-300">{cloudSchoolCode}</strong> et validez. Vos notes, inscriptions et caisse se synchroniseront automatiquement !
-              </p>
-            </div>
-
-            {/* Form to change / join school code */}
-            <div className="pt-4 space-y-4">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                Rejoindre une autre école ou changer de code
-              </h3>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <input
-                  type="text"
-                  value={targetCode}
-                  onChange={e => setTargetCode(e.target.value.toUpperCase())}
-                  placeholder="Ex: ECOLE-HAMDALLAYE"
-                  className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-black uppercase text-slate-900 tracking-wider outline-none focus:ring-2 focus:ring-blue-900"
-                />
-
-                <button
-                  type="button"
-                  disabled={isCloudBusy || !targetCode.trim()}
-                  onClick={async () => {
-                    if (!targetCode.trim()) return;
-                    setIsCloudBusy(true);
-                    setCloudMessage(null);
-                    try {
-                      const ok = await switchOrJoinSchool(targetCode, formData.schoolName, formData.adminPassword);
-                      if (ok) {
-                        setCloudMessage({ text: `Connecté à l'établissement [${targetCode.toUpperCase()}] avec succès !`, isError: false });
-                      } else {
-                        setCloudMessage({ text: "Échec de connexion au code établissement.", isError: true });
-                      }
-                    } catch (e) {
-                      setCloudMessage({ text: "Erreur de connexion.", isError: true });
-                    } finally {
-                      setIsCloudBusy(false);
-                    }
-                  }}
-                  className="px-6 py-3 bg-blue-900 hover:bg-blue-950 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {isCloudBusy ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-                  <span>Se Connecter</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isCloudBusy}
-                  onClick={async () => {
-                    setIsCloudBusy(true);
-                    setCloudMessage(null);
-                    try {
-                      const ok = await forceCloudPush();
-                      if (ok) {
-                        setCloudMessage({ text: "Toutes les données ont été synchronisées vers le Cloud !", isError: false });
-                      } else {
-                        setCloudMessage({ text: "Erreur de synchronisation.", isError: true });
-                      }
-                    } catch (e) {
-                      setCloudMessage({ text: "Erreur réseau Cloud.", isError: true });
-                    } finally {
-                      setIsCloudBusy(false);
-                    }
-                  }}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-                  title="Téléverser toutes les données locales vers Firebase Firestore"
-                >
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Forcer Envoi Cloud</span>
-                </button>
-              </div>
-
-              {cloudMessage && (
-                <div className={`p-4 rounded-2xl text-xs font-bold flex items-center gap-2 ${
-                  cloudMessage.isError ? 'bg-rose-50 text-rose-800 border border-rose-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                }`}>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{cloudMessage.text}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Architecture Multi-Écoles & Multi-Appareils expliquée */}
-            <div className="p-6 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-4">
-              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-blue-900" />
-                Comment fonctionne l'utilisation simultanée :
-              </h4>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-900 flex items-center justify-center font-black">
-                    <Laptop className="w-4 h-4" />
-                  </div>
-                  <strong className="block text-xs font-black text-slate-900">1. Bureau & Direction</strong>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Le directeur inscrit les élèves, enregistre les paiements et génère les bulletins officiels.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-900 flex items-center justify-center font-black">
-                    <Smartphone className="w-4 h-4" />
-                  </div>
-                  <strong className="block text-xs font-black text-slate-900">2. Enseignants sur Mobile</strong>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Les professeurs saisissent les notes de devoirs et compositions directement depuis leur smartphone en classe.
-                  </p>
-                </div>
-
-                <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-2">
-                  <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-900 flex items-center justify-center font-black">
-                    <Cloud className="w-4 h-4" />
-                  </div>
-                  <strong className="block text-xs font-black text-slate-900">3. Cloud Firestore</strong>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Chaque modification est instantanément répliquée sur tous les appareils connectés au même code d'école.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
       </>
       )}

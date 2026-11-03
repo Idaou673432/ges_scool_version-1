@@ -286,42 +286,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           ) : (
-            /* Expanded View for User Profile */
-            <>
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs">
-                  {currentUser?.fullName.charAt(0)}
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-xs font-bold text-slate-900 truncate">
-                    {currentUser?.fullName}
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider truncate">
-                    {AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}
-                  </span>
-                </div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                {currentUser?.fullName?.charAt(0) || 'A'}
               </div>
-
-              {/* Role Switcher */}
-              <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] font-medium text-slate-500">
-                <span className="uppercase tracking-wider text-[9px] flex items-center gap-1">
-                  <Shield className="w-3 h-3 text-slate-400" />
-                  <span>Rôle:</span>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-xs font-bold text-slate-900 truncate">
+                  {currentUser?.fullName}
                 </span>
-                <select
-                  value={currentUser?.role}
-                  onChange={(e) => switchRoleSimulated(e.target.value as any)}
-                  className="bg-white text-slate-800 text-[10px] font-semibold rounded-md px-2 py-0.5 border border-slate-200 outline-none focus:border-slate-800 cursor-pointer shadow-2xs"
-                >
-                  <option value="ADMIN">Admin</option>
-                  <option value="DIRECTEUR">Directeur</option>
-                  <option value="SECRETAIRE">Secrétaire</option>
-                  <option value="COMPTABLE">Comptable</option>
-                  <option value="ENSEIGNANT">Enseignant</option>
-                  <option value="LECTURE_SEULE">Lecture Seule</option>
-                </select>
+                <span className="text-[10px] font-medium text-slate-500 truncate">
+                  {AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}
+                </span>
               </div>
-            </>
+            </div>
           )}
         </div>
 

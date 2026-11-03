@@ -240,7 +240,7 @@ export function AppContent() {
           {activeTab === 'payments' && <PaymentsModule />}
           {activeTab === 'modules' && <SettingsModule initialTab="FEATURES" />}
           {activeTab === 'settings' && <SettingsModule initialTab="INFO" />}
-          {activeTab === 'backup' && <SettingsModule initialTab="CLOUD_SYNC" />}
+          {activeTab === 'backup' && <SettingsModule initialTab="INFO" />}
         </main>
 
         {/* Mobile Quick Bottom Navigation Bar */}
