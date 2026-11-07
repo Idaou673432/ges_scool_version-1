@@ -21,6 +21,7 @@ import { AttendanceModule } from './modules/attendance/AttendanceModule';
 import { BulletinsModule } from './modules/bulletins/BulletinsModule';
 import { CardsModule } from './modules/cards/CardsModule';
 import { PaymentsModule } from './modules/payments/PaymentsModule';
+import { CashierModule } from './modules/cashier/CashierModule';
 import { SettingsModule } from './modules/settings/SettingsModule';
 import { StudentQrScannerModal } from './components/qr/StudentQrScannerModal';
 import { StudentQrProfileModal } from './components/qr/StudentQrProfileModal';
@@ -47,7 +48,8 @@ export function AppContent() {
       attendance: 'attendance',
       bulletins: 'bulletins',
       cards: 'cards',
-      payments: 'payments'
+      payments: 'payments',
+      cashier: 'payments'
     };
     const reqFeature = tabFeatureMap[activeTab];
     if (reqFeature && !isFeatureEnabled(reqFeature)) {
@@ -242,6 +244,7 @@ export function AppContent() {
           {activeTab === 'bulletins' && <BulletinsModule />}
           {activeTab === 'cards' && <CardsModule />}
           {activeTab === 'payments' && <PaymentsModule />}
+          {activeTab === 'cashier' && <CashierModule />}
           {activeTab === 'modules' && <SettingsModule initialTab="FEATURES" />}
           {activeTab === 'settings' && <SettingsModule initialTab="INFO" />}
           {activeTab === 'backup' && <SettingsModule initialTab="INFO" />}

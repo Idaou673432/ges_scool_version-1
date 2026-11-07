@@ -159,21 +159,15 @@ export const GradesModule: React.FC = () => {
         </div>
       )}
 
-      {/* Control Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div>
-          <div className="flex items-center justify-between">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Classe *</label>
-            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-              isFirstCycle ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-100 text-slate-700'
-            }`}>
-              {isFirstCycle ? 'Sur 10' : 'Sur 20'}
-            </span>
-          </div>
+      {/* Clean Control Bar */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center gap-3">
+        {/* Classe */}
+        <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Classe :</span>
           <select
             value={selectedClassId}
             onChange={e => setSelectedClassId(e.target.value)}
-            className="w-full mt-1.5 py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
+            className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
           >
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -181,12 +175,13 @@ export const GradesModule: React.FC = () => {
           </select>
         </div>
 
-        <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Matière *</label>
+        {/* Matière */}
+        <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Matière :</span>
           <select
             value={selectedSubjectId}
             onChange={e => setSelectedSubjectId(e.target.value)}
-            className="w-full mt-1.5 py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
+            className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
           >
             {subjects.map(s => (
               <option key={s.id} value={s.id}>{s.name} (Coef {s.coefficient})</option>
@@ -194,35 +189,37 @@ export const GradesModule: React.FC = () => {
           </select>
         </div>
 
-        <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Type d'Évaluation *</label>
+        {/* Type d'évaluation */}
+        <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Type :</span>
           <select
             value={evaluationType}
             onChange={e => setEvaluationType(e.target.value as EvaluationType)}
-            className="w-full mt-1.5 py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
+            className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
           >
-            <option value="INTERROGATION">Interro Écrite / Orale</option>
-            <option value="DEVOIR">Devoir de Classe</option>
-            <option value="COMPOSITION">Composition Trimestrielle</option>
-            <option value="EXAMEN">Examen Blanc (DEF/BAC)</option>
+            <option value="INTERROGATION">Interro</option>
+            <option value="DEVOIR">Devoir</option>
+            <option value="COMPOSITION">Composition</option>
+            <option value="EXAMEN">Examen Blanc</option>
           </select>
         </div>
 
-        <div>
-          <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Période / Évaluation *</label>
+        {/* Période */}
+        <div className="flex items-center gap-2 flex-1 min-w-[160px]">
+          <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Période :</span>
           <select
             value={term}
             onChange={e => setTerm(e.target.value as EvaluationTerm)}
-            className="w-full mt-1.5 py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
+            className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
           >
-            <optgroup label="Évaluations Mensuelles (Devoirs)">
+            <optgroup label="Devoirs">
               {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
                 .filter(t => t.category === 'EVALUATION_MENSUELLE')
                 .map(t => (
                   <option key={t.id} value={t.id}>{t.label}</option>
                 ))}
             </optgroup>
-            <optgroup label="Trimestres (Compositions)">
+            <optgroup label="Compositions">
               {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
                 .filter(t => t.category === 'TRIMESTRE')
                 .map(t => (
@@ -238,72 +235,56 @@ export const GradesModule: React.FC = () => {
             </optgroup>
           </select>
         </div>
-      </div>
 
-      {/* Info Banner for Evaluation / Trimestre Logic */}
-      <div className="bg-slate-50 border border-slate-200/80 p-3.5 rounded-xl flex items-center gap-3 text-xs text-slate-700 font-medium">
-        <span className="font-bold bg-slate-900 text-white px-2 py-0.5 rounded text-[10px] uppercase shrink-0">Note</span>
-        <span className="leading-relaxed">
-          {(() => {
-            const count = settings.evaluationCount || 9;
-            const perTrim = Math.max(1, Math.ceil(count / 3));
-            if (term.startsWith('EVALUATION_')) {
-              const num = parseInt(term.replace('EVALUATION_', '')) || 1;
-              const trimNum = Math.min(3, Math.ceil(num / perTrim));
-              const devNum = num - (trimNum - 1) * perTrim;
-              return `Devoir N°${devNum}/${perTrim} du ${trimNum === 1 ? '1er' : `${trimNum}ème`} Trimestre. Calculé automatiquement pour la note de classe.`;
-            }
-            if (term.startsWith('TRIMESTRE_')) {
-              const trimNum = term.replace('TRIMESTRE_', '');
-              return `Composition du ${trimNum === '1' ? '1er' : `${trimNum}ème`} Trimestre combinée à la moyenne des devoirs pour le bulletin officiel.`;
-            }
-            return 'Sélectionnez une période pour effectuer la saisie des notes.';
-          })()}
+        <span className="text-xs font-mono font-semibold text-slate-500 whitespace-nowrap">
+          Barème : sur {currentMaxScore}
         </span>
       </div>
 
       {activeTab === 'PROMOTION' ? (
         <PromotionManager selectedClassId={selectedClassId} term={term} />
       ) : activeTab === 'BATCH' ? (
-        /* Grade Entry Table with Student Photo */
-        <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-2xs">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50/75 font-bold text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-100">
+        /* Saisie Épurée et Rapide */
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead className="bg-slate-50 border-b border-slate-200 font-bold text-[11px] text-slate-500 uppercase tracking-wider">
               <tr>
-                <th className="py-3 px-6">Photo</th>
-                <th className="py-3 px-4">Matricule</th>
-                <th className="py-3 px-4">Élève</th>
-                <th className="py-3 px-4">Sexe</th>
-                <th className="py-3 px-4 w-40">Note sur {currentMaxScore}</th>
-                <th className="py-3 px-6">Appréciation</th>
+                <th className="py-3 px-4">Élève & Matricule</th>
+                <th className="py-3 px-4 w-40 text-center">Note sur {currentMaxScore}</th>
+                <th className="py-3 px-4">Appréciation</th>
               </tr>
             </thead>
-            <tbody className="text-xs font-medium text-slate-700 divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100">
               {currentClassStudents.map((std) => {
                 const currentScore = scoresMap[std.id] ?? (isFirstCycle ? 6 : 12);
-                const { appreciation, badgeColor } = getMaliScoreAppreciation(currentScore, currentMaxScore);
+                const { appreciation } = getMaliScoreAppreciation(currentScore, currentMaxScore);
 
                 return (
                   <tr key={std.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-6">
-                      {std.photoUrl ? (
-                        <img
-                          src={std.photoUrl}
-                          alt={std.firstName}
-                          className="w-9 h-9 rounded-xl object-cover border border-slate-200 shadow-2xs"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-800 font-bold flex items-center justify-center text-xs border border-slate-200">
-                          {std.firstName.charAt(0)}{std.lastName.charAt(0)}
+                    <td className="py-2.5 px-4">
+                      <div className="flex items-center gap-3">
+                        {std.photoUrl ? (
+                          <img
+                            src={std.photoUrl}
+                            alt=""
+                            className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs shrink-0">
+                            {std.firstName[0]}{std.lastName[0]}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-slate-900 leading-snug">
+                            {std.lastName.toUpperCase()} {std.firstName}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            {std.matricule}
+                          </p>
                         </div>
-                      )}
+                      </div>
                     </td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">{std.matricule}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-900">
-                      {std.lastName.toUpperCase()} {std.firstName}
-                    </td>
-                    <td className="py-3 px-4 text-slate-500">{std.gender}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-2.5 px-4 text-center">
                       <input
                         type="number"
                         step="0.25"
@@ -312,11 +293,11 @@ export const GradesModule: React.FC = () => {
                         value={scoresMap[std.id] ?? ''}
                         placeholder={isFirstCycle ? "6" : "12"}
                         onChange={e => handleScoreChange(std.id, e.target.value)}
-                        className="w-24 py-1.5 px-3 font-mono font-bold text-sm bg-slate-50 border border-slate-200/90 rounded-xl text-center text-slate-900 outline-none focus:border-slate-800 focus:bg-white"
+                        className="w-24 py-1.5 px-2 text-center font-mono font-bold text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-900 outline-none focus:bg-white focus:border-slate-800 transition-colors"
                       />
                     </td>
-                    <td className="py-3 px-6">
-                      <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold border ${badgeColor}`}>
+                    <td className="py-2.5 px-4">
+                      <span className="text-xs font-medium text-slate-700">
                         {appreciation}
                       </span>
                     </td>

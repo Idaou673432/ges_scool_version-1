@@ -22,7 +22,8 @@ import {
   X,
   ChevronRight,
   Shield,
-  Sliders
+  Sliders,
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSchool } from '../../contexts/SchoolContext';
@@ -40,6 +41,7 @@ export type NavTab =
   | 'bulletins'
   | 'cards'
   | 'payments'
+  | 'cashier'
   | 'modules'
   | 'settings'
   | 'backup';
@@ -76,6 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     bulletins: 'bulletins',
     cards: 'cards',
     payments: 'payments',
+    cashier: 'payments',
     modules: null,
     settings: null,
     backup: null
@@ -109,7 +112,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'Administration',
       items: [
-        { id: 'payments' as NavTab, label: 'Paiements & Caisse', icon: CreditCard, perm: 'payments:view' },
+        { id: 'payments' as NavTab, label: 'Paiements', icon: CreditCard, perm: 'payments:view' },
+        { id: 'cashier' as NavTab, label: 'Caisse', icon: Wallet, perm: 'payments:view' },
         { id: 'settings' as NavTab, label: 'Paramètres', icon: Settings, perm: 'settings:view' },
       ]
     }

@@ -29,7 +29,6 @@ export const BulletinsModule: React.FC = () => {
   const [selectedTerm, setSelectedTerm] = useState<EvaluationTerm>('TRIMESTRE_1');
   const [activeStudentId, setActiveStudentId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [scoreFilter, setScoreFilter] = useState<'ALL' | 'PASSING' | 'FAILING'>('ALL');
   const [studentSortMode, setStudentSortMode] = useState<'RANK' | 'ALPHA'>('RANK');
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [isPrintAllMode, setIsPrintAllMode] = useState<boolean>(false);
@@ -55,17 +54,6 @@ export const BulletinsModule: React.FC = () => {
           s.matricule.toLowerCase().includes(q);
         if (!matchesName) return false;
       }
-
-      // Score status filter
-      if (scoreFilter !== 'ALL') {
-        const card = generateReportCard(s.id, selectedTerm);
-        if (card) {
-          const passThreshold = card.maxScore === 10 ? 5 : 10;
-          if (scoreFilter === 'PASSING' && card.generalAverage < passThreshold) return false;
-          if (scoreFilter === 'FAILING' && card.generalAverage >= passThreshold) return false;
-        }
-      }
-
       return true;
     });
 
@@ -84,7 +72,7 @@ export const BulletinsModule: React.FC = () => {
       const avgB = cardB ? cardB.generalAverage : 0;
       return avgB - avgA;
     });
-  }, [totalClassStudents, searchQuery, scoreFilter, selectedTerm, generateReportCard, studentSortMode, grades]);
+  }, [totalClassStudents, searchQuery, selectedTerm, generateReportCard, studentSortMode, grades]);
 
   // Ensure an active student is selected
   const activeStudent = useMemo(() => {
@@ -523,56 +511,38 @@ export const BulletinsModule: React.FC = () => {
             </div>
           </div>
 
-          {/* Clean Inline Stats - No decorative icons */}
+          {/* Clean Inline Stats - Unboxed Typography */}
           {classStats.total > 0 && (
-            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-900 border border-emerald-200/80">
-                  <strong className="font-bold">Admission :</strong> {classStats.passRate}% ({classStats.passing}/{classStats.total})
-                </span>
-
-                <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-900 border border-blue-200/80">
-                  <strong className="font-bold">Moyenne :</strong> {classStats.avg.toFixed(2)}/20
-                </span>
-
-                <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80">
-                  <strong className="font-bold">Plus forte :</strong> {classStats.maxAvg.toFixed(2)}/20
-                </span>
-
-                <span className="px-2.5 py-1 rounded-md bg-rose-50 text-rose-900 border border-rose-200/80">
-                  <strong className="font-bold">Plus faible :</strong> {classStats.minAvg.toFixed(2)}/20
-                </span>
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 font-medium">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span>{classStats.total} élèves classés</span>
+                <span aria-hidden="true">·</span>
+                <span>Taux d'admission : <strong className="text-slate-900 font-mono">{classStats.passRate}%</strong></span>
+                <span aria-hidden="true">·</span>
+                <span>Moyenne : <strong className="text-slate-900 font-mono">{classStats.avg.toFixed(2)}/20</strong></span>
+                <span aria-hidden="true">·</span>
+                <span>Max : <strong className="text-slate-900 font-mono">{classStats.maxAvg.toFixed(2)}</strong></span>
               </div>
-
-              <span className="text-[11px] font-mono text-slate-400 hidden xl:inline">
-                {classStats.total} élève{classStats.total > 1 ? 's' : ''} classé{classStats.total > 1 ? 's' : ''}
-              </span>
             </div>
           )}
         </div>
 
         {/* Main Interactive Screen Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
           {/* Left: Student List Sidebar */}
           <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate">
-                Élèves ({classStudents.length}/{totalClassStudents.length})
+              <h2 className="text-xs font-bold text-slate-700 truncate">
+                Élèves de la classe ({classStudents.length})
               </h2>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setStudentSortMode(prev => prev === 'RANK' ? 'ALPHA' : 'RANK')}
-                  className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 transition-colors cursor-pointer"
-                  title="Basculer entre le classement par rang (1er au dernier) et le classement alphabétique"
-                >
-                  <ArrowUpDown className="w-3 h-3 text-blue-700 shrink-0" />
-                  <span>{studentSortMode === 'RANK' ? '1er au dernier' : 'A-Z'}</span>
-                </button>
-                <span className="text-[10px] font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
-                  {currentClass?.name}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setStudentSortMode(prev => prev === 'RANK' ? 'ALPHA' : 'RANK')}
+                className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                title="Changer l'ordre de tri"
+              >
+                {studentSortMode === 'RANK' ? 'Tri : 1er au dernier' : 'Tri : A à Z'}
+              </button>
             </div>
 
             {/* Quick Search bar */}
@@ -582,7 +552,7 @@ export const BulletinsModule: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Rechercher nom, prénom..."
+                placeholder="Rechercher par nom ou matricule..."
                 className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
               />
               {searchQuery && (
@@ -593,40 +563,6 @@ export const BulletinsModule: React.FC = () => {
                   <X className="w-3 h-3" />
                 </button>
               )}
-            </div>
-
-            {/* Status Filter Chips */}
-            <div className="flex items-center gap-1.5 pb-0.5">
-              <button
-                onClick={() => setScoreFilter('ALL')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  scoreFilter === 'ALL'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Tous ({totalClassStudents.length})
-              </button>
-              <button
-                onClick={() => setScoreFilter('PASSING')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  scoreFilter === 'PASSING'
-                    ? 'bg-emerald-800 text-white'
-                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                }`}
-              >
-                Admis
-              </button>
-              <button
-                onClick={() => setScoreFilter('FAILING')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                  scoreFilter === 'FAILING'
-                    ? 'bg-rose-800 text-white'
-                    : 'bg-rose-50 text-rose-800 hover:bg-rose-100'
-                }`}
-              >
-                En difficulté
-              </button>
             </div>
 
             {/* Student list */}
@@ -716,16 +652,13 @@ export const BulletinsModule: React.FC = () => {
 
               {classStudents.length === 0 && (
                 <div className="text-center py-8 space-y-2">
-                  <p className="text-xs text-slate-400 italic">Aucun élève ne correspond aux filtres.</p>
-                  {(searchQuery || scoreFilter !== 'ALL') && (
+                  <p className="text-xs text-slate-400 italic">Aucun élève trouvé pour cette recherche.</p>
+                  {searchQuery && (
                     <button
-                      onClick={() => {
-                        setSearchQuery('');
-                        setScoreFilter('ALL');
-                      }}
-                      className="text-[10px] font-bold uppercase text-slate-700 underline hover:text-slate-900"
+                      onClick={() => setSearchQuery('')}
+                      className="text-xs font-semibold text-slate-700 underline hover:text-slate-900 cursor-pointer"
                     >
-                      Réinitialiser la recherche
+                      Effacer la recherche
                     </button>
                   )}
                 </div>
@@ -872,7 +805,7 @@ export const BulletinsModule: React.FC = () => {
                               </td>
 
                               {/* Direct Note de classe input */}
-                              <td className="py-2.5 px-2 text-center">
+                              <td className="py-2 px-2 text-center">
                                 <input
                                   type="number"
                                   step="0.25"
@@ -880,13 +813,13 @@ export const BulletinsModule: React.FC = () => {
                                   max={activeReportCard.maxScore === 10 ? 10 : 20}
                                   value={classScoreVal.toString()}
                                   onChange={e => handleClassScoreChange(s.subjectId, e.target.value)}
-                                  className="w-24 py-1.5 px-2 text-center font-mono font-black text-xs text-amber-950 bg-amber-50/90 border-2 border-amber-200 focus:border-amber-600 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
+                                  className="w-20 py-1 px-2 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 focus:border-slate-900 focus:bg-white rounded-lg outline-none transition-all"
                                   title="Note de classe / devoirs"
                                 />
                               </td>
 
                               {/* Direct Note de composition input */}
-                              <td className="py-2.5 px-2 text-center">
+                              <td className="py-2 px-2 text-center">
                                 <input
                                   type="number"
                                   step="0.25"
@@ -894,32 +827,28 @@ export const BulletinsModule: React.FC = () => {
                                   max={activeReportCard.maxScore === 10 ? 10 : 40}
                                   value={compScoreVal.toString()}
                                   onChange={e => handleCompositionScoreChange(s.subjectId, e.target.value)}
-                                  className="w-24 py-1.5 px-2 text-center font-mono font-black text-xs text-purple-950 bg-purple-50/90 border-2 border-purple-200 focus:border-purple-600 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
+                                  className="w-20 py-1 px-2 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 focus:border-slate-900 focus:bg-white rounded-lg outline-none transition-all"
                                   title="Note de composition"
                                 />
                               </td>
 
                               {/* Calculated Moyenne Matière */}
-                              <td className="py-2.5 px-2 text-center">
-                                <span className={`inline-block min-w-[56px] py-1 px-2 font-mono font-black text-xs rounded-xl border ${
-                                  s.finalScore >= (sMaxScore / 2)
-                                    ? 'bg-blue-50 text-blue-950 border-blue-200'
-                                    : 'bg-rose-50 text-rose-950 border-rose-200'
-                                }`}>
+                              <td className="py-2 px-2 text-center">
+                                <span className="font-mono font-bold text-xs text-slate-900">
                                   {s.finalScore.toFixed(2)}
                                 </span>
                               </td>
 
-                              <td className="py-3 px-2 text-center font-black text-slate-700">
+                              <td className="py-2.5 px-2 text-center font-semibold text-slate-600">
                                 {s.coefficient}
                               </td>
 
-                              <td className="py-3 px-2 text-center font-mono font-black text-slate-900">
+                              <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-900">
                                 {s.weightedScore.toFixed(2)}
                               </td>
 
-                              <td className="py-3 px-4">
-                                <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${badgeColor}`}>
+                              <td className="py-2.5 px-4">
+                                <span className="text-xs font-medium text-slate-700">
                                   {appreciation}
                                 </span>
                               </td>
@@ -932,32 +861,30 @@ export const BulletinsModule: React.FC = () => {
                 </div>
 
                 {/* Editable Teacher Observation & Conseil de Classe */}
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block">
-                      Appréciation Générale du Conseil de Classe & Directeur
-                    </label>
-                    <span className="text-[9px] font-bold text-slate-400">Suggestions rapides en 1 clic :</span>
-                  </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Appréciation générale du Conseil de Classe
+                  </label>
 
                   <textarea
                     rows={2}
                     value={getCommentForStudent(activeStudent.id)}
                     onChange={e => handleCommentChange(activeStudent.id, e.target.value)}
-                    placeholder="Saisissez ici l'observation finale..."
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                    placeholder="Saisissez l'observation du conseil..."
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400"
                   />
 
-                  {/* Preset Quick Chips */}
-                  <div className="flex flex-wrap gap-1.5 pt-1">
+                  {/* Preset Quick suggestions */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                    <span className="text-[11px] text-slate-400 font-medium">Suggestions :</span>
                     {COMMENT_PRESETS.map((preset, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleCommentChange(activeStudent.id, preset)}
-                        className="text-[10px] font-bold px-3 py-1 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-900 border border-slate-200 hover:border-blue-200 rounded-full transition-all cursor-pointer shadow-2xs"
+                        className="text-[11px] px-2 py-0.5 bg-white hover:bg-slate-100 text-slate-600 rounded-md border border-slate-200 transition-colors cursor-pointer"
                       >
-                        + {preset}
+                        {preset.split('.')[0]}
                       </button>
                     ))}
                   </div>

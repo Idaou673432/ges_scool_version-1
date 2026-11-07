@@ -180,91 +180,73 @@ export const DashboardModule: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. Les 4 Chiffres Clés de l'Établissement */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* Effectif Global */}
-        {isFeatureEnabled('students') && (
-          <div 
-            onClick={() => onNavigate('students')}
-            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Effectif Total</span>
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-900 flex items-center justify-center">
-                <Users className="w-4 h-4" />
-              </div>
+      {/* 2. Les Chiffres Clés de l'Établissement - Synthèse Épurée */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+          {/* Effectif Global */}
+          {isFeatureEnabled('students') && (
+            <div 
+              onClick={() => onNavigate('students')}
+              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
+            >
+              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Effectif Total</span>
+              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
+                {stats.totalStudents} <span className="text-xs font-normal text-slate-400">élèves</span>
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {maleCount}G · {femaleCount}F
+              </p>
             </div>
-            <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
-              {stats.totalStudents} <span className="text-xs font-normal text-slate-400">élèves</span>
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium mt-1">
-              {maleCount} garçons · {femaleCount} filles
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Classes & Enseignants */}
-        {isFeatureEnabled('classes') && (
-          <div 
-            onClick={() => onNavigate('classes')}
-            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Classes & Personnel</span>
-              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center">
-                <School className="w-4 h-4" />
-              </div>
+          {/* Classes */}
+          {isFeatureEnabled('classes') && (
+            <div 
+              onClick={() => onNavigate('classes')}
+              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
+            >
+              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Classes & Salles</span>
+              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
+                {classes.length} <span className="text-xs font-normal text-slate-400">classes</span>
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {stats.totalTeachers} enseignants
+              </p>
             </div>
-            <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
-              {classes.length} <span className="text-xs font-normal text-slate-400">salles de classe</span>
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium mt-1">
-              {stats.totalTeachers} enseignants en activité
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Recettes de Caisse */}
-        {isFeatureEnabled('payments') && (
-          <div 
-            onClick={() => onNavigate('payments')}
-            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Recettes Encaissées</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                <CreditCard className="w-4 h-4" />
-              </div>
+          {/* Recettes */}
+          {isFeatureEnabled('payments') && (
+            <div 
+              onClick={() => onNavigate('cashier')}
+              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
+            >
+              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Recettes de Caisse</span>
+              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
+                {formatFCFA(stats.totalRevenueFCFA)}
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                Exercice scolaire en cours
+              </p>
             </div>
-            <p className="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
-              {formatFCFA(stats.totalRevenueFCFA)}
-            </p>
-            <p className="text-[11px] text-emerald-700 font-medium mt-1">
-              Total scolarités de l'exercice
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* Moyenne Établissement */}
-        {isFeatureEnabled('grades') && (
-          <div 
-            onClick={() => onNavigate('grades')}
-            className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer group"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-500">Moyenne Générale</span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-                <Award className="w-4 h-4" />
-              </div>
+          {/* Moyenne */}
+          {isFeatureEnabled('grades') && (
+            <div 
+              onClick={() => onNavigate('grades')}
+              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
+            >
+              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Moyenne Établissement</span>
+              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
+                {schoolAverage} <span className="text-xs font-normal text-slate-400">/ 20</span>
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {getMaliScoreAppreciation(parseFloat(schoolAverage), 20).appreciation}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-slate-900 tabular-nums font-mono mt-2">
-              {schoolAverage} <span className="text-xs font-normal text-slate-400">/ 20</span>
-            </p>
-            <p className="text-[11px] text-slate-500 font-medium mt-1">
-              {getMaliScoreAppreciation(parseFloat(schoolAverage), 20).appreciation} · {settings.activeTerm?.replace('_', ' ') || 'Trimestre 1'}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* 3. Sélecteur de Vue de l'Accueil (Vue Générale / Résultats Académiques / Historique Scans) */}

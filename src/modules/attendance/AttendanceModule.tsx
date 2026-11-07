@@ -312,59 +312,36 @@ export const AttendanceModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Module Header & Action Tabs */}
-      <div className="bg-white rounded-2xl p-6 sm:p-7 border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-5">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 bg-slate-100 text-slate-900 rounded-xl">
-              <CalendarCheck className="w-5 h-5" />
-            </span>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-                Suivi des Présences & Assiduité
-              </h1>
-              <p className="text-xs text-slate-500 font-medium">
-                Appels quotidiens, alertes parents WhatsApp & registre d'assiduité officiel
-              </p>
-            </div>
+    <div className="space-y-3.5 max-w-7xl mx-auto pb-12">
+      {/* 1. Entête Compact avec Actions & Onglets */}
+      <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <CalendarCheck className="w-4 h-4 text-amber-400" />
+          </div>
+          <div>
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
+              Suivi des Présences & Assiduité
+            </h1>
+            <p className="text-xs text-slate-500 font-medium">
+              Pointage journalier · Alertes WhatsApp · Registre d'assiduité
+            </p>
           </div>
         </div>
 
-        {/* Tab Switcher & Actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-2xs transition-all cursor-pointer"
-            title="Scanner le QR Code d'un élève pour pointer sa présence ou consulter sa fiche"
-          >
-            <Camera className="w-3.5 h-3.5 text-amber-300" />
-            <span>Scanner QR Élève</span>
-          </button>
-
-          {attendanceRecords.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowDeleteAllModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-all cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Supprimer Tout ({attendanceRecords.length})</span>
-            </button>
-          )}
-
+        {/* Switcher & Actions Rapides */}
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex bg-slate-100 p-1 rounded-xl">
             <button
               type="button"
               onClick={() => setActiveTab('CALL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === 'CALL'
                   ? 'bg-white text-slate-900 shadow-2xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <span>Appel Quotidien</span>
+              Appel Quotidien
             </button>
             <button
               type="button"
@@ -379,83 +356,131 @@ export const AttendanceModule: React.FC = () => {
               <span>Registre</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+            title="Scanner le QR Code d'un badge élève"
+          >
+            <Camera className="w-3.5 h-3.5 text-slate-700" />
+            <span>Scanner QR</span>
+          </button>
+
+          {activeTab === 'CALL' && (
+            <>
+              <button
+                type="button"
+                onClick={handleMarkAllPresent}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition-all cursor-pointer"
+                title="Marquer tous les élèves de la classe présents"
+              >
+                <CheckCheck className="w-3.5 h-3.5" />
+                <span>Tous Présents</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportDailyPdf}
+                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer"
+                title="Imprimer la feuille d'appel PDF"
+              >
+                <Printer className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveCall}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Enregistrer</span>
+              </button>
+            </>
+          )}
+
+          {attendanceRecords.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowDeleteAllModal(true)}
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+              title="Vider toutes les présences enregistrées"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Main Filter Toolbar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-              Classe *
-            </label>
+      {/* 2. Barre de Contrôle & Synthèse Compacte (Unifiée) */}
+      <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Classe */}
+          <div className="flex items-center gap-2 flex-1 min-w-[170px]">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Classe :</span>
             <select
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
-              className="w-full py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
+              className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
             >
               {classes.map(cls => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.name} ({cls.level})
+                  {cls.name}
                 </option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1 flex items-center gap-1">
-              <CalendarIcon className="w-3 h-3 text-slate-400" />
-              <span>Date de l'Appel *</span>
-            </label>
+          {/* Date de l'appel */}
+          <div className="flex items-center gap-2 flex-1 min-w-[150px]">
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Date :</span>
             <input
               type="date"
               value={selectedDate}
               onChange={e => setSelectedDate(e.target.value)}
-              className="w-full py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white cursor-pointer transition-all"
+              className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
             />
           </div>
 
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-              Responsable d'Appel
-            </label>
+          {/* Recherche */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              value={markedByTeacher}
-              onChange={e => setMarkedByTeacher(e.target.value)}
-              placeholder="Professeur ou surveillant"
-              className="w-full py-2 px-3 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white transition-all"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par élève ou matricule..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-slate-400"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-              Rechercher un Élève
-            </label>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Nom, matricule..."
-                className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-800 focus:bg-white transition-all"
-              />
+        {/* Synthèse typographique en 1 ligne (remplace les 6 grosses cartes) */}
+        {activeTab === 'CALL' && (
+          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 font-medium">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span>Effectif : <strong className="text-slate-900 font-mono">{dailyStats.total}</strong> élèves</span>
+              <span aria-hidden="true">·</span>
+              <span>Présents : <strong className="text-emerald-700 font-mono">{dailyStats.presents}</strong></span>
+              <span aria-hidden="true">·</span>
+              <span>Retards : <strong className="text-amber-700 font-mono">{dailyStats.lates}</strong></span>
+              <span aria-hidden="true">·</span>
+              <span>Absences : <strong className="text-rose-700 font-mono">{dailyStats.absJustified + dailyStats.absUnjustified}</strong></span>
+              <span aria-hidden="true">·</span>
+              <span>Taux d'assiduité : <strong className="text-blue-900 font-mono">{dailyStats.rate}%</strong></span>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* SUCCESS BANNER NOTIFICATION */}
       {saveSuccess && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between text-emerald-900 animate-in fade-in duration-300">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <span className="text-xs font-bold">
-              Les présences quotidiennes pour la classe {currentClass?.name} ont été enregistrées avec succès dans la base de données local storage & SQLite !
-            </span>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between text-emerald-900 text-xs font-bold animate-in fade-in duration-300">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Présences enregistrées avec succès pour la classe {currentClass?.name}.</span>
           </div>
-          <span className="text-[10px] uppercase font-black tracking-widest bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full">
+          <span className="text-[10px] uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
             Sauvegardé
           </span>
         </div>
@@ -463,83 +488,7 @@ export const AttendanceModule: React.FC = () => {
 
       {/* TAB 1: APPPEL QUOTIDIEN */}
       {activeTab === 'CALL' && (
-        <div className="space-y-6">
-          {/* Daily Quick Stats Card Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">Effectif Total</div>
-              <div className="text-xl font-black text-slate-900 mt-1">{dailyStats.total} élève(s)</div>
-            </div>
-
-            <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200 shadow-xs">
-              <div className="text-[10px] font-black uppercase tracking-widest text-emerald-700 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Présents</span>
-              </div>
-              <div className="text-xl font-black text-emerald-900 mt-1">{dailyStats.presents}</div>
-            </div>
-
-            <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200 shadow-xs">
-              <div className="text-[10px] font-black uppercase tracking-widest text-amber-700 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                <span>En Retard</span>
-              </div>
-              <div className="text-xl font-black text-amber-900 mt-1">{dailyStats.lates}</div>
-            </div>
-
-            <div className="bg-indigo-50/60 p-4 rounded-2xl border border-indigo-200 shadow-xs">
-              <div className="text-[10px] font-black uppercase tracking-widest text-indigo-700 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>Abs. Justifiés</span>
-              </div>
-              <div className="text-xl font-black text-indigo-900 mt-1">{dailyStats.absJustified}</div>
-            </div>
-
-            <div className="bg-rose-50/60 p-4 rounded-2xl border border-rose-200 shadow-xs">
-              <div className="text-[10px] font-black uppercase tracking-widest text-rose-700 flex items-center gap-1">
-                <XCircle className="w-3.5 h-3.5" />
-                <span>Abs. Injustifiés</span>
-              </div>
-              <div className="text-xl font-black text-rose-900 mt-1">{dailyStats.absUnjustified}</div>
-            </div>
-
-            <div className="bg-blue-900 text-white p-4 rounded-2xl shadow-xs">
-              <div className="text-[10px] font-black uppercase tracking-widest text-blue-200">Taux du Jour</div>
-              <div className="text-xl font-black mt-1">{dailyStats.rate}%</div>
-            </div>
-          </div>
-
-          {/* Quick Action Toolbar */}
-          <div className="bg-slate-900 text-white p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-md">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleMarkAllPresent}
-                className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm"
-              >
-                <CheckCheck className="w-4 h-4" />
-                <span>Tout Marquer Présent</span>
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportDailyPdf}
-                className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-100 rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-700"
-              >
-                <Printer className="w-4 h-4 text-blue-400" />
-                <span>Imprimer Feuille d'Appel (PDF)</span>
-              </button>
-
-              <button
-                onClick={handleSaveCall}
-                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-md shadow-blue-600/30"
-              >
-                <Save className="w-4 h-4" />
-                <span>Enregistrer l'Appel</span>
-              </button>
-            </div>
-          </div>
-
+        <div className="space-y-3.5">
           {/* Student List for Attendance Marking */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
             {filteredStudents.length === 0 ? (

@@ -39,7 +39,8 @@ import {
   Edit3,
   BookOpen,
   TrendingUp,
-  Share2
+  Share2,
+  X
 } from 'lucide-react';
 import { Student, SchoolClass, Payment, AttendanceRecord, EvaluationTerm, PaymentCategory, PaymentMethod, ReportCard } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
@@ -229,7 +230,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   // 4. Action : Télécharger Bulletin de Notes PDF
   const handleDownloadBulletinPdf = async () => {
     try {
-      if (!reportCard || !reportCard.subjects || reportCard.subjects.length === 0) {
+      if (!reportCard || !reportCard.subjectAverages || reportCard.subjectAverages.length === 0) {
         setToastMessage(`Aucune note disponible pour le ${selectedTerm}.`);
         setTimeout(() => setToastMessage(null), 3500);
         return;
@@ -876,7 +877,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                 <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-2xl shadow-2xs flex flex-col justify-between">
                   <span className="text-emerald-800 font-bold uppercase text-[10px] block">Appréciation Officielle</span>
                   <p className="font-black text-emerald-950 text-sm mt-1">
-                    {reportCard.appreciation || 'Travail satisfaisant'}
+                    {getMaliScoreAppreciation(reportCard.generalAverage, reportCard.maxScore || 20).appreciation || reportCard.directorDecision || 'Travail satisfaisant'}
                   </p>
                   <p className="text-[11px] text-emerald-700 mt-0.5">Mention du conseil des maîtres</p>
                 </div>
@@ -886,7 +887,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
                 <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
                   <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
-                    Relevé Détaillé des Matières & Coefficients ({reportCard.subjects.length} matières)
+                    Relevé Détaillé des Matières & Coefficients ({reportCard.subjectAverages.length} matières)
                   </h3>
                 </div>
 
@@ -903,28 +904,37 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {reportCard.subjects.map((sub) => (
-                        <tr key={sub.subjectId} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4 font-bold text-slate-900">
-                            {sub.subjectName}
-                          </td>
-                          <td className="py-3 px-3 font-mono text-slate-600">
-                            {sub.coefficient}
-                          </td>
-                          <td className="py-3 px-3 font-mono text-slate-700">
-                            {sub.classWorkScore.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-3 font-mono text-slate-700">
-                            {sub.compositionScore.toFixed(2)}
-                          </td>
-                          <td className="py-3 px-3 font-mono font-bold text-blue-900">
-                            {sub.weightedAverage.toFixed(2)} / {reportCard.maxScore}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600 font-medium">
-                            {sub.appreciation || 'Bien'}
-                          </td>
-                        </tr>
-                      ))}
+                      {reportCard.subjectAverages.map((sub) => {
+                        const classVal = sub.classScore !== undefined ? sub.classScore : sub.finalScore;
+                        const compVal = sub.compositionScore !== undefined 
+                          ? sub.compositionScore 
+                          : ((reportCard.maxScore || 20) === 10 ? sub.finalScore : sub.finalScore * 2);
+                        const sMax = sub.maxScore || reportCard.maxScore || 20;
+                        const { appreciation } = getMaliScoreAppreciation(sub.finalScore, sMax);
+
+                        return (
+                          <tr key={sub.subjectId} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-4 font-bold text-slate-900">
+                              {sub.subjectName}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-slate-600">
+                              {sub.coefficient}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-slate-700">
+                              {classVal.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-3 font-mono text-slate-700">
+                              {compVal.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-3 font-mono font-bold text-blue-900">
+                              {sub.finalScore.toFixed(2)} / {sMax}
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 font-medium">
+                              {sub.appreciation || appreciation}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

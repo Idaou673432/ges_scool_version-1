@@ -260,83 +260,43 @@ export const CardsModule: React.FC = () => {
       </div>
 
       {/* Toolbar & Filters - Screen Only */}
-      <div className="no-print bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="no-print bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Select All Button */}
           <button
             onClick={toggleSelectAll}
-            className="flex items-center gap-2 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
           >
             {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
               <CheckSquare className="w-4 h-4 text-slate-900" />
             ) : (
               <Square className="w-4 h-4 text-slate-400" />
             )}
-            <span>Tout Sélectionner ({filteredStudents.length})</span>
+            <span>Tout sélectionner ({filteredStudents.length})</span>
           </button>
 
           {/* Class Filter */}
           <select
             value={selectedClassId}
             onChange={e => setSelectedClassId(e.target.value)}
-            className="py-2 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
+            className="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
           >
             <option value="ALL">Toutes les classes</option>
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-
-          {/* Theme Switcher */}
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-            <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider mr-1">Couleur:</span>
-            <button
-              onClick={() => setCardTheme('MALI_GOLD')}
-              className={`w-6 h-6 rounded-full bg-gradient-to-r from-emerald-600 via-amber-400 to-rose-600 border-2 cursor-pointer transition-all ${
-                cardTheme === 'MALI_GOLD' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-amber-400/50' : 'border-transparent opacity-80'
-              }`}
-              title="Thème National Mali & Or"
-            />
-            <button
-              onClick={() => setCardTheme('ROYAL_AZUR')}
-              className={`w-6 h-6 rounded-full bg-gradient-to-r from-blue-900 to-indigo-900 border-2 cursor-pointer transition-all ${
-                cardTheme === 'ROYAL_AZUR' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-blue-400/50' : 'border-transparent opacity-80'
-              }`}
-              title="Thème Azur Royal & Or"
-            />
-            <button
-              onClick={() => setCardTheme('EMERALD_PRESTIGE')}
-              className={`w-6 h-6 rounded-full bg-gradient-to-r from-emerald-900 to-teal-800 border-2 cursor-pointer transition-all ${
-                cardTheme === 'EMERALD_PRESTIGE' ? 'border-emerald-400 scale-110 shadow-xs ring-2 ring-emerald-400/50' : 'border-transparent opacity-80'
-              }`}
-              title="Thème Émeraude Prestige"
-            />
-            <button
-              onClick={() => setCardTheme('BURGUNDY_GOLD')}
-              className={`w-6 h-6 rounded-full bg-gradient-to-r from-rose-950 to-amber-900 border-2 cursor-pointer transition-all ${
-                cardTheme === 'BURGUNDY_GOLD' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-rose-400/50' : 'border-transparent opacity-80'
-              }`}
-              title="Thème Pourpre & Or"
-            />
-            <button
-              onClick={() => setCardTheme('OBSIDIAN_GOLD')}
-              className={`w-6 h-6 rounded-full bg-gradient-to-r from-slate-950 to-amber-500 border-2 cursor-pointer transition-all ${
-                cardTheme === 'OBSIDIAN_GOLD' ? 'border-amber-400 scale-110 shadow-xs ring-2 ring-amber-400/50' : 'border-transparent opacity-80'
-              }`}
-              title="Thème Obsidienne & Or Luxe"
-            />
-          </div>
         </div>
 
         {/* Search Field */}
-        <div className="relative w-full md:w-64">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="relative w-full md:w-72">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Rechercher élève ou matricule..."
+            placeholder="Rechercher par élève ou matricule..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+            className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400"
           />
         </div>
       </div>
