@@ -91,12 +91,16 @@ export function AppContent() {
     return null;
   });
 
-  // Persisted desktop sidebar collapsed state
+  // Persisted desktop sidebar collapsed state (default: true for icon-only mode to save horizontal space)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
-      return secureLocalStorage.getItem('kalangest_sidebar_collapsed') === 'true';
+      const stored = secureLocalStorage.getItem('kalangest_sidebar_collapsed');
+      if (stored !== null) {
+        return stored === 'true';
+      }
+      return true; // Mode icônes uniquement par défaut sur bureau pour un espace maximal
     } catch {
-      return false;
+      return true;
     }
   });
 

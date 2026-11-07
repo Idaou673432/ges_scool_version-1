@@ -202,7 +202,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Navigation Menu */}
-        <nav className="flex-1 overflow-y-auto px-3 space-y-4 custom-scrollbar py-3">
+        <nav className={`flex-1 ${isCollapsed ? 'lg:overflow-visible' : 'overflow-y-auto'} overflow-y-auto px-3 space-y-4 custom-scrollbar py-3`}>
           {navSections.map((sec, secIdx) => (
             <div key={sec.title || secIdx} className="space-y-1">
               {!isCollapsed && sec.title && (
@@ -222,6 +222,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         type="button"
                         onClick={() => handleSelectTab(item.id)}
+                        title={isCollapsed ? `${item.label} (${sec.title})` : undefined}
                         className={`w-full flex items-center rounded-xl text-xs transition-all cursor-pointer ${
                           isCollapsed 
                             ? 'justify-center p-2.5' 
@@ -252,9 +253,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                       {/* Floating Tooltip in Collapsed Desktop Mode */}
                       {isCollapsed && (
-                        <div className="hidden lg:group-hover:flex absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-lg whitespace-nowrap items-center gap-1.5 pointer-events-none animate-in fade-in duration-150">
-                          <span>{item.label}</span>
-                          <ChevronRight className="w-3 h-3 text-slate-400" />
+                        <div className="hidden lg:group-hover:flex absolute left-full top-1/2 -translate-y-1/2 ml-3.5 z-50 px-3 py-1.5 bg-slate-900 text-white text-xs font-semibold rounded-xl shadow-xl whitespace-nowrap items-center gap-2 pointer-events-none animate-in fade-in duration-150 border border-slate-800">
+                          <span className="font-bold text-white">{item.label}</span>
+                          {sec.title && (
+                            <span className="text-[10px] text-slate-400 font-normal uppercase tracking-wider">
+                              · {sec.title}
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>

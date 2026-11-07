@@ -1107,90 +1107,46 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
               </button>
             </div>
 
-            {/* NOMBRE D'EVALUATIONS & MENSUALITES PAR CYCLE */}
-            <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/80 space-y-6">
-              <div>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  Liaison entre le Nombre d'Évaluations et les Mensualités (Scolarité)
-                </h3>
-                <p className="text-[11px] text-slate-500 font-medium mt-1">
-                  Chaque évaluation mensuelle correspond à 1 mensualité due. Si le 1er cycle organise 2 évaluations dans l'année, les parents ne payent que 2 mensualités.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1er Cycle */}
-                <div className="bg-amber-50/70 border border-amber-200/80 p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                      Premier Cycle (Fondamental)
-                    </span>
-                    <span className="text-[10px] font-bold text-amber-800">
-                      {formData.evaluationCount1stCycle || 2} Mensualité(s) Dues
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 font-medium">
-                    Nombre d'évaluations mensuelles / devoirs retenus au 1er Cycle :
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min="1"
-                      max="12"
-                      value={formData.evaluationCount1stCycle ?? 2}
-                      onChange={e => setFormData(prev => ({ ...prev, evaluationCount1stCycle: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) }))}
-                      className="w-24 p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-black text-amber-950 text-center outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                    <span className="text-xs font-black text-amber-900">
-                      = {(formData.evaluationCount1stCycle ?? 2)} mensualité(s) à payer
-                    </span>
-                  </div>
+            {/* NOMBRE D'EVALUATIONS PAR CYCLE (Compact & Léger) */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-bold text-slate-700">1er Cycle :</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={formData.evaluationCount1stCycle ?? 2}
+                    onChange={e => setFormData(prev => ({ ...prev, evaluationCount1stCycle: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) }))}
+                    className="w-14 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 text-center outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <span className="text-[11px] text-slate-500 font-medium">mensualités</span>
                 </div>
 
-                {/* 2ème Cycle & Lycée */}
-                <div className="bg-emerald-50/70 border border-emerald-200/80 p-4 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                      Second Cycle & Lycée
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-800">
-                      {formData.evaluationCount2ndCycle || 6} Mensualité(s) Dues
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-600 font-medium">
-                    Nombre d'évaluations mensuelles / devoirs retenus au 2ème Cycle & Lycée :
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min="1"
-                      max="12"
-                      value={formData.evaluationCount2ndCycle ?? 6}
-                      onChange={e => setFormData(prev => ({ ...prev, evaluationCount2ndCycle: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) }))}
-                      className="w-24 p-2.5 bg-white border border-emerald-300 rounded-xl text-xs font-black text-emerald-950 text-center outline-none focus:ring-2 focus:ring-emerald-500"
-                    />
-                    <span className="text-xs font-black text-emerald-900">
-                      = {(formData.evaluationCount2ndCycle ?? 6)} mensualité(s) à payer
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-bold text-slate-700">2ème Cycle & Lycée :</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={formData.evaluationCount2ndCycle ?? 6}
+                    onChange={e => setFormData(prev => ({ ...prev, evaluationCount2ndCycle: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) }))}
+                    className="w-14 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 text-center outline-none focus:ring-1 focus:ring-slate-400"
+                  />
+                  <span className="text-[11px] text-slate-500 font-medium">mensualités</span>
                 </div>
-              </div>
 
-              <div className="pt-2 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800">Nombre d'évaluations global par défaut :</h4>
-                  <p className="text-[11px] text-slate-500">Utilisé si aucune catégorie n'est précisée dans la classe</p>
-                </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-bold text-slate-700">Total annuel :</span>
                   <input
                     type="number"
                     min="1"
                     max="12"
                     value={formData.evaluationCount || 9}
                     onChange={e => setFormData(prev => ({ ...prev, evaluationCount: Math.max(1, Math.min(12, parseInt(e.target.value) || 9)) }))}
-                    className="w-20 p-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900 text-center outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-14 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 text-center outline-none focus:ring-1 focus:ring-slate-400"
                   />
-                  <span className="text-xs font-medium text-slate-500">évaluations / an</span>
+                  <span className="text-[11px] text-slate-500 font-medium">évals/an</span>
                 </div>
               </div>
             </div>

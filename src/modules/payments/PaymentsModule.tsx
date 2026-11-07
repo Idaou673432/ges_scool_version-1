@@ -180,6 +180,7 @@ export const PaymentsModule: React.FC = () => {
     }
   });
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseError, setExpenseError] = useState<string | null>(null);
   const [expenseToDeleteModal, setExpenseToDeleteModal] = useState<Expense | null>(null);
   const [expenseFormData, setExpenseFormData] = useState<Partial<Expense>>({
     category: 'SALAIRE',
@@ -266,25 +267,23 @@ export const PaymentsModule: React.FC = () => {
     });
   }, [students, classes, payments, settings]);
 
-  // Liste filtrée des élèves pour l'onglet principal
+  // Liste filtrée des élèves pour l'onglet principal via la zone de recherche
   const filteredStudentsFinancials = useMemo(() => {
     return studentsFinancials.filter(item => {
       const q = studentSearchGlobal.toLowerCase().trim();
-      const matchesSearch = !q || 
+      if (!q) return true;
+      return (
         item.student.firstName.toLowerCase().includes(q) ||
         item.student.lastName.toLowerCase().includes(q) ||
         item.student.matricule.toLowerCase().includes(q) ||
+        item.clsName.toLowerCase().includes(q) ||
         (item.student.parent?.fatherPhone && item.student.parent.fatherPhone.includes(q)) ||
-        (item.student.parent?.motherPhone && item.student.parent.motherPhone.includes(q));
-
-      const matchesClass = selectedClassFilter === 'ALL' || item.student.classId === selectedClassFilter;
-      const matchesStatus = statusFilter === 'ALL' || item.status === statusFilter;
-
-      return matchesSearch && matchesClass && matchesStatus;
+        (item.student.parent?.motherPhone && item.student.parent.motherPhone.includes(q))
+      );
     }).sort((a, b) => {
       return b.remaining - a.remaining || a.student.lastName.localeCompare(b.student.lastName);
     });
-  }, [studentsFinancials, studentSearchGlobal, selectedClassFilter, statusFilter]);
+  }, [studentsFinancials, studentSearchGlobal]);
 
   // Totaux financiers généraux
   const totalCollected = useMemo(() => payments.reduce((acc, curr) => acc + curr.amountPaid, 0), [payments]);
@@ -349,15 +348,20 @@ export const PaymentsModule: React.FC = () => {
     });
   }, [invoices, invoiceSearch, invoiceClassFilter, invoiceStatusFilter, classes]);
 
-  // Ouvrir le modal d'encaissement pour un élève spécifique ou vierge
-  const handleOpenAddForStudent = (targetStudent?: Student) => {
+  // Ouvrir le modal d'encaissement pour un élève spécifique ou vierge, avec option de solder
+  const handleOpenAddForStudent = (targetStudent?: Student, settleFull: boolean = false) => {
     const std = targetStudent || (students.length > 0 ? students[0] : undefined);
     const defaultClass = classes.find(c => c.id === std?.classId);
     const stdFin = std ? studentsFinancials.find(f => f.student.id === std.id) : undefined;
     
-    const suggestedAmount = stdFin && stdFin.remaining > 0 
-      ? Math.min(stdFin.remaining, defaultClass?.monthlyFee || 25000) 
-      : (defaultClass?.monthlyFee || 25000);
+    let suggestedAmount = defaultClass?.monthlyFee || 25000;
+    if (stdFin) {
+      if (settleFull && stdFin.remaining > 0) {
+        suggestedAmount = stdFin.remaining;
+      } else if (stdFin.remaining > 0) {
+        suggestedAmount = Math.min(stdFin.remaining, defaultClass?.monthlyFee || 25000);
+      }
+    }
 
     setModalStudentSearch('');
     setIsChangingStudent(!targetStudent);
@@ -366,8 +370,8 @@ export const PaymentsModule: React.FC = () => {
       studentMatricule: std?.matricule || '',
       studentName: std ? `${std.lastName.toUpperCase()} ${std.firstName}` : '',
       className: defaultClass?.name || '',
-      category: 'MENSUALITE',
-      monthCovered: 'Octobre 2025',
+      category: settleFull ? 'SOLDE_TOTAL' : 'MENSUALITE',
+      monthCovered: settleFull ? 'Solde intégral scolarité' : 'Octobre 2025',
       amountPaid: suggestedAmount,
       expectedAmount: defaultClass?.monthlyFee || 25000,
       method: 'ESPECES',
@@ -416,14 +420,33 @@ export const PaymentsModule: React.FC = () => {
     setReceiptModalPayment(newPayment);
   };
 
+  const handleOpenExpenseModal = () => {
+    setExpenseError(null);
+    setIsExpenseModalOpen(true);
+  };
+
   const handleAddExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const reqAmount = Number(expenseFormData.amount) || 0;
+    if (reqAmount <= 0) {
+      setExpenseError('Veuillez saisir un montant valide supérieur à 0 FCFA.');
+      return;
+    }
+    // Strict business rule: Expenses cannot exceed available cash/revenue
+    if (reqAmount > netBalance) {
+      setExpenseError(
+        `Opération refusée : Le montant de la dépense (${formatFCFA(reqAmount)}) dépasse le solde disponible en caisse (${formatFCFA(Math.max(0, netBalance))}). Les dépenses ne peuvent pas être supérieures aux recettes.`
+      );
+      return;
+    }
+    setExpenseError(null);
+
     const newExpense: Expense = {
       id: `exp-${Date.now()}`,
       reference: `DEP-2025-${String(expenses.length + 1).padStart(3, '0')}`,
       category: expenseFormData.category || 'AUTRES',
       description: expenseFormData.description || 'Dépense de fonctionnement',
-      amount: Number(expenseFormData.amount) || 0,
+      amount: reqAmount,
       expenseDate: expenseFormData.expenseDate || new Date().toISOString().slice(0, 10),
       beneficiary: expenseFormData.beneficiary || 'Bénéficiaire',
       paymentMethod: expenseFormData.paymentMethod || 'ESPECES',
@@ -770,7 +793,7 @@ export const PaymentsModule: React.FC = () => {
           {/* Bouton Dépense */}
           <button
             type="button"
-            onClick={() => setIsExpenseModalOpen(true)}
+            onClick={handleOpenExpenseModal}
             className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
           >
             <MinusCircle className="w-4 h-4 text-rose-600" />
@@ -966,17 +989,16 @@ export const PaymentsModule: React.FC = () => {
       {activeTab === 'STUDENTS_FINANCES' && (
         <div className="space-y-4">
           
-          {/* Barre de Recherche et Filtres */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            {/* Recherche Élève */}
+          {/* Barre de Recherche Épurée */}
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={studentSearchGlobal}
                 onChange={e => setStudentSearchGlobal(e.target.value)}
-                placeholder="Rechercher par nom, prénom, matricule ou téléphone parent..."
-                className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                placeholder="Rechercher un élève (nom, prénom, matricule, classe ou téléphone)..."
+                className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
               />
               {studentSearchGlobal && (
                 <button
@@ -988,74 +1010,9 @@ export const PaymentsModule: React.FC = () => {
                 </button>
               )}
             </div>
-
-            {/* Filtre Classe */}
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedClassFilter}
-                onChange={e => setSelectedClassFilter(e.target.value)}
-                className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none cursor-pointer"
-              >
-                <option value="ALL">Toutes les Classes ({classes.length})</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Quick status tabs (Pill Buttons) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('ALL')}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                  statusFilter === 'ALL'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Tous ({students.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('UNPAID')}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  statusFilter === 'UNPAID'
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
-                }`}
-              >
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>Impayés ({unpaidCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('PARTIEL')}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  statusFilter === 'PARTIEL'
-                    ? 'bg-amber-600 text-white'
-                    : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                }`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Partiels ({partialCount})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('A_JOUR')}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  statusFilter === 'A_JOUR'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                }`}
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>À Jour ({upToDateCount})</span>
-              </button>
-            </div>
+            <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+              {filteredStudentsFinancials.length} élève{filteredStudentsFinancials.length > 1 ? 's' : ''}
+            </span>
           </div>
 
           {/* Tableau Simplifié des Élèves */}
@@ -1178,6 +1135,19 @@ export const PaymentsModule: React.FC = () => {
                                 <Plus className="w-3.5 h-3.5" />
                                 <span>Encaisser</span>
                               </button>
+
+                              {/* Bouton Solder Tout en 1 Clic si reliquat restant */}
+                              {item.remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAddForStudent(item.student, true)}
+                                  className="px-2.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                  title={`Solder immédiatement tout le reliquat (${formatFCFA(item.remaining)})`}
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Solder ({formatFCFA(item.remaining)})</span>
+                                </button>
+                              )}
 
                               {/* Bouton Relance si solde restant */}
                               {item.remaining > 0 && (
@@ -1508,7 +1478,7 @@ export const PaymentsModule: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => setIsExpenseModalOpen(true)}
+              onClick={handleOpenExpenseModal}
               className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
@@ -2117,6 +2087,29 @@ export const PaymentsModule: React.FC = () => {
             </div>
 
             <form onSubmit={handleAddExpenseSubmit} className="p-6 space-y-3.5 text-xs">
+              {/* Solde Disponible en Caisse */}
+              <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                netBalance > 0 ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950' : 'bg-rose-50 border-rose-200 text-rose-950'
+              }`}>
+                <div>
+                  <span className="font-bold text-xs block">Solde Disponible en Caisse</span>
+                  <span className="text-[10px] text-slate-500">Recettes : {formatFCFA(totalCollected)} • Dépenses : {formatFCFA(totalExpenses)}</span>
+                </div>
+                <span className={`font-black font-mono text-sm ${netBalance > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                  {formatFCFA(Math.max(0, netBalance))}
+                </span>
+              </div>
+
+              {/* Message d'erreur / Refus si dépense supérieure aux recettes */}
+              {expenseError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-start gap-2 shadow-2xs">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                  <p className="text-xs font-semibold leading-relaxed">
+                    {expenseError}
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Catégorie de Dépense *</label>
                 <select

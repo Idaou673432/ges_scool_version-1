@@ -28,9 +28,8 @@ export const TeachersModule: React.FC = () => {
     phone: '',
     email: '',
     address: 'Bamako',
-    diploma: 'Master ENSup',
     specialty: 'Mathématiques',
-    monthlySalary: 200000,
+    monthlySalary: undefined,
     status: 'ACTIF',
     subjectsHandled: []
   });
@@ -44,9 +43,8 @@ export const TeachersModule: React.FC = () => {
       phone: '',
       email: '',
       address: 'Bamako',
-      diploma: 'Master ENSup',
       specialty: 'Mathématiques',
-      monthlySalary: 200000,
+      monthlySalary: undefined,
       status: 'ACTIF',
       subjectsHandled: []
     });
@@ -144,19 +142,23 @@ export const TeachersModule: React.FC = () => {
 
               <div className="space-y-2 text-xs text-slate-600 pt-4 mt-4 border-t border-slate-100">
                 <div className="flex items-center gap-2 font-medium">
-                  <Award className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>{tch.diploma}</span>
-                </div>
-                <div className="flex items-center gap-2 font-medium">
                   <Phone className="w-4 h-4 text-slate-400 shrink-0" />
                   <span className="font-mono">{tch.phone}</span>
                 </div>
+                {tch.email && (
+                  <div className="flex items-center gap-2 font-medium text-slate-500">
+                    <Mail className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="truncate">{tch.email}</span>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="pt-3.5 border-t border-slate-100 flex justify-between items-center text-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Salaire Mensuel</span>
-              <span className="font-bold text-emerald-700 text-sm font-mono">{formatFCFA(tch.monthlySalary)}</span>
+              <span className="font-bold text-emerald-700 text-sm font-mono">
+                {tch.monthlySalary && tch.monthlySalary > 0 ? formatFCFA(tch.monthlySalary) : 'Non défini'}
+              </span>
             </div>
           </div>
         ))}
@@ -194,51 +196,43 @@ export const TeachersModule: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="font-semibold text-slate-700">Téléphone Mobile *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="+223 76 ..."
-                  value={formData.phone}
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700">Diplôme Académique *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Master ENSup, Licence ULSHB"
-                  value={formData.diploma}
-                  onChange={e => setFormData({ ...formData, diploma: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-medium"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700">Téléphone Mobile *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="+223 76 ..."
+                    value={formData.phone}
+                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-medium"
+                  />
+                </div>
                 <div>
                   <label className="font-semibold text-slate-700">Spécialité *</label>
                   <input
                     type="text"
                     required
+                    placeholder="Ex: Mathématiques, SVT..."
                     value={formData.specialty}
                     onChange={e => setFormData({ ...formData, specialty: e.target.value })}
                     className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-medium"
                   />
                 </div>
-                <div>
-                  <label className="font-semibold text-slate-700">Salaire FCFA *</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.monthlySalary}
-                    onChange={e => setFormData({ ...formData, monthlySalary: Number(e.target.value) })}
-                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-                  />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-700">Salaire Mensuel FCFA</label>
+                  <span className="text-[10px] text-slate-400 font-medium">(Optionnel)</span>
                 </div>
+                <input
+                  type="number"
+                  placeholder="Ex: 150000 (ou laisser vide)"
+                  value={formData.monthlySalary ?? ''}
+                  onChange={e => setFormData({ ...formData, monthlySalary: e.target.value ? Number(e.target.value) : undefined })}
+                  className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
+                />
               </div>
 
               <div className="flex justify-end gap-2.5 pt-3">

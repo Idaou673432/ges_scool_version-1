@@ -84,12 +84,12 @@ export interface SchoolClass {
   category: SchoolLevelCategory;
   level: string; // Ex: '9ème', 'TSS'
   section?: string; // Ex: 'A', 'B'
-  capacity: number;
   mainTeacherId?: string;
   classroom?: string; // Ex: 'Salle 04'
   monthlyFee: number; // Frais mensuels FCFA
   inscriptionFee: number; // Frais d'inscription FCFA
   studentCount?: number;
+  capacity?: number; // Optionnel (retiré des contraintes obligatoires)
   passingGrade?: number; // Note de passage / moyenne d'admission (ex: 10/20 ou 5/10)
 }
 
@@ -111,10 +111,10 @@ export interface Teacher {
   phone: string;
   email?: string;
   address: string;
-  diploma: string; // Ex: 'Master ENSup', 'Licence DER Sciences', 'CAP'
+  diploma?: string; // Optionnel
   specialty: string;
   subjectsHandled: string[]; // Subject IDs
-  monthlySalary: number; // FCFA
+  monthlySalary?: number; // FCFA (Optionnel)
   photoUrl?: string;
   status: 'ACTIF' | 'INACTIF';
   hireDate: string;

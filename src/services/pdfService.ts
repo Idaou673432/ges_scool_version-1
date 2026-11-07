@@ -929,7 +929,7 @@ export class PdfService {
     doc.setFont('Helvetica', 'bold');
     doc.text(`Diplôme : `, 120, 57);
     doc.setFont('Helvetica', 'normal');
-    doc.text(teacher.diploma, 140, 57);
+    doc.text(teacher.diploma || '-', 140, 57);
 
     // Éléments de Rémunération
     let y = 80;
