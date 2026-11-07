@@ -22,19 +22,20 @@ export class PdfService {
     w: number,
     h: number
   ): void {
+    const isFullPage = w >= 160;
     const maxScore = reportCard.maxScore || 20;
     const termLabel = getTermLabel(reportCard.term, settings?.evaluationMonths);
 
     // Outer border
     doc.setDrawColor(15, 23, 42); // Black / Dark Slate
-    doc.setLineWidth(0.3);
+    doc.setLineWidth(0.35);
     doc.rect(x0, y0, w, h);
 
-    let y = y0 + 3;
+    let y = y0 + (isFullPage ? 5 : 3);
 
     // 1. TOP HEADER SECTION
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(7.5);
+    doc.setFontSize(isFullPage ? 9 : 7.5);
     doc.setTextColor(15, 23, 42);
 
     const acadText = (settings.academyName || "ACADEMIE D'ENSEIGNEMENT BAMAKO RIVE DROITE").toUpperCase();
@@ -42,23 +43,24 @@ export class PdfService {
     const schoolText = (settings.schoolName || "ECOLE PRIVEE LE BIRGO NIAMAKORO").toUpperCase();
     const fullHeaderLine = `${acadText} ${capText} ${schoolText}`;
 
-    doc.text(fullHeaderLine, x0 + w / 2, y, { align: 'center', maxWidth: w - 6 });
-    y += 4;
+    doc.text(fullHeaderLine, x0 + w / 2, y, { align: 'center', maxWidth: w - 8 });
+    y += (isFullPage ? 5 : 4);
 
-    doc.setFontSize(7);
+    doc.setFontSize(isFullPage ? 8 : 7);
     doc.text(`TEL: ${settings.phone || '76041281 / 75167282'}`, x0 + w / 2, y, { align: 'center' });
-    y += 5;
+    y += (isFullPage ? 6 : 5);
 
     // Title BULLETIN DE NOTES
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(isFullPage ? 13 : 10);
     doc.text('BULLETIN DE NOTES', x0 + w / 2, y, { align: 'center' });
-    doc.line(x0 + w / 2 - 25, y + 1, x0 + w / 2 + 25, y + 1);
+    doc.setLineWidth(0.4);
+    doc.line(x0 + w / 2 - (isFullPage ? 35 : 25), y + 1.2, x0 + w / 2 + (isFullPage ? 35 : 25), y + 1.2);
 
-    y += 5;
+    y += (isFullPage ? 7 : 5);
 
     // 2. TOP 3-BOX GRID
-    const boxHeight = 15;
+    const boxHeight = isFullPage ? 20 : 15;
     const b1Width = w * 0.42;
     const b2Width = w * 0.22;
     const b3Width = w * 0.32;
@@ -70,44 +72,44 @@ export class PdfService {
 
     // Box 1: Left
     doc.rect(b1X, y, b1Width, boxHeight);
-    doc.setFontSize(7);
+    doc.setFontSize(isFullPage ? 8 : 7);
     doc.setFont('Helvetica', 'bold');
-    doc.text('ELEVE :', b1X + 2, y + 4);
-    doc.text(reportCard.studentName.toUpperCase(), b1X + 16, y + 4, { maxWidth: b1Width - 18 });
+    doc.text('ELEVE :', b1X + 2, y + (isFullPage ? 5 : 4));
+    doc.text(reportCard.studentName.toUpperCase(), b1X + (isFullPage ? 18 : 16), y + (isFullPage ? 5 : 4), { maxWidth: b1Width - 20 });
 
     doc.setFont('Helvetica', 'normal');
-    doc.text('N° Mle :', b1X + 2, y + 8.5);
+    doc.text('N° Mle :', b1X + 2, y + (isFullPage ? 11 : 8.5));
     doc.setFont('Helvetica', 'bold');
-    doc.text(reportCard.studentMatricule || '---', b1X + 16, y + 8.5);
+    doc.text(reportCard.studentMatricule || '---', b1X + (isFullPage ? 18 : 16), y + (isFullPage ? 11 : 8.5));
 
     doc.setFont('Helvetica', 'normal');
-    doc.text('CLASSE :', b1X + 2, y + 13);
+    doc.text('CLASSE :', b1X + 2, y + (isFullPage ? 17 : 13));
     doc.setFont('Helvetica', 'bold');
-    doc.text(reportCard.className.toUpperCase(), b1X + 16, y + 13);
+    doc.text(reportCard.className.toUpperCase(), b1X + (isFullPage ? 18 : 16), y + (isFullPage ? 17 : 13));
 
     // Box 2: Center - Large Class Emblem
     doc.rect(b2X, y, b2Width, boxHeight);
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text(reportCard.className.toUpperCase(), b2X + b2Width / 2, y + 9.5, { align: 'center' });
+    doc.setFontSize(isFullPage ? 15 : 12);
+    doc.text(reportCard.className.toUpperCase(), b2X + b2Width / 2, y + (isFullPage ? 12 : 9.5), { align: 'center' });
 
     // Box 3: Right
     doc.rect(b3X, y, b3Width, boxHeight);
-    doc.setFontSize(7);
+    doc.setFontSize(isFullPage ? 8 : 7);
     doc.setFont('Helvetica', 'normal');
-    doc.text('Année scolaire', b3X + 2, y + 4);
+    doc.text('Année scolaire', b3X + 2, y + (isFullPage ? 5 : 4));
     doc.setFont('Helvetica', 'bold');
-    doc.text(reportCard.academicYear, b3X + b3Width - 2, y + 4, { align: 'right' });
+    doc.text(reportCard.academicYear, b3X + b3Width - 2, y + (isFullPage ? 5 : 4), { align: 'right' });
 
     doc.setFont('Helvetica', 'bold');
-    doc.text(termLabel.toUpperCase(), b3X + b3Width / 2, y + 8.5, { align: 'center' });
+    doc.text(termLabel.toUpperCase(), b3X + b3Width / 2, y + (isFullPage ? 11 : 8.5), { align: 'center' });
 
     doc.setFont('Helvetica', 'normal');
-    doc.text('Effectif de la Classe:', b3X + 2, y + 13);
+    doc.text('Effectif de la Classe:', b3X + 2, y + (isFullPage ? 17 : 13));
     doc.setFont('Helvetica', 'bold');
-    doc.text(String(reportCard.totalClassStudents), b3X + b3Width - 2, y + 13, { align: 'right' });
+    doc.text(String(reportCard.totalClassStudents), b3X + b3Width - 2, y + (isFullPage ? 17 : 13), { align: 'right' });
 
-    y += boxHeight + 3;
+    y += boxHeight + (isFullPage ? 4 : 3);
 
     // 3. MAIN GRADES TABLE
     const colW = [
@@ -121,45 +123,46 @@ export class PdfService {
     ];
 
     // Table Header
+    const thH = isFullPage ? 7.5 : 6;
     doc.setFillColor(241, 245, 249);
-    doc.rect(x0, y, w, 6, 'FD');
+    doc.rect(x0, y, w, thH, 'FD');
 
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(6.5);
+    doc.setFontSize(isFullPage ? 7.5 : 6.5);
     doc.setTextColor(15, 23, 42);
 
     let xCursor = x0;
-    doc.text('MATIERES', xCursor + 2, y + 4);
+    doc.text('MATIERES', xCursor + 2, y + (isFullPage ? 5 : 4));
     xCursor += colW[0];
-    doc.line(xCursor, y, xCursor, y + 6);
+    doc.line(xCursor, y, xCursor, y + thH);
 
-    doc.text('COEF', xCursor + colW[1] / 2, y + 4, { align: 'center' });
+    doc.text('COEF', xCursor + colW[1] / 2, y + (isFullPage ? 5 : 4), { align: 'center' });
     xCursor += colW[1];
-    doc.line(xCursor, y, xCursor, y + 6);
+    doc.line(xCursor, y, xCursor, y + thH);
 
-    doc.text(maxScore === 10 ? 'N.CLASSE/10' : 'NOTES DE CLASSE SUR 20', xCursor + colW[2] / 2, y + 4, { align: 'center' });
+    doc.text(maxScore === 10 ? 'N.CLASSE/10' : 'NOTES CLASSE /20', xCursor + colW[2] / 2, y + (isFullPage ? 5 : 4), { align: 'center' });
     xCursor += colW[2];
-    doc.line(xCursor, y, xCursor, y + 6);
+    doc.line(xCursor, y, xCursor, y + thH);
 
-    doc.text(maxScore === 10 ? 'COMPOS/10' : 'NOTE DE COMP SUR 40', xCursor + colW[3] / 2, y + 4, { align: 'center' });
+    doc.text(maxScore === 10 ? 'COMPOS/10' : 'COMPOS /40', xCursor + colW[3] / 2, y + (isFullPage ? 5 : 4), { align: 'center' });
     xCursor += colW[3];
-    doc.line(xCursor, y, xCursor, y + 6);
+    doc.line(xCursor, y, xCursor, y + thH);
 
-    doc.text('MOY GEN', xCursor + colW[4] / 2, y + 4, { align: 'center' });
+    doc.text('MOY GEN', xCursor + colW[4] / 2, y + (isFullPage ? 5 : 4), { align: 'center' });
     xCursor += colW[4];
-    doc.line(xCursor, y, xCursor, y + 6);
+    doc.line(xCursor, y, xCursor, y + thH);
 
-    doc.text('NOTES COEF', xCursor + colW[5] / 2, y + 4, { align: 'center' });
+    doc.text('NOTES COEF', xCursor + colW[5] / 2, y + (isFullPage ? 5 : 4), { align: 'center' });
     xCursor += colW[5];
-    doc.line(xCursor, y, xCursor, y + 6);
+    doc.line(xCursor, y, xCursor, y + thH);
 
-    doc.text('APPRECIATIONS', xCursor + colW[6] / 2, y + 4, { align: 'center' });
+    doc.text('APPRECIATIONS', xCursor + colW[6] / 2, y + (isFullPage ? 5 : 4), { align: 'center' });
 
-    y += 6;
+    y += thH;
 
     // Table Rows
-    const rowH = 4.5;
-    doc.setFontSize(6.5);
+    const rowH = isFullPage ? 6 : 4.5;
+    doc.setFontSize(isFullPage ? 7.5 : 6.5);
 
     reportCard.subjectAverages.forEach((sub) => {
       const classVal = sub.classScore !== undefined ? sub.classScore : sub.finalScore;
@@ -170,42 +173,42 @@ export class PdfService {
       let xPos = x0;
       // MATIERES
       doc.setFont('Helvetica', 'bold');
-      doc.text(sub.subjectName.toUpperCase(), xPos + 1.5, y + 3.2, { maxWidth: colW[0] - 2 });
+      doc.text(sub.subjectName.toUpperCase(), xPos + 2, y + (isFullPage ? 4.2 : 3.2), { maxWidth: colW[0] - 3 });
       xPos += colW[0];
       doc.line(xPos, y, xPos, y + rowH);
 
       // COEF
       doc.setFont('Helvetica', 'bold');
-      doc.text(String(sub.coefficient), xPos + colW[1] / 2, y + 3.2, { align: 'center' });
+      doc.text(String(sub.coefficient), xPos + colW[1] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
       xPos += colW[1];
       doc.line(xPos, y, xPos, y + rowH);
 
       // N.CLASSE
       doc.setFont('Helvetica', 'normal');
-      doc.text(classVal.toFixed(2).replace('.', ','), xPos + colW[2] / 2, y + 3.2, { align: 'center' });
+      doc.text(classVal.toFixed(2).replace('.', ','), xPos + colW[2] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
       xPos += colW[2];
       doc.line(xPos, y, xPos, y + rowH);
 
       // N.COMP
-      doc.text(compVal.toFixed(2).replace('.', ','), xPos + colW[3] / 2, y + 3.2, { align: 'center' });
+      doc.text(compVal.toFixed(2).replace('.', ','), xPos + colW[3] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
       xPos += colW[3];
       doc.line(xPos, y, xPos, y + rowH);
 
       // MOY GEN
       doc.setFont('Helvetica', 'bold');
-      doc.text(sub.finalScore.toFixed(2).replace('.', ','), xPos + colW[4] / 2, y + 3.2, { align: 'center' });
+      doc.text(sub.finalScore.toFixed(2).replace('.', ','), xPos + colW[4] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
       xPos += colW[4];
       doc.line(xPos, y, xPos, y + rowH);
 
       // NOTES COEF
-      doc.text(sub.weightedScore.toFixed(2).replace('.', ','), xPos + colW[5] / 2, y + 3.2, { align: 'center' });
+      doc.text(sub.weightedScore.toFixed(2).replace('.', ','), xPos + colW[5] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
       xPos += colW[5];
       doc.line(xPos, y, xPos, y + rowH);
 
       // APPRECIATIONS
       const apprText = sub.appreciation || (sub.finalScore >= 16 ? 'EXCELLENT' : sub.finalScore >= 14 ? 'BIEN' : sub.finalScore >= 12 ? 'ASSEZ-BIEN' : sub.finalScore >= 10 ? 'PASSABLE' : sub.finalScore >= 8 ? 'INSUFFISANT' : 'MAL');
       doc.setFont('Helvetica', 'normal');
-      doc.text(apprText.toUpperCase(), xPos + 1, y + 3.2, { maxWidth: colW[6] - 1 });
+      doc.text(apprText.toUpperCase(), xPos + 1.5, y + (isFullPage ? 4.2 : 3.2), { maxWidth: colW[6] - 2 });
 
       y += rowH;
     });
@@ -213,10 +216,10 @@ export class PdfService {
     // TOTAL COEFFICIENTS ROW
     doc.rect(x0, y, w, rowH);
     doc.setFont('Helvetica', 'bold');
-    doc.text('TOTAL DES COEFFICIENTS', x0 + 2, y + 3.2);
+    doc.text('TOTAL DES COEFFICIENTS', x0 + 2, y + (isFullPage ? 4.2 : 3.2));
     let totalX = x0 + colW[0];
     doc.line(totalX, y, totalX, y + rowH);
-    doc.text(String(reportCard.totalCoefficients), totalX + colW[1] / 2, y + 3.2, { align: 'center' });
+    doc.text(String(reportCard.totalCoefficients), totalX + colW[1] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
     totalX += colW[1];
     doc.line(totalX, y, totalX, y + rowH);
 
@@ -224,45 +227,46 @@ export class PdfService {
 
     // TOTAL NOTES COEFFICIEES ROW
     doc.rect(x0, y, w, rowH);
-    doc.text('TOTAL DES NOTES COEFFICIEES', x0 + 2, y + 3.2);
+    doc.text('TOTAL DES NOTES COEFFICIEES', x0 + 2, y + (isFullPage ? 4.2 : 3.2));
     let totalX2 = x0 + colW[0] + colW[1] + colW[2] + colW[3] + colW[4];
     doc.line(totalX2, y, totalX2, y + rowH);
-    doc.text(reportCard.totalPoints.toFixed(2).replace('.', ','), totalX2 + colW[5] / 2, y + 3.2, { align: 'center' });
+    doc.text(reportCard.totalPoints.toFixed(2).replace('.', ','), totalX2 + colW[5] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
     totalX2 += colW[5];
     doc.line(totalX2, y, totalX2, y + rowH);
 
     y += rowH;
 
     // MOYENNE & RANG ROW
+    const moyH = isFullPage ? 8 : 5.5;
     doc.setFillColor(248, 250, 252);
-    doc.rect(x0, y, w, 5.5, 'FD');
+    doc.rect(x0, y, w, moyH, 'FD');
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(7);
-    doc.text(`MOYENNE DE L'ELEVE : ${reportCard.generalAverage.toFixed(2).replace('.', ',')}`, x0 + 2, y + 3.8);
-    doc.text(`RANG : ${reportCard.rankInClass} / ${reportCard.totalClassStudents}`, x0 + w / 2 + 10, y + 3.8);
+    doc.setFontSize(isFullPage ? 8.5 : 7);
+    doc.text(`MOYENNE DE L'ELEVE : ${reportCard.generalAverage.toFixed(2).replace('.', ',')}`, x0 + 2, y + (isFullPage ? 5.2 : 3.8));
+    doc.text(`RANG : ${reportCard.rankInClass} / ${reportCard.totalClassStudents}`, x0 + w / 2 + 10, y + (isFullPage ? 5.2 : 3.8));
 
-    y += 7.5;
+    y += moyH + (isFullPage ? 4 : 2);
 
     // 4. BOTTOM APPRECIATION & SIGNATURE BLOCK
     const botH = h - (y - y0) - 2;
     if (botH > 8) {
       doc.rect(x0, y, w, botH);
-      doc.setFontSize(6.5);
+      doc.setFontSize(isFullPage ? 8 : 6.5);
       doc.setFont('Helvetica', 'bold');
-      doc.text('Appréciation du Directeur :', x0 + 2, y + 4);
+      doc.text('Appréciation du Directeur :', x0 + 3, y + (isFullPage ? 6 : 4));
 
       const directorAppr = reportCard.generalAverage >= 14 ? 'BIEN - FELICITATIONS' : reportCard.generalAverage >= 10 ? 'PASSABLE - SATISFAISANT' : reportCard.generalAverage >= 8 ? 'INSUFFISANT' : 'MEDIOCRE';
-      doc.text(directorAppr, x0 + 35, y + 4);
+      doc.text(directorAppr, x0 + (isFullPage ? 45 : 35), y + (isFullPage ? 6 : 4));
 
       doc.setFont('Helvetica', 'normal');
-      doc.text(`${settings.city || 'Bamako'} le ...../...../${new Date().getFullYear()}`, x0 + 2, y + botH - 2.5);
+      doc.text(`${settings.city || 'Bamako'} le ...../...../${new Date().getFullYear()}`, x0 + 3, y + botH - (isFullPage ? 4 : 2.5));
 
       doc.setFont('Helvetica', 'bold');
-      doc.text('Le Directeur', x0 + w - 20, y + botH - 2.5, { align: 'center' });
+      doc.text('Le Directeur', x0 + w - 25, y + botH - (isFullPage ? 4 : 2.5), { align: 'center' });
 
       if (settings.stampUrl) {
         try {
-          doc.addImage(settings.stampUrl, 'PNG', x0 + w - 32, y + 2, 24, 12);
+          doc.addImage(settings.stampUrl, 'PNG', x0 + w - 38, y + 3, 28, 14);
         } catch (e) {
           // ignore error if format non-PNG/JPEG
         }
@@ -271,25 +275,25 @@ export class PdfService {
   }
 
   /**
-   * Génère le Bulletin Trimestriel Officiel (Mali) en PDF (2 bulletins côte à côte sur 1 page A4 Paysage)
+   * Génère le Bulletin Trimestriel Officiel (Mali) en PDF (1 page A4 Portrait par élève)
    */
   public static async generateReportCardPdf(
     reportCard: ReportCard,
     settings: SchoolSettings
   ): Promise<void> {
     const doc = new jsPDF({
-      orientation: 'landscape',
+      orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-    this.renderSingleBulletinOnDoc(doc, reportCard, settings, 6, 6, 138, 198);
-    this.renderSingleBulletinOnDoc(doc, reportCard, settings, 153, 6, 138, 198);
+    this.renderSingleBulletinOnDoc(doc, reportCard, settings, 10, 10, 190, 277);
     doc.save(`Bulletin_${reportCard.studentMatricule}_${reportCard.term}.pdf`);
   }
 
   /**
-   * Génère un seul PDF multi-pages contenant TOUS les bulletins de la classe (2 bulletins par page A4 Paysage)
+   * Génère un seul PDF multi-pages contenant TOUS les bulletins de la classe :
+   * 1 page A4 Portrait par élève, strictement classés par rang (1er au dernier) sans répétition.
    */
   public static async generateClassReportCardsPdf(
     reportCards: ReportCard[],
@@ -307,19 +311,16 @@ export class PdfService {
     });
 
     const doc = new jsPDF({
-      orientation: 'landscape',
+      orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
 
-    for (let i = 0; i < sortedReportCards.length; i += 2) {
+    for (let i = 0; i < sortedReportCards.length; i++) {
       if (i > 0) {
-        doc.addPage('a4', 'landscape');
+        doc.addPage('a4', 'portrait');
       }
-      const rc1 = sortedReportCards[i];
-      const rc2 = sortedReportCards[i + 1] || sortedReportCards[i];
-      this.renderSingleBulletinOnDoc(doc, rc1, settings, 6, 6, 138, 198);
-      this.renderSingleBulletinOnDoc(doc, rc2, settings, 153, 6, 138, 198);
+      this.renderSingleBulletinOnDoc(doc, sortedReportCards[i], settings, 10, 10, 190, 277);
     }
 
     const safeClassName = className.replace(/[^a-zA-Z0-9_-]/g, '_');

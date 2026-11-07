@@ -5,28 +5,17 @@
 
 import React, { useState, useMemo } from 'react';
 import { 
-  FileText, 
+  FileText,
   Printer, 
-  Download, 
-  Eye, 
-  Award, 
   CheckCircle2, 
   Search, 
-  Sparkles, 
-  Save, 
   BookOpen, 
-  Users, 
-  TrendingUp, 
-  UserCheck, 
-  AlertCircle,
-  Building2,
-  Calendar,
-  Layers,
-  X,
-  Filter,
-  FileSpreadsheet,
-  Edit3,
-  ArrowUpDown
+  X, 
+  FileSpreadsheet, 
+  Edit3, 
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { ReportCard, StudentSubjectAverage, EvaluationGrade, EvaluationTerm } from '../../types';
@@ -102,6 +91,27 @@ export const BulletinsModule: React.FC = () => {
     return classStudents.find(s => s.id === activeStudentId) || classStudents[0] || null;
   }, [classStudents, activeStudentId]);
 
+  // Track active student index for sequential grading (Élève précédent / Élève suivant)
+  const activeStudentIndex = useMemo(() => {
+    if (!activeStudent) return -1;
+    return classStudents.findIndex(s => s.id === activeStudent.id);
+  }, [classStudents, activeStudent]);
+
+  const hasPrevStudent = activeStudentIndex > 0;
+  const hasNextStudent = activeStudentIndex >= 0 && activeStudentIndex < classStudents.length - 1;
+
+  const handlePrevStudent = () => {
+    if (hasPrevStudent) {
+      setActiveStudentId(classStudents[activeStudentIndex - 1].id);
+    }
+  };
+
+  const handleNextStudent = () => {
+    if (hasNextStudent) {
+      setActiveStudentId(classStudents[activeStudentIndex + 1].id);
+    }
+  };
+
   // Dynamic report card calculation for active student
   const activeReportCard: ReportCard | null = useMemo(() => {
     if (!activeStudent) return null;
@@ -163,8 +173,8 @@ export const BulletinsModule: React.FC = () => {
       });
     }
 
-    setSavedNotice(`Note de classe mise à jour : ${scoreNum}/${maxScore}`);
-    setTimeout(() => setSavedNotice(null), 2000);
+    setSavedNotice(`Note de classe enregistrée : ${scoreNum}/${maxScore}`);
+    setTimeout(() => setSavedNotice(null), 1800);
   };
 
   const handleCompositionScoreChange = (subjectId: string, val: string) => {
@@ -205,59 +215,8 @@ export const BulletinsModule: React.FC = () => {
       });
     }
 
-    setSavedNotice(`Note de composition mise à jour : ${scoreNum}/${maxCompScore}`);
-    setTimeout(() => setSavedNotice(null), 2000);
-  };
-
-  const handleDirectGradeChange = (subjectId: string, val: string) => {
-    if (!activeStudent) return;
-    const isFirstCycle = currentClass?.category === 'FONDAMENTAL_1';
-    const maxScore = isFirstCycle ? 10 : 20;
-
-    let scoreNum = parseFloat(val);
-    if (isNaN(scoreNum)) scoreNum = 0;
-    scoreNum = Math.min(maxScore, Math.max(0, scoreNum));
-
-    const subjectObj = subjects.find(sub => sub.id === subjectId);
-    const coef = subjectObj ? subjectObj.coefficient : 1;
-
-    const classGrades = grades.filter(
-      g => g.studentId === activeStudent.id && g.subjectId === subjectId && g.term === selectedTerm && g.type !== 'COMPOSITION' && g.type !== 'EXAMEN'
-    );
-    const existingClassScore = classGrades.length > 0 ? classGrades[0].score : scoreNum;
-
-    const maxCompScore = isFirstCycle ? 10 : 40;
-    let neededCompScore = isFirstCycle ? ((scoreNum * 2) - existingClassScore) : ((scoreNum * 3) - existingClassScore);
-    neededCompScore = Math.min(maxCompScore, Math.max(0, neededCompScore));
-
-    const compGrades = grades.filter(
-      g => g.studentId === activeStudent.id && g.subjectId === subjectId && g.term === selectedTerm && (g.type === 'COMPOSITION' || g.type === 'EXAMEN')
-    );
-
-    if (compGrades.length > 0) {
-      saveGrade({
-        ...compGrades[0],
-        score: neededCompScore,
-        maxScore: maxCompScore,
-        coefficient: coef
-      });
-    } else {
-      saveGrade({
-        studentId: activeStudent.id,
-        classId: activeStudent.classId,
-        subjectId,
-        term: selectedTerm,
-        academicYear: settings.currentAcademicYear,
-        type: 'COMPOSITION',
-        score: neededCompScore,
-        maxScore: maxCompScore,
-        coefficient: coef,
-        date: new Date().toISOString().split('T')[0]
-      });
-    }
-
-    setSavedNotice(`Note générale mise à jour : ${scoreNum}/${maxScore}`);
-    setTimeout(() => setSavedNotice(null), 2000);
+    setSavedNotice(`Note de composition enregistrée : ${scoreNum}/${maxCompScore}`);
+    setTimeout(() => setSavedNotice(null), 1800);
   };
 
   // Direct comment update
@@ -306,8 +265,8 @@ export const BulletinsModule: React.FC = () => {
                 <title>${isAll ? 'Bulletins_de_Classe' : 'Bulletin_de_Notes'}</title>
                 <script src="https://cdn.tailwindcss.com"></script>
                 <style>
-                  @page { size: A4 landscape; margin: 4mm; }
-                  body { background: #ffffff !important; color: #0f172a !important; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 4mm; }
+                  @page { size: A4 portrait; margin: 6mm; }
+                  body { background: #ffffff !important; color: #0f172a !important; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 0; }
                   .page-break { page-break-after: always !important; break-after: page !important; }
                 </style>
               </head>
@@ -432,30 +391,24 @@ export const BulletinsModule: React.FC = () => {
     <div className="space-y-4 pb-12">
       {/* ----------------- SCREEN ONLY HEADER & CONTROLS (COMPACT) ----------------- */}
       <div className="no-print space-y-3">
-        {/* 1. Slim Header Bar & Action Buttons */}
+        {/* 1. Header Bar & Action Buttons */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-blue-50 text-blue-900 border border-blue-200/60 rounded-lg shrink-0">
-              <FileText className="w-5 h-5 text-blue-900" />
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
+                Bulletins de Notes Trimestriels
+              </h1>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">
+                Année {settings.academicYear}
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
-                  Bulletins de Notes Trimestriels
-                </h1>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">
-                  <Sparkles className="w-3 h-3 text-blue-700" />
-                  MEN Mali • {settings.academicYear}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-medium hidden lg:block">
-                Saisie directe des notes • Classement automatique (1er au dernier) • Impression A4 normalisée
-              </p>
-            </div>
+            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
+              Saisie directe des notes • Classement automatique (1er au dernier) • Impression A4
+            </p>
           </div>
 
-          {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* Action Toolbar: 4 actions essentielles sans doublons */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
                 setShowBatchModal(true);
@@ -465,60 +418,40 @@ export const BulletinsModule: React.FC = () => {
                 }
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Saisir directement les notes de classe et de composition pour tous les élèves de la classe"
+              title="Saisir rapidement les notes pour toute la classe"
             >
-              <Edit3 className="w-3.5 h-3.5 text-amber-100" />
-              <span>Saisie Classe</span>
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Saisie des notes</span>
             </button>
 
             <button
               onClick={handlePrintSingle}
               disabled={!activeReportCard}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Imprimer ce bulletin directement sur imprimante A4"
+              title="Imprimer le bulletin de l'élève affiché (A4 / PDF)"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-300" />
-              <span>Imprimer</span>
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimer bulletin</span>
             </button>
 
             <button
               onClick={handlePrintClass}
               disabled={allClassReportCards.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
               title="Imprimer tous les bulletins de la classe ordonnés du 1er au dernier élève"
             >
-              <Printer className="w-3.5 h-3.5 text-amber-400" />
-              <span>Imprimer Classe ({allClassReportCards.length})</span>
-            </button>
-
-            <button
-              onClick={handleDownloadPdf}
-              disabled={!activeReportCard}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Exporter le bulletin actif au format PDF officiel"
-            >
-              <Download className="w-3.5 h-3.5 text-emerald-200" />
-              <span>PDF</span>
-            </button>
-
-            <button
-              onClick={handleDownloadAllClassPdfs}
-              disabled={allClassReportCards.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Exporter tous les bulletins de la classe en 1 seul fichier PDF multi-pages (triés du 1er au dernier)"
-            >
-              <Download className="w-3.5 h-3.5 text-blue-200" />
-              <span>PDF Classe</span>
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimer toute la classe ({allClassReportCards.length})</span>
             </button>
 
             <button
               onClick={handleExportClassCsv}
               disabled={allClassReportCards.length === 0}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-lg border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
-              title="Exporter le récapitulatif des résultats en fichier CSV / Excel"
+              title="Exporter les résultats en fichier Excel / CSV"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">CSV</span>
+              <span>Export Excel</span>
             </button>
           </div>
         </div>
@@ -531,14 +464,13 @@ export const BulletinsModule: React.FC = () => {
           </div>
         )}
 
-        {/* 2. Compact Selectors & Inline Class Stats Card */}
+        {/* 2. Selectors & Inline Class Stats Card */}
         <div className="bg-white px-4 py-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
             {/* Classe */}
-            <div className="md:col-span-4 flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0 flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                <span>Classe :</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
+                Classe :
               </span>
               <select
                 value={selectedClassId}
@@ -557,24 +489,23 @@ export const BulletinsModule: React.FC = () => {
             </div>
 
             {/* Période / Évaluation */}
-            <div className="md:col-span-4 flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0 flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>Période :</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
+                Période :
               </span>
               <select
                 value={selectedTerm}
                 onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
                 className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
               >
-                <optgroup label="Évaluations Mensuelles (1er Cycle & Devoirs)">
+                <optgroup label="Évaluations Mensuelles">
                   {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
                     .filter(t => t.category === 'EVALUATION_MENSUELLE')
                     .map(t => (
                       <option key={t.id} value={t.id}>{t.label}</option>
                     ))}
                 </optgroup>
-                <optgroup label="Trimestres (2ème Cycle & Lycée)">
+                <optgroup label="Trimestres">
                   {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
                     .filter(t => t.category === 'TRIMESTRE')
                     .map(t => (
@@ -590,59 +521,30 @@ export const BulletinsModule: React.FC = () => {
                 </optgroup>
               </select>
             </div>
-
-            {/* Recherche rapide */}
-            <div className="md:col-span-4 relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Rechercher élève (nom, matricule)..."
-                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded bg-slate-200"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
           </div>
 
-          {/* Slim Inline Performance Metrics */}
+          {/* Clean Inline Stats - No decorative icons */}
           {classStats.total > 0 && (
             <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 border border-emerald-200/80">
-                  <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase text-emerald-800">Admission :</span>
-                  <span className="font-mono font-black text-emerald-700 text-xs">{classStats.passRate}%</span>
-                  <span className="text-[10px] text-emerald-600 font-medium">({classStats.passing}/{classStats.total})</span>
-                </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-900 border border-emerald-200/80">
+                  <strong className="font-bold">Admission :</strong> {classStats.passRate}% ({classStats.passing}/{classStats.total})
+                </span>
 
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-900 border border-blue-200/80">
-                  <TrendingUp className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase text-blue-800">Moy. Classe :</span>
-                  <span className="font-mono font-black text-blue-700 text-xs">{classStats.avg.toFixed(2)}/20</span>
-                </div>
+                <span className="px-2.5 py-1 rounded-md bg-blue-50 text-blue-900 border border-blue-200/80">
+                  <strong className="font-bold">Moyenne :</strong> {classStats.avg.toFixed(2)}/20
+                </span>
 
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/80">
-                  <Award className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase text-amber-800">Plus forte :</span>
-                  <span className="font-mono font-black text-amber-700 text-xs">{classStats.maxAvg.toFixed(2)}/20</span>
-                </div>
+                <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-900 border border-amber-200/80">
+                  <strong className="font-bold">Plus forte :</strong> {classStats.maxAvg.toFixed(2)}/20
+                </span>
 
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-50 text-rose-900 border border-rose-200/80">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                  <span className="text-[10px] font-bold uppercase text-rose-800">Plus faible :</span>
-                  <span className="font-mono font-black text-rose-700 text-xs">{classStats.minAvg.toFixed(2)}/20</span>
-                </div>
+                <span className="px-2.5 py-1 rounded-md bg-rose-50 text-rose-900 border border-rose-200/80">
+                  <strong className="font-bold">Plus faible :</strong> {classStats.minAvg.toFixed(2)}/20
+                </span>
               </div>
 
-              <span className="text-[11px] font-mono font-semibold text-slate-500 hidden xl:inline">
+              <span className="text-[11px] font-mono text-slate-400 hidden xl:inline">
                 {classStats.total} élève{classStats.total > 1 ? 's' : ''} classé{classStats.total > 1 ? 's' : ''}
               </span>
             </div>
@@ -652,14 +554,11 @@ export const BulletinsModule: React.FC = () => {
         {/* Main Interactive Screen Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left: Student List Sidebar */}
-          <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs space-y-4">
+          <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <Users className="w-4 h-4 text-slate-500 shrink-0" />
-                <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate">
-                  Élèves ({classStudents.length}/{totalClassStudents.length})
-                </h2>
-              </div>
+              <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 truncate">
+                Élèves ({classStudents.length}/{totalClassStudents.length})
+              </h2>
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
@@ -697,7 +596,7 @@ export const BulletinsModule: React.FC = () => {
             </div>
 
             {/* Status Filter Chips */}
-            <div className="flex items-center gap-1.5 pb-1">
+            <div className="flex items-center gap-1.5 pb-0.5">
               <button
                 onClick={() => setScoreFilter('ALL')}
                 className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
@@ -751,25 +650,25 @@ export const BulletinsModule: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      {/* Rank Medal or Badge */}
+                      {/* Clean rank badge without emojis */}
                       <div className="shrink-0">
                         {rank === 1 ? (
-                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md font-black text-[10px] shadow-2xs ${
+                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-black text-[10px] shadow-2xs ${
                             isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900 border border-amber-300'
                           }`}>
-                            🥇 1er
+                            1er
                           </span>
                         ) : rank === 2 ? (
-                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
                             isSelected ? 'bg-slate-700 text-slate-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
                           }`}>
-                            🥈 2e
+                            2e
                           </span>
                         ) : rank === 3 ? (
-                          <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
                             isSelected ? 'bg-amber-800 text-amber-100' : 'bg-amber-50 text-amber-800 border border-amber-300'
                           }`}>
-                            🥉 3e
+                            3e
                           </span>
                         ) : rank !== null ? (
                           <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
@@ -843,42 +742,65 @@ export const BulletinsModule: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Bulletin Header Badge */}
-                <div className="bg-slate-900 text-white p-5 sm:p-6 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm border border-slate-800">
-                  <div className="space-y-1">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-amber-300 bg-amber-400/20 px-2.5 py-0.5 rounded-md border border-amber-400/30">
-                      RÉPUBLIQUE DU MALI • MEN
-                    </span>
-                    <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white mt-1">
-                      {activeReportCard.studentName}
-                    </h2>
-                    <p className="text-xs text-slate-300 font-mono font-medium">
-                      MLE: {activeReportCard.studentMatricule} • Classe: {activeReportCard.className}
+                {/* Direct Student Navigation Stepper */}
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-100/90 rounded-2xl border border-slate-200 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={handlePrevStudent}
+                    disabled={!hasPrevStudent}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-2xs cursor-pointer"
+                    title="Aller à l'élève précédent"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-slate-600" />
+                    <span>Élève précédent</span>
+                  </button>
+
+                  <div className="text-center">
+                    <p className="text-xs font-black text-slate-900 tracking-wide">
+                      Élève {activeStudentIndex + 1} sur {classStudents.length}
+                    </p>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      {studentSortMode === 'RANK' ? 'Trié par rang officiel (1er au dernier)' : 'Ordre alphabétique'}
                     </p>
                   </div>
 
-                  <div className="flex flex-col sm:items-end gap-2.5 shrink-0">
-                    <div className="text-left sm:text-right bg-white/10 p-3.5 rounded-xl border border-white/10">
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300 block">
-                        Moyenne Générale
-                      </span>
-                      <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
-                        {activeReportCard.generalAverage.toFixed(2)}
-                        <span className="text-xs text-white/60 font-sans"> / {activeReportCard.maxScore || 20}</span>
-                      </span>
-                      <p className="text-[10px] font-semibold text-emerald-300 mt-0.5">
-                        Rang: {activeReportCard.rankInClass}e sur {activeReportCard.totalClassStudents} élèves
-                      </p>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={handleNextStudent}
+                    disabled={!hasNextStudent}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed bg-blue-900 hover:bg-blue-800 text-white shadow-2xs cursor-pointer"
+                    title="Passer à l'élève suivant pour continuer la saisie"
+                  >
+                    <span>Élève suivant</span>
+                    <ChevronRight className="w-4 h-4 text-white" />
+                  </button>
+                </div>
 
-                    <button
-                      onClick={handleDownloadPdf}
-                      className="flex items-center justify-center gap-2 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-colors shadow-xs cursor-pointer w-full sm:w-auto"
-                      title="Enregistrer et télécharger le bulletin au format PDF"
-                    >
-                      <Download className="w-3.5 h-3.5 text-emerald-200" />
-                      <span>Exporter en PDF</span>
-                    </button>
+                {/* Bulletin Header Badge */}
+                <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm border border-slate-800">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                      RÉPUBLIQUE DU MALI • MEN
+                    </span>
+                    <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white">
+                      {activeReportCard.studentName}
+                    </h2>
+                    <p className="text-xs text-slate-300 font-mono">
+                      Matricule : {activeReportCard.studentMatricule || '---'} • Classe : {activeReportCard.className}
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right bg-white/10 px-4 py-3 rounded-xl border border-white/10 shrink-0">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300 block">
+                      Moyenne Générale
+                    </span>
+                    <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
+                      {activeReportCard.generalAverage.toFixed(2)}
+                      <span className="text-xs text-white/60 font-sans"> / {activeReportCard.maxScore || 20}</span>
+                    </span>
+                    <p className="text-[10px] font-semibold text-emerald-300 mt-0.5">
+                      Rang : {activeReportCard.rankInClass}{activeReportCard.rankInClass === 1 ? 'er' : 'e'} sur {activeReportCard.totalClassStudents} élèves
+                    </p>
                   </div>
                 </div>
 
@@ -904,17 +826,17 @@ export const BulletinsModule: React.FC = () => {
 
                 {/* Interactive Grade Table with Direct Input */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <BookOpen className="w-4 h-4 text-blue-900" />
                       <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                        {activeReportCard.maxScore === 10 ? 'Notes des Matières (1er Cycle Fondamental — sur 10)' : 'Notes des Matières (Format Officiel IFP / Lycée / 2nd Cycle)'}
+                        {activeReportCard.maxScore === 10 ? 'Notes des Matières (1er Cycle — Barème /10)' : 'Notes des Matières (Barème Officiel /20 et /40)'}
                       </h3>
                     </div>
-                    <span className="text-[10px] font-bold text-slate-400 italic">
+                    <span className="text-[10px] font-bold text-slate-500 italic bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
                       {activeReportCard.maxScore === 10
-                        ? 'Calcul automatique : Moy.G = (N.Classe + Compos) / 2'
-                        : 'Calcul automatique : Moy.G = (N.Classe + Compos) / 3'}
+                        ? 'Formule : Moyenne = (N.Classe + Compos) / 2'
+                        : 'Formule : Moyenne = (N.Classe + Compos) / 3'}
                     </span>
                   </div>
 
@@ -923,15 +845,15 @@ export const BulletinsModule: React.FC = () => {
                       <thead className="bg-slate-100 font-black text-[10px] uppercase tracking-widest text-slate-600 border-b border-slate-200">
                         <tr>
                           <th className="py-3 px-4">Matières</th>
-                          <th className="py-3 px-2 text-center w-28">
+                          <th className="py-3 px-2 text-center w-32">
                             N.Classe /{activeReportCard.maxScore === 10 ? 10 : 20}
                           </th>
-                          <th className="py-3 px-2 text-center w-28">
+                          <th className="py-3 px-2 text-center w-32">
                             Compos /{activeReportCard.maxScore === 10 ? 10 : 40}
                           </th>
-                          <th className="py-3 px-2 text-center font-bold">Moy.G /{activeReportCard.maxScore}</th>
-                          <th className="py-3 px-2 text-center">Coeff.</th>
-                          <th className="py-3 px-2 text-center">Moy. Coeff</th>
+                          <th className="py-3 px-2 text-center w-28">Moyenne /{activeReportCard.maxScore}</th>
+                          <th className="py-3 px-2 text-center w-16">Coeff.</th>
+                          <th className="py-3 px-2 text-center w-24">Moy. Coeff</th>
                           <th className="py-3 px-4">Appréciations</th>
                         </tr>
                       </thead>
@@ -943,13 +865,14 @@ export const BulletinsModule: React.FC = () => {
                           const compScoreVal = s.compositionScore !== undefined ? s.compositionScore : (activeReportCard.maxScore === 10 ? s.finalScore : s.finalScore * 2);
 
                           return (
-                            <tr key={s.subjectId} className="hover:bg-slate-50 transition-colors">
+                            <tr key={s.subjectId} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3 px-4">
                                 <p className="font-black text-slate-900">{s.subjectName}</p>
                                 <p className="text-[10px] font-mono text-slate-400">{s.subjectCode}</p>
                               </td>
 
-                              <td className="py-2 px-2 text-center">
+                              {/* Direct Note de classe input */}
+                              <td className="py-2.5 px-2 text-center">
                                 <input
                                   type="number"
                                   step="0.25"
@@ -957,12 +880,13 @@ export const BulletinsModule: React.FC = () => {
                                   max={activeReportCard.maxScore === 10 ? 10 : 20}
                                   value={classScoreVal.toString()}
                                   onChange={e => handleClassScoreChange(s.subjectId, e.target.value)}
-                                  className="w-20 py-1.5 px-2 text-center font-mono font-black text-xs text-amber-950 bg-amber-50/80 border-2 border-amber-200 focus:border-amber-600 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
-                                  title="Saisir directement la note de classe / devoirs"
+                                  className="w-24 py-1.5 px-2 text-center font-mono font-black text-xs text-amber-950 bg-amber-50/90 border-2 border-amber-200 focus:border-amber-600 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
+                                  title="Note de classe / devoirs"
                                 />
                               </td>
 
-                              <td className="py-2 px-2 text-center">
+                              {/* Direct Note de composition input */}
+                              <td className="py-2.5 px-2 text-center">
                                 <input
                                   type="number"
                                   step="0.25"
@@ -970,21 +894,20 @@ export const BulletinsModule: React.FC = () => {
                                   max={activeReportCard.maxScore === 10 ? 10 : 40}
                                   value={compScoreVal.toString()}
                                   onChange={e => handleCompositionScoreChange(s.subjectId, e.target.value)}
-                                  className="w-20 py-1.5 px-2 text-center font-mono font-black text-xs text-purple-950 bg-purple-50/80 border-2 border-purple-200 focus:border-purple-600 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
-                                  title="Saisir directement la note de composition"
+                                  className="w-24 py-1.5 px-2 text-center font-mono font-black text-xs text-purple-950 bg-purple-50/90 border-2 border-purple-200 focus:border-purple-600 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
+                                  title="Note de composition"
                                 />
                               </td>
 
-                              <td className="py-2 px-2 text-center">
-                                <input
-                                  type="number"
-                                  step="0.25"
-                                  min="0"
-                                  max={sMaxScore}
-                                  value={s.finalScore.toString()}
-                                  onChange={e => handleDirectGradeChange(s.subjectId, e.target.value)}
-                                  className="w-20 py-1.5 px-2 text-center font-mono font-black text-sm text-blue-950 bg-blue-50/80 border-2 border-blue-200 focus:border-blue-900 focus:bg-white rounded-xl outline-none shadow-xs transition-all"
-                                />
+                              {/* Calculated Moyenne Matière */}
+                              <td className="py-2.5 px-2 text-center">
+                                <span className={`inline-block min-w-[56px] py-1 px-2 font-mono font-black text-xs rounded-xl border ${
+                                  s.finalScore >= (sMaxScore / 2)
+                                    ? 'bg-blue-50 text-blue-950 border-blue-200'
+                                    : 'bg-rose-50 text-rose-950 border-rose-200'
+                                }`}>
+                                  {s.finalScore.toFixed(2)}
+                                </span>
                               </td>
 
                               <td className="py-3 px-2 text-center font-black text-slate-700">
@@ -1247,40 +1170,30 @@ export const BulletinsModule: React.FC = () => {
         </div>
       )}
 
-      {/* ----------------- OFFICIAL PRINTABLE DOCUMENT (PRINT ONLY: 2 BULLETINS PER A4 LANDSCAPE PAGE) ----------------- */}
+      {/* ----------------- OFFICIAL PRINTABLE DOCUMENT (1 BULLETIN PER STUDENT - PORTRAIT A4) ----------------- */}
       <div className="print-only" id="printable-bulletins-container">
         {isPrintAllMode ? (
-          /* Bulk print all class bulletins: paired 2-by-2 side-by-side */
+          /* Bulk print all class bulletins: strictly ordered 1er to last, 1 student per page, zero repetition */
           <div>
-            {chunkArray(allClassReportCards, 2).map((pair, idx, arr) => (
+            {allClassReportCards.map((rc, idx) => (
               <div
-                key={idx}
-                className={`w-[287mm] h-[200mm] mx-auto grid grid-cols-2 gap-3 items-start p-1 bg-white ${
-                  idx < arr.length - 1 ? 'page-break' : ''
+                key={rc.studentId}
+                className={`w-[190mm] h-[270mm] max-h-[275mm] mx-auto p-1 bg-white flex flex-col justify-between ${
+                  idx < allClassReportCards.length - 1 ? 'page-break' : ''
                 }`}
               >
                 <PrintableBulletin
-                  report={pair[0]}
+                  report={rc}
                   settings={settings}
-                  comment={getCommentForStudent(pair[0].studentId)}
-                />
-                <PrintableBulletin
-                  report={pair[1] || pair[0]}
-                  settings={settings}
-                  comment={getCommentForStudent((pair[1] || pair[0]).studentId)}
+                  comment={getCommentForStudent(rc.studentId)}
                 />
               </div>
             ))}
           </div>
         ) : (
-          /* Single printable bulletin: 2 identical copies side-by-side on 1 A4 Landscape page */
+          /* Single printable bulletin: exactly 1 student, 1 page, zero repetition */
           activeReportCard && (
-            <div className="w-[287mm] h-[200mm] mx-auto grid grid-cols-2 gap-3 items-start p-1 bg-white">
-              <PrintableBulletin
-                report={activeReportCard}
-                settings={settings}
-                comment={getCommentForStudent(activeReportCard.studentId)}
-              />
+            <div className="w-[190mm] h-[270mm] max-h-[275mm] mx-auto p-1 bg-white flex flex-col justify-between">
               <PrintableBulletin
                 report={activeReportCard}
                 settings={settings}
@@ -1293,15 +1206,6 @@ export const BulletinsModule: React.FC = () => {
     </div>
   );
 };
-
-/* Helper function to group array into pairs */
-function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
 
 /* -------------------------------------------------------------------------- */
 /* PRINTABLE BULLETIN COMPONENT (EXACT FORMAT MATCHING OFFICIAL MALI BULLETIN) */
@@ -1318,74 +1222,78 @@ const PrintableBulletin: React.FC<PrintableBulletinProps> = ({ report, settings,
   const maxScore = report.maxScore || 20;
 
   return (
-    <div className="w-full bg-white text-slate-900 font-sans text-[8.5px] leading-tight p-2 border border-slate-900 flex flex-col justify-between h-[195mm] box-border">
+    <div className="w-full bg-white text-slate-900 font-sans text-[9px] leading-tight p-3 border-2 border-slate-900 flex flex-col justify-between h-full box-border">
       
       {/* 1. TOP HEADER SECTION */}
-      <div className="text-center space-y-0.5 border-b border-slate-900 pb-1.5">
-        <p className="font-bold uppercase text-[9px] tracking-tight">
+      <div className="text-center space-y-1 border-b-2 border-slate-900 pb-2">
+        <p className="font-bold uppercase text-[9.5px] tracking-tight">
           {settings.academyName || "ACADEMIE D'ENSEIGNEMENT BAMAKO RIVE DROITE"} {settings.capName ? `CAP DE ${settings.capName}` : "CAP DE FALADIE"} {settings.schoolName || "ECOLE PRIVEE LE BIRGO NIAMAKORO"}
         </p>
-        <p className="font-bold text-[8.5px]">
+        <p className="font-bold text-[9px] text-slate-700">
           TEL: {settings.phone || '76041281 / 75167282'}
         </p>
-        <h1 className="font-black text-xs uppercase tracking-widest mt-1 underline">
+        <h1 className="font-black text-sm uppercase tracking-widest mt-1 underline">
           BULLETIN DE NOTES
         </h1>
       </div>
 
       {/* 2. TOP 3-BOX GRID */}
-      <div className="grid grid-cols-12 gap-1 my-1 text-[8.5px]">
+      <div className="grid grid-cols-12 gap-1.5 my-1.5 text-[9px]">
         {/* Left Box */}
-        <div className="col-span-5 border border-slate-900 p-1.5 flex flex-col justify-center space-y-0.5">
-          <div className="flex items-center gap-1">
+        <div className="col-span-5 border border-slate-900 p-2 flex flex-col justify-center space-y-1">
+          <div className="flex items-center gap-1.5">
             <span className="font-bold text-slate-700">ELEVE :</span>
-            <span className="font-black uppercase text-[9.5px] text-slate-900 truncate">{report.studentName}</span>
+            <span className="font-black uppercase text-[10.5px] text-slate-900 truncate">{report.studentName}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span className="font-bold text-slate-700">N° Mle :</span>
             <span className="font-mono font-bold text-slate-900">{report.studentMatricule || '---'}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span className="font-bold text-slate-700">CLASSE :</span>
             <span className="font-black text-slate-900 uppercase">{report.className}</span>
           </div>
         </div>
 
         {/* Center Box: Large Class Badge */}
-        <div className="col-span-3 border border-slate-900 p-1 flex items-center justify-center text-center bg-slate-50 relative overflow-hidden">
-          <div className="border border-slate-300 p-1 w-full h-full flex items-center justify-center">
-            <span className="font-black text-base uppercase tracking-tight text-slate-900">{report.className}</span>
+        <div className="col-span-3 border border-slate-900 p-1.5 flex items-center justify-center text-center bg-slate-50 relative overflow-hidden">
+          <div className="border border-slate-300 p-1.5 w-full h-full flex items-center justify-center">
+            <span className="font-black text-lg uppercase tracking-tight text-slate-900">{report.className}</span>
           </div>
         </div>
 
         {/* Right Box */}
-        <div className="col-span-4 border border-slate-900 p-1.5 flex flex-col justify-center space-y-0.5 text-right">
+        <div className="col-span-4 border border-slate-900 p-2 flex flex-col justify-center space-y-1 text-right">
           <div className="flex justify-between items-center">
             <span className="font-bold text-slate-700">Année scolaire :</span>
             <span className="font-bold text-slate-900">{report.academicYear}</span>
           </div>
-          <div className="font-black uppercase text-blue-950 text-[9px] text-center border-y border-slate-300 py-0.5 my-0.5">
+          <div className="font-black uppercase text-blue-950 text-[10px] text-center border-y border-slate-300 py-0.5 my-0.5">
             {termFormatted}
           </div>
-          <div className="flex justify-between items-center text-[8px]">
-            <span className="font-bold text-slate-700">Effectif de la Classe :</span>
-            <span className="font-black text-slate-900">{report.totalClassStudents}</span>
+          <div className="flex justify-between items-center text-[8.5px]">
+            <span className="font-bold text-slate-700">Effectif Classe :</span>
+            <span className="font-black text-slate-900">{report.totalClassStudents} élèves</span>
           </div>
         </div>
       </div>
 
       {/* 3. MAIN GRADES TABLE */}
-      <div className="flex-1 my-0.5">
-        <table className="w-full border-collapse border border-slate-900 text-center text-[8px]">
+      <div className="flex-1 my-1">
+        <table className="w-full border-collapse border border-slate-900 text-center text-[8.5px]">
           <thead>
-            <tr className="bg-slate-100 font-black text-[7.5px] uppercase tracking-tight text-slate-900 border-b border-slate-900">
-              <th className="border-r border-slate-900 p-0.5 text-left w-[32%]">MATIERES</th>
-              <th className="border-r border-slate-900 p-0.5 w-[8%]">COEF</th>
-              <th className="border-r border-slate-900 p-0.5 w-[14%]">NOTES DE CLASSE SUR 20</th>
-              <th className="border-r border-slate-900 p-0.5 w-[14%]">NOTE DE COMP SUR 40</th>
-              <th className="border-r border-slate-900 p-0.5 w-[10%]">MOY GEN</th>
-              <th className="border-r border-slate-900 p-0.5 w-[10%]">NOTES COEF</th>
-              <th className="p-0.5 text-left w-[12%]">APPRECIATIONS</th>
+            <tr className="bg-slate-100 font-black text-[8px] uppercase tracking-tight text-slate-900 border-b border-slate-900">
+              <th className="border-r border-slate-900 p-1 text-left w-[32%]">MATIERES</th>
+              <th className="border-r border-slate-900 p-1 w-[8%]">COEF</th>
+              <th className="border-r border-slate-900 p-1 w-[15%]">
+                {maxScore === 10 ? 'N.CLASSE /10' : 'NOTES CLASSE /20'}
+              </th>
+              <th className="border-r border-slate-900 p-1 w-[15%]">
+                {maxScore === 10 ? 'COMPOS /10' : 'NOTE COMP /40'}
+              </th>
+              <th className="border-r border-slate-900 p-1 w-[10%]">MOY GEN</th>
+              <th className="border-r border-slate-900 p-1 w-[10%]">NOTES COEF</th>
+              <th className="p-1 text-left w-[10%]">APPRECIATIONS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-900 font-semibold text-slate-900">
@@ -1395,26 +1303,26 @@ const PrintableBulletin: React.FC<PrintableBulletinProps> = ({ report, settings,
               const { appreciation } = getMaliScoreAppreciation(sub.finalScore, maxScore);
 
               return (
-                <tr key={sub.subjectId} className="h-4">
-                  <td className="border-r border-slate-900 px-1 py-0.5 text-left font-bold uppercase truncate max-w-[105px]">
+                <tr key={sub.subjectId} className="h-5">
+                  <td className="border-r border-slate-900 px-1.5 py-1 text-left font-bold uppercase truncate max-w-[130px]">
                     {sub.subjectName}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-0.5 font-bold">
+                  <td className="border-r border-slate-900 px-1 py-1 font-bold">
                     {sub.coefficient}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-0.5 font-mono">
+                  <td className="border-r border-slate-900 px-1 py-1 font-mono">
                     {classVal.toFixed(2).replace('.', ',')}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-0.5 font-mono">
+                  <td className="border-r border-slate-900 px-1 py-1 font-mono">
                     {compVal.toFixed(2).replace('.', ',')}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-0.5 font-mono font-black">
+                  <td className="border-r border-slate-900 px-1 py-1 font-mono font-black">
                     {sub.finalScore.toFixed(2).replace('.', ',')}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-0.5 font-mono font-bold">
+                  <td className="border-r border-slate-900 px-1 py-1 font-mono font-bold">
                     {sub.weightedScore.toFixed(2).replace('.', ',')}
                   </td>
-                  <td className="px-1 py-0.5 text-left text-[7.5px] font-bold uppercase truncate">
+                  <td className="px-1.5 py-1 text-left text-[8px] font-bold uppercase truncate">
                     {sub.appreciation || appreciation.toUpperCase()}
                   </td>
                 </tr>
@@ -1422,34 +1330,34 @@ const PrintableBulletin: React.FC<PrintableBulletinProps> = ({ report, settings,
             })}
 
             {/* TOTAL COEFFICIENTS ROW */}
-            <tr className="border-t border-slate-900 font-black">
-              <td className="border-r border-slate-900 px-1 py-0.5 text-left uppercase text-[7.5px]">
+            <tr className="border-t border-slate-900 font-black h-5">
+              <td className="border-r border-slate-900 px-1.5 py-1 text-left uppercase text-[8px]">
                 TOTAL DES COEFFICIENTS
               </td>
-              <td className="border-r border-slate-900 px-1 py-0.5 font-black text-center">
+              <td className="border-r border-slate-900 px-1 py-1 font-black text-center">
                 {report.totalCoefficients}
               </td>
               <td className="border-r border-slate-900" colSpan={5}></td>
             </tr>
 
             {/* TOTAL NOTES COEFFICIEES ROW */}
-            <tr className="border-t border-slate-900 font-black">
-              <td className="border-r border-slate-900 px-1 py-0.5 text-left uppercase text-[7.5px]" colSpan={5}>
+            <tr className="border-t border-slate-900 font-black h-5">
+              <td className="border-r border-slate-900 px-1.5 py-1 text-left uppercase text-[8px]" colSpan={5}>
                 TOTAL DES NOTES COEFFICIEES
               </td>
-              <td className="border-r border-slate-900 px-1 py-0.5 font-mono font-black text-center">
+              <td className="border-r border-slate-900 px-1 py-1 font-mono font-black text-center">
                 {report.totalPoints.toFixed(2).replace('.', ',')}
               </td>
-              <td className="px-1 py-0.5"></td>
+              <td className="px-1 py-1"></td>
             </tr>
 
             {/* MOYENNE & RANG ROW */}
-            <tr className="border-t-2 border-slate-900 font-black bg-slate-50">
-              <td className="border-r border-slate-900 px-1 py-1 text-left uppercase" colSpan={3}>
-                MOYENNE DE L'ELEVE : <span className="font-mono text-[9.5px] ml-1">{report.generalAverage.toFixed(2).replace('.', ',')}</span>
+            <tr className="border-t-2 border-slate-900 font-black bg-slate-50 h-7">
+              <td className="border-r border-slate-900 px-2 py-1.5 text-left uppercase" colSpan={3}>
+                MOYENNE DE L'ELEVE : <span className="font-mono text-[11px] ml-1">{report.generalAverage.toFixed(2).replace('.', ',')}</span>
               </td>
-              <td className="border-r border-slate-900 px-1 py-1 text-center uppercase" colSpan={4}>
-                RANG : <span className="font-mono text-[9.5px] ml-1">{report.rankInClass} / {report.totalClassStudents}</span>
+              <td className="border-r border-slate-900 px-2 py-1.5 text-center uppercase" colSpan={4}>
+                RANG : <span className="font-mono text-[11px] ml-1">{report.rankInClass} / {report.totalClassStudents}</span>
               </td>
             </tr>
           </tbody>
@@ -1457,25 +1365,25 @@ const PrintableBulletin: React.FC<PrintableBulletinProps> = ({ report, settings,
       </div>
 
       {/* 4. BOTTOM APPRECIATION & SIGNATURE BLOCK */}
-      <div className="border border-slate-900 p-1.5 space-y-1 my-0.5 text-[8px]">
-        <div className="flex items-baseline justify-between border-b border-dashed border-slate-400 pb-0.5">
+      <div className="border border-slate-900 p-2.5 space-y-1.5 my-1 text-[8.5px]">
+        <div className="flex items-baseline justify-between border-b border-dashed border-slate-400 pb-1">
           <span className="font-bold text-slate-800 uppercase">Appréciation du Directeur :</span>
-          <span className="font-black text-[9px] uppercase tracking-wider text-slate-900">
+          <span className="font-black text-[9.5px] uppercase tracking-wider text-slate-900">
             {comment || (report.generalAverage >= 14 ? 'BIEN - FELICITATIONS' : report.generalAverage >= 10 ? 'PASSABLE - SATISFAISANT' : report.generalAverage >= 8 ? 'INSUFFISANT' : 'MEDIOCRE')}
           </span>
         </div>
 
-        <div className="flex justify-between items-end pt-0.5 font-bold">
+        <div className="flex justify-between items-end pt-1 font-bold">
           <div>
             <span>{settings.city || 'Bamako'} le </span>
             <span className="font-mono">..../..../{new Date().getFullYear()}</span>
           </div>
-          <div className="text-right pr-2 relative">
-            <span className="uppercase text-[8.5px] font-black block">Le Directeur</span>
+          <div className="text-right pr-3 relative">
+            <span className="uppercase text-[9px] font-black block">Le Directeur</span>
             {settings.stampUrl ? (
-              <img src={settings.stampUrl} alt="Cachet et Signature" className="h-8 max-w-[80px] object-contain ml-auto my-0.5" />
+              <img src={settings.stampUrl} alt="Cachet et Signature" className="h-10 max-w-[90px] object-contain ml-auto my-0.5" />
             ) : (
-              <div className="h-5"></div>
+              <div className="h-7"></div>
             )}
           </div>
         </div>
