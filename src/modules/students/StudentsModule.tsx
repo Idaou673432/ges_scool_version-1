@@ -410,72 +410,86 @@ export const StudentsModule: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
       
-      {/* 1. Entête Épuré du Répertoire des Élèves */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5 text-amber-400" />
+      {/* Entête & Recherche Unifiés Ultra-Compacts */}
+      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Left: Title + Inlined Search */}
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+            <Users className="w-4 h-4 text-blue-900 shrink-0" />
+            <span>Élèves</span>
+            <span className="text-[11px] text-slate-400 font-normal">({filteredStudents.length}/{students.length})</span>
           </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900">
-              Répertoire des Élèves & Opérations Centralisées
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              {students.length} inscrits · {activeStudents.length} actifs · {maleCount}G · {femaleCount}F · {classes.length} classes
-            </p>
+
+          <div className="relative flex-1 min-w-[170px] max-w-sm">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Rechercher nom, matricule, classe..."
+              className="w-full pl-8 pr-7 py-1 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-slate-400 transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Actions Rapides */}
-        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Inscrire un Élève</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ Inscrire</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsExcelImportOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-            <span>Importer Excel</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+            <span className="hidden sm:inline">Excel</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsMenStatsOpen(true)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
             title="Générer la fiche officielle statistique demandée par le CAP et l'Académie"
           >
-            <Building2 className="w-4 h-4 text-slate-600" />
-            <span>Fiche MEN</span>
+            <Building2 className="w-3.5 h-3.5 text-slate-600" />
+            <span className="hidden sm:inline">Fiche MEN</span>
           </button>
 
           <button
             type="button"
             onClick={handleExportCsv}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
-            title="Exporter la liste actuelle en fichier CSV"
+            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
+            title="Exporter en CSV"
           >
-            <Download className="w-4 h-4 text-slate-600" />
-            <span>Export CSV</span>
+            <Download className="w-3.5 h-3.5 text-slate-600" />
+            <span className="hidden sm:inline">CSV</span>
           </button>
 
           {students.length > 0 && (
             <button
               type="button"
               onClick={() => setShowDeleteAllModal(true)}
-              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
+              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
               title="Supprimer tous les élèves"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -483,7 +497,7 @@ export const StudentsModule: React.FC = () => {
 
       {/* Message de confirmation Toast */}
       {toastMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fadeIn">
+        <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fadeIn">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{toastMessage}</span>
@@ -494,49 +508,24 @@ export const StudentsModule: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Zone de Recherche Unique & Épurée (sans filtres encombrants) */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher par élève (nom, prénom, matricule, classe ex: 9ème, téléphone parent)..."
-            className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400 transition-colors"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-        <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
-          {filteredStudents.length} élève{filteredStudents.length > 1 ? 's' : ''}
-        </span>
-      </div>
-
       {/* 3. Tableau Centralisé des Élèves avec Opérations Directes */}
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Élève & Matricule</th>
-                <th className="py-3 px-3">Classe</th>
-                <th className="py-3 px-3">Scolarité & Caisse</th>
-                <th className="py-3 px-3">Parent / Contact</th>
-                <th className="py-3 px-3">Statut</th>
-                <th className="py-3 px-4 text-right">Opérations Centralisées</th>
+                <th className="py-2 px-3">Élève & Matricule</th>
+                <th className="py-2 px-2.5">Classe</th>
+                <th className="py-2 px-2.5">Scolarité & Caisse</th>
+                <th className="py-2 px-2.5">Parent / Contact</th>
+                <th className="py-2 px-2.5">Statut</th>
+                <th className="py-2 px-3 text-right">Opérations Centralisées</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
                     Aucun élève trouvé pour cette recherche.
                   </td>
                 </tr>
@@ -554,16 +543,16 @@ export const StudentsModule: React.FC = () => {
                       title="Cliquer pour ouvrir le Dossier Centralisé de l'élève (Paiements, Carte, Notes, Assiduité)"
                     >
                       {/* Élève */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
+                      <td className="py-1.5 sm:py-2 px-3">
+                        <div className="flex items-center gap-2.5">
                           {std.photoUrl ? (
                             <img
                               src={std.photoUrl}
                               alt={std.firstName}
-                              className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0 group-hover:ring-2 group-hover:ring-blue-600 transition-all"
+                              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-slate-200 shrink-0 group-hover:ring-2 group-hover:ring-blue-600 transition-all"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold flex items-center justify-center text-xs shrink-0 group-hover:bg-blue-900 transition-colors">
+                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-900 text-white font-bold flex items-center justify-center text-xs shrink-0 group-hover:bg-blue-900 transition-colors">
                               {std.firstName.charAt(0)}{std.lastName.charAt(0)}
                             </div>
                           )}
@@ -581,12 +570,12 @@ export const StudentsModule: React.FC = () => {
                       </td>
 
                       {/* Classe */}
-                      <td className="py-3 px-3 font-semibold text-slate-700">
+                      <td className="py-1.5 sm:py-2 px-2.5 font-semibold text-slate-700">
                         {studentClass?.name || 'Non assigné'}
                       </td>
 
                       {/* Scolarité & Situation en Caisse */}
-                      <td className="py-3 px-3">
+                      <td className="py-1.5 sm:py-2 px-2.5">
                         {fin.annualFee > 0 ? (
                           <div>
                             {fin.remaining === 0 ? (
@@ -610,7 +599,7 @@ export const StudentsModule: React.FC = () => {
                       </td>
 
                       {/* Parent / Contact */}
-                      <td className="py-3 px-3">
+                      <td className="py-1.5 sm:py-2 px-2.5">
                         <p className="text-slate-800 font-medium truncate max-w-[140px]">
                           {std.parent?.fatherName || std.parent?.motherName || 'Tuteur'}
                         </p>
@@ -620,7 +609,7 @@ export const StudentsModule: React.FC = () => {
                       </td>
 
                       {/* Statut */}
-                      <td className="py-3 px-3">
+                      <td className="py-1.5 sm:py-2 px-2.5">
                         <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
                           isActif 
                             ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
@@ -631,7 +620,7 @@ export const StudentsModule: React.FC = () => {
                       </td>
 
                       {/* Actions Centralisées */}
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-1.5 sm:py-2 px-3 text-right">
                         <div className="flex items-center justify-end gap-1 flex-wrap">
                           {/* 1. Bouton Encaisser pour cet élève */}
                           <button

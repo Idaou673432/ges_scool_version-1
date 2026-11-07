@@ -227,7 +227,7 @@ export function AppContent() {
         {/* Global Offline Status & Scan Queue Synchronization Banner */}
         <OfflineScanBanner />
 
-        <main className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 pb-24 lg:pb-6 custom-scrollbar">
+        <main className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-3.5 pb-20 lg:pb-4 custom-scrollbar">
           {activeTab === 'dashboard' && (
             <DashboardModule 
               onNavigate={setActiveTab} 

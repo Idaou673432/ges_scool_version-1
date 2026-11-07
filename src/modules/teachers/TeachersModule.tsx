@@ -2,8 +2,8 @@
  * SomaSikolo - Enseignants & Corps Professeurs Module
  */
 
-import React, { useState } from 'react';
-import { Briefcase, Plus, Phone, Mail, Award, Edit3, Trash2, Printer, FileText } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Briefcase, Plus, Phone, Mail, Award, Edit3, Trash2, Printer, FileText, Search, X } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { Teacher } from '../../types';
 import { formatFCFA } from '../../constants/maliEducation';
@@ -16,6 +16,18 @@ export const TeachersModule: React.FC = () => {
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredTeachers = useMemo(() => {
+    if (!searchQuery.trim()) return teachers;
+    const q = searchQuery.toLowerCase().trim();
+    return teachers.filter(t => 
+      t.firstName.toLowerCase().includes(q) ||
+      t.lastName.toLowerCase().includes(q) ||
+      t.specialty.toLowerCase().includes(q) ||
+      (t.phone && t.phone.includes(q))
+    );
+  }, [teachers, searchQuery]);
 
   const handlePrintSalarySlip = (teacher: Teacher) => {
     PdfService.generateTeacherSalarySlipPdf(teacher, settings);
@@ -63,61 +75,82 @@ export const TeachersModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-            <Briefcase className="w-7 h-7 text-blue-900" />
-            <span>Gestion du Corps Enseignant</span>
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
-            Professeurs • Spécialités académiques • Traitements salariaux FCFA
-          </p>
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
+      {/* Entête & Recherche Unifiés Ultra-Compacts */}
+      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Left: Title + Search */}
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+            <Briefcase className="w-4 h-4 text-blue-900 shrink-0" />
+            <span>Enseignants</span>
+            <span className="text-[11px] text-slate-400 font-normal">({filteredTeachers.length}/{teachers.length})</span>
+          </div>
+
+          <div className="relative flex-1 min-w-[170px] max-w-sm">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Rechercher nom, spécialité, tél..."
+              className="w-full pl-8 pr-7 py-1 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-slate-400 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {teachers.length > 0 && (
             <button
               onClick={() => setShowDeleteAllModal(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
             >
-              <Trash2 className="w-4 h-4 text-rose-600" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
               <span>Supprimer Tout ({teachers.length})</span>
             </button>
           )}
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>Ajouter un Enseignant</span>
+            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <span>+ Ajouter Enseignant</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {teachers.map((tch) => (
-          <div key={tch.id} className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-2xs space-y-5 flex flex-col justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+        {filteredTeachers.map((tch) => (
+          <div key={tch.id} className="bg-white border border-slate-200/80 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2 flex flex-col justify-between">
             <div>
               <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-slate-900 text-white font-bold text-sm flex items-center justify-center shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
                     {tch.firstName.charAt(0)}{tch.lastName.charAt(0)}
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-base">
+                    <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">
                       {tch.firstName} {tch.lastName.toUpperCase()}
                     </h3>
-                    <span className="text-xs text-slate-500 font-medium">{tch.specialty}</span>
+                    <span className="text-[11px] text-slate-500 font-medium">{tch.specialty}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handlePrintSalarySlip(tch)}
-                    className="p-1.5 text-slate-400 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
                     title="Télécharger Fiche de Paie PDF"
                   >
-                    <FileText className="w-4 h-4" />
+                    <FileText className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => {
@@ -125,38 +158,38 @@ export const TeachersModule: React.FC = () => {
                       setFormData(tch);
                       setIsModalOpen(true);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                     title="Modifier"
                   >
-                    <Edit3 className="w-4 h-4" />
+                    <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setDeletingTeacherId(tch.id)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Supprimer"
                   >
-                    <Trash2 className="w-4 h-4 text-rose-500" />
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2 text-xs text-slate-600 pt-4 mt-4 border-t border-slate-100">
-                <div className="flex items-center gap-2 font-medium">
-                  <Phone className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span className="font-mono">{tch.phone}</span>
+              <div className="space-y-1 text-xs text-slate-600 pt-2 mt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 font-medium">
+                  <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="font-mono text-[11px]">{tch.phone}</span>
                 </div>
                 {tch.email && (
-                  <div className="flex items-center gap-2 font-medium text-slate-500">
-                    <Mail className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="truncate">{tch.email}</span>
+                  <div className="flex items-center gap-1.5 font-medium text-slate-500">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="truncate text-[11px]">{tch.email}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="pt-3.5 border-t border-slate-100 flex justify-between items-center text-xs">
+            <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Salaire Mensuel</span>
-              <span className="font-bold text-emerald-700 text-sm font-mono">
+              <span className="font-bold text-emerald-700 text-xs sm:text-sm font-mono">
                 {tch.monthlySalary && tch.monthlySalary > 0 ? formatFCFA(tch.monthlySalary) : 'Non défini'}
               </span>
             </div>

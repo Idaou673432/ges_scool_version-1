@@ -113,20 +113,20 @@ export const DashboardModule: React.FC<DashboardProps> = ({
   }, [payments]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
       
       {/* 1. Entête Épuré de l'Accueil */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-              <School className="w-5 h-5 text-amber-400" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <School className="w-4 h-4 text-amber-400" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
                 {settings.schoolName || 'Tableau de bord'}
               </h1>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[11px] text-slate-500 font-medium">
                 Année scolaire {settings.currentAcademicYear} {settings.academyName ? `· ${settings.academyName}` : ''} {settings.capName ? `· ${settings.capName}` : ''}
               </p>
             </div>
@@ -134,14 +134,14 @@ export const DashboardModule: React.FC<DashboardProps> = ({
         </div>
 
         {/* Actions Rapides Essentielles */}
-        <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
+        <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
           {isFeatureEnabled('students') && (
             <button
               type="button"
               onClick={() => onNavigate('students')}
-              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Inscrire Élève</span>
             </button>
           )}
@@ -150,9 +150,9 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('payments')}
-              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
             >
-              <CreditCard className="w-4 h-4" />
+              <CreditCard className="w-3.5 h-3.5" />
               <span>Encaisser</span>
             </button>
           )}
@@ -161,9 +161,9 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={onOpenQrScanner}
-              className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition-colors cursor-pointer"
             >
-              <QrCode className="w-4 h-4" />
+              <QrCode className="w-3.5 h-3.5" />
               <span>Scanner QR</span>
             </button>
           )}
@@ -171,7 +171,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
           <button
             type="button"
             onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
             title="Générer le rapport officiel pour le Ministère de l'Éducation Nationale"
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
@@ -181,8 +181,8 @@ export const DashboardModule: React.FC<DashboardProps> = ({
       </div>
 
       {/* 2. Les Chiffres Clés de l'Établissement - Synthèse Épurée */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+      <div className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 shadow-2xs">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
           {/* Effectif Global */}
           {isFeatureEnabled('students') && (
             <div 
@@ -250,30 +250,30 @@ export const DashboardModule: React.FC<DashboardProps> = ({
       </div>
 
       {/* 3. Sélecteur de Vue de l'Accueil (Vue Générale / Résultats Académiques / Historique Scans) */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-1.5 p-1 bg-slate-200/60 rounded-xl overflow-x-auto">
+      <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+        <div className="flex items-center gap-1 p-0.5 bg-slate-200/60 rounded-lg overflow-x-auto">
           <button
             onClick={() => setActiveDashboardTab('OVERVIEW')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
               activeDashboardTab === 'OVERVIEW'
-                ? 'bg-white text-slate-900 shadow-xs'
+                ? 'bg-white text-slate-900 shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <School className="w-4 h-4" />
+            <School className="w-3.5 h-3.5" />
             <span>Vue Générale</span>
           </button>
 
           {isFeatureEnabled('grades') && (
             <button
               onClick={() => setActiveDashboardTab('ACADEMIC')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                 activeDashboardTab === 'ACADEMIC'
-                  ? 'bg-white text-slate-900 shadow-xs'
+                  ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Award className="w-4 h-4" />
+              <Award className="w-3.5 h-3.5" />
               <span>Résultats & Réussite</span>
             </button>
           )}
@@ -281,14 +281,14 @@ export const DashboardModule: React.FC<DashboardProps> = ({
           {isFeatureEnabled('qrScanner') && (
             <button
               onClick={() => setActiveDashboardTab('SCANS')}
-              className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
                 activeDashboardTab === 'SCANS'
-                  ? 'bg-white text-slate-900 shadow-xs'
+                  ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <QrCode className="w-4 h-4" />
-              <span>Historique Scans QR ({historyCount})</span>
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Scans QR ({historyCount})</span>
             </button>
           )}
         </div>
@@ -296,16 +296,16 @@ export const DashboardModule: React.FC<DashboardProps> = ({
 
       {/* VUE 1 : VUE GÉNÉRALE & GESTION COURANTE */}
       {activeDashboardTab === 'OVERVIEW' && (
-        <div className="space-y-6">
+        <div className="space-y-2">
           {/* Grille 2 Colonnes : Trésorerie & Cycles */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 sm:gap-3">
             {/* Graphique de Trésorerie Mensuelle */}
             {isFeatureEnabled('payments') && (
-              <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 p-3 sm:p-4 space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div>
-                    <h2 className="text-sm font-bold text-slate-900">Suivi Financier Mensuel (FCFA)</h2>
-                    <p className="text-xs text-slate-500">Recettes scolaires encaissées vs dépenses courantes</p>
+                    <h2 className="text-xs font-bold text-slate-900">Suivi Financier Mensuel (FCFA)</h2>
+                    <p className="text-[11px] text-slate-500">Recettes scolaires encaissées vs dépenses courantes</p>
                   </div>
                   <div className="flex items-center gap-3 text-xs font-semibold">
                     <span className="flex items-center gap-1.5 text-slate-800">
@@ -371,16 +371,16 @@ export const DashboardModule: React.FC<DashboardProps> = ({
 
           {/* Tableau des Règlements en Attente (Rappels de Caisse) */}
           {isFeatureEnabled('payments') && (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+              <div className="p-2.5 sm:p-3 border-b border-slate-100 flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900">Paiements de Scolarité en Attente</h2>
-                  <p className="text-xs text-slate-500">Élèves ayant un solde de mensualités restant à régler</p>
+                  <h2 className="text-xs font-bold text-slate-900">Paiements de Scolarité en Attente</h2>
+                  <p className="text-[11px] text-slate-500">Élèves ayant un solde de mensualités restant à régler</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => onNavigate('payments')}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg transition-colors cursor-pointer"
                 >
                   Voir la Caisse
                 </button>
@@ -390,41 +390,41 @@ export const DashboardModule: React.FC<DashboardProps> = ({
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      <th className="py-3 px-4">Élève & Matricule</th>
-                      <th className="py-3 px-4">Classe</th>
-                      <th className="py-3 px-4 text-right">Montant Payé</th>
-                      <th className="py-3 px-4 text-right">Reste à Régler</th>
-                      <th className="py-3 px-4 text-right">Action</th>
+                      <th className="py-2 px-3">Élève & Matricule</th>
+                      <th className="py-2 px-2.5">Classe</th>
+                      <th className="py-2 px-2.5 text-right">Montant Payé</th>
+                      <th className="py-2 px-2.5 text-right">Reste à Régler</th>
+                      <th className="py-2 px-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {pendingPayments.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                        <td colSpan={5} className="py-6 text-center text-slate-400 font-medium">
                           Tous les élèves sont à jour de leurs règlements de scolarité.
                         </td>
                       </tr>
                     ) : (
                       pendingPayments.map((p) => (
                         <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-4">
-                            <p className="font-bold text-slate-900">{p.studentName}</p>
+                          <td className="py-1.5 sm:py-2 px-3">
+                            <p className="font-bold text-slate-900 leading-tight">{p.studentName}</p>
                             <p className="text-[10px] text-slate-400 font-mono">{p.studentMatricule}</p>
                           </td>
-                          <td className="py-3 px-4 font-medium text-slate-700">
+                          <td className="py-1.5 sm:py-2 px-2.5 font-medium text-slate-700">
                             {p.className}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-medium text-emerald-700 tabular-nums">
+                          <td className="py-1.5 sm:py-2 px-2.5 text-right font-mono font-medium text-emerald-700 tabular-nums">
                             {formatFCFA(p.amountPaid)}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 tabular-nums">
+                          <td className="py-1.5 sm:py-2 px-2.5 text-right font-mono font-bold text-rose-600 tabular-nums">
                             {formatFCFA(p.remainingAmount)}
                           </td>
-                          <td className="py-3 px-4 text-right">
+                          <td className="py-1.5 sm:py-2 px-3 text-right">
                             <button
                               type="button"
                               onClick={() => onNavigate('payments')}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer"
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md text-xs transition-colors cursor-pointer"
                             >
                               Encaisser
                             </button>

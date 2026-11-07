@@ -376,115 +376,52 @@ export const BulletinsModule: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-4 pb-12">
-      {/* ----------------- SCREEN ONLY HEADER & CONTROLS (COMPACT) ----------------- */}
-      <div className="no-print space-y-3">
-        {/* 1. Header Bar & Action Buttons */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200/80 shadow-2xs">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900">
-                Bulletins de Notes Trimestriels
-              </h1>
-              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold border border-slate-200">
-                Année {settings.academicYear}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-              Saisie directe des notes • Classement automatique (1er au dernier) • Impression A4
-            </p>
-          </div>
-
-          {/* Action Toolbar: 4 actions essentielles sans doublons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => {
-                setShowBatchModal(true);
-                if (!batchSubjectId && subjects.length > 0) {
-                  const classSubj = subjects.filter(s => !currentClass || s.classCategory === currentClass.category);
-                  if (classSubj.length > 0) setBatchSubjectId(classSubj[0].id);
-                }
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Saisir rapidement les notes pour toute la classe"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Saisie des notes</span>
-            </button>
-
-            <button
-              onClick={handlePrintSingle}
-              disabled={!activeReportCard}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Imprimer le bulletin de l'élève affiché (A4 / PDF)"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimer bulletin</span>
-            </button>
-
-            <button
-              onClick={handlePrintClass}
-              disabled={allClassReportCards.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Imprimer tous les bulletins de la classe ordonnés du 1er au dernier élève"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Imprimer toute la classe ({allClassReportCards.length})</span>
-            </button>
-
-            <button
-              onClick={handleExportClassCsv}
-              disabled={allClassReportCards.length === 0}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-lg border border-slate-200/80 shadow-2xs transition-colors cursor-pointer"
-              title="Exporter les résultats en fichier Excel / CSV"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Export Excel</span>
-            </button>
-          </div>
-        </div>
-
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
+      {/* ----------------- SCREEN ONLY HEADER & CONTROLS (ULTRA COMPACT) ----------------- */}
+      <div className="no-print space-y-2">
         {/* Saved Toast Notification */}
         {savedNotice && (
-          <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
             <span>{savedNotice} — Re-calcul automatique effectué.</span>
           </div>
         )}
 
-        {/* 2. Selectors & Inline Class Stats Card */}
-        <div className="bg-white px-4 py-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-            {/* Classe */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
-                Classe :
-              </span>
+        {/* Single Unified Ultra-Compact Header & Action Bar */}
+        <div className="bg-white px-3 py-2 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+          {/* Left: Title + Class & Period dropdowns + Inline Stats */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+              <FileText className="w-4 h-4 text-slate-700 shrink-0" />
+              <span>Bulletins</span>
+            </div>
+
+            {/* Classe selector */}
+            <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-lg px-2 py-1 transition-colors shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Classe</span>
               <select
                 value={selectedClassId}
                 onChange={e => {
                   setSelectedClassId(e.target.value);
                   setActiveStudentId('');
                 }}
-                className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
               >
                 {classes.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.studentCount || 0} élèves)
+                    {c.name} ({c.studentCount || 0})
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Période / Évaluation */}
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
-                Période :
-              </span>
+            {/* Période selector */}
+            <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-lg px-2 py-1 transition-colors shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Période</span>
               <select
                 value={selectedTerm}
                 onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
-                className="flex-1 min-w-0 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
+                className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
               >
                 <optgroup label="Évaluations Mensuelles">
                   {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
@@ -509,28 +446,76 @@ export const BulletinsModule: React.FC = () => {
                 </optgroup>
               </select>
             </div>
+
+            {/* Inline Stats (Compact) */}
+            {classStats.total > 0 && (
+              <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-200 text-[11px] text-slate-500 font-medium shrink-0">
+                <span><strong className="text-slate-800">{classStats.total}</strong> élèves</span>
+                <span className="text-slate-300">·</span>
+                <span>Admis : <strong className="text-emerald-700">{classStats.passRate}%</strong></span>
+                <span className="text-slate-300">·</span>
+                <span>Moy : <strong className="text-slate-800 font-mono">{classStats.avg.toFixed(2)}/20</strong></span>
+              </div>
+            )}
           </div>
 
-          {/* Clean Inline Stats - Unboxed Typography */}
-          {classStats.total > 0 && (
-            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 font-medium">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span>{classStats.total} élèves classés</span>
-                <span aria-hidden="true">·</span>
-                <span>Taux d'admission : <strong className="text-slate-900 font-mono">{classStats.passRate}%</strong></span>
-                <span aria-hidden="true">·</span>
-                <span>Moyenne : <strong className="text-slate-900 font-mono">{classStats.avg.toFixed(2)}/20</strong></span>
-                <span aria-hidden="true">·</span>
-                <span>Max : <strong className="text-slate-900 font-mono">{classStats.maxAvg.toFixed(2)}</strong></span>
-              </div>
-            </div>
-          )}
+          {/* Right: Actions */}
+          <div className="flex items-center gap-1.5 ml-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setShowBatchModal(true);
+                if (!batchSubjectId && subjects.length > 0) {
+                  const classSubj = subjects.filter(s => !currentClass || s.classCategory === currentClass.category);
+                  if (classSubj.length > 0) setBatchSubjectId(classSubj[0].id);
+                }
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+              title="Saisir rapidement les notes pour toute la classe"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Saisie</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintSingle}
+              disabled={!activeReportCard}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+              title="Imprimer le bulletin de l'élève affiché"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimer</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintClass}
+              disabled={allClassReportCards.length === 0}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-900 hover:bg-blue-800 disabled:opacity-40 text-white font-semibold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+              title="Imprimer tous les bulletins de la classe"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Tout imprimer ({allClassReportCards.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportClassCsv}
+              disabled={allClassReportCards.length === 0}
+              className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
+              title="Exporter les résultats en Excel / CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">Excel</span>
+            </button>
+          </div>
         </div>
 
         {/* Main Interactive Screen Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 sm:gap-3">
           {/* Left: Student List Sidebar */}
-          <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
+          <div className="lg:col-span-4 bg-white border border-slate-200/80 rounded-xl p-2.5 sm:p-3 shadow-2xs space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-xs font-bold text-slate-700 truncate">
                 Élèves de la classe ({classStudents.length})
@@ -667,16 +652,16 @@ export const BulletinsModule: React.FC = () => {
           </div>
 
           {/* Right: Interactive Bulletin Card View & Direct Grade Inputs */}
-          <div className="lg:col-span-8 bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs">
+          <div className="lg:col-span-8 bg-white border border-slate-200/80 rounded-xl p-3 sm:p-4 shadow-2xs">
             {!activeReportCard || !activeStudent ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-20 space-y-3">
-                <FileText className="w-14 h-14 text-slate-300 stroke-1" />
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-xs py-12 space-y-2">
+                <FileText className="w-10 h-10 text-slate-300 stroke-1" />
                 <p className="font-medium">Sélectionnez un élève dans la liste à gauche pour saisir ses notes et afficher son bulletin.</p>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {/* Direct Student Navigation Stepper */}
-                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-100/90 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs">
                   <button
                     type="button"
                     onClick={handlePrevStudent}

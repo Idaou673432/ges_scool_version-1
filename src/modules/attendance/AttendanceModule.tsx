@@ -312,116 +312,50 @@ export const AttendanceModule: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3.5 max-w-7xl mx-auto pb-12">
-      {/* 1. Entête Compact avec Actions & Onglets */}
-      <div className="bg-white rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-            <CalendarCheck className="w-4 h-4 text-amber-400" />
-          </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-              Suivi des Présences & Assiduité
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Pointage journalier · Alertes WhatsApp · Registre d'assiduité
-            </p>
-          </div>
-        </div>
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
+      {/* Barre d'Action & Contrôles Unifiée Ultra-Compacte */}
+      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs space-y-1.5 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Titre + Onglets + Sélecteurs Classe & Date */}
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+              <CalendarCheck className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="hidden sm:inline font-bold">Présences</span>
+            </div>
 
-        {/* Switcher & Actions Rapides */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button
-              type="button"
-              onClick={() => setActiveTab('CALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'CALL'
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Appel Quotidien
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('REGISTER')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeTab === 'REGISTER'
-                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Registre</span>
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-xl transition-all cursor-pointer"
-            title="Scanner le QR Code d'un badge élève"
-          >
-            <Camera className="w-3.5 h-3.5 text-slate-700" />
-            <span>Scanner QR</span>
-          </button>
-
-          {activeTab === 'CALL' && (
-            <>
+            {/* Switcher Appel / Registre */}
+            <div className="flex bg-slate-100 p-0.5 rounded-lg shrink-0">
               <button
                 type="button"
-                onClick={handleMarkAllPresent}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition-all cursor-pointer"
-                title="Marquer tous les élèves de la classe présents"
+                onClick={() => setActiveTab('CALL')}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'CALL'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <CheckCheck className="w-3.5 h-3.5" />
-                <span>Tous Présents</span>
+                Appel
               </button>
-
               <button
                 type="button"
-                onClick={handleExportDailyPdf}
-                className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-all cursor-pointer"
-                title="Imprimer la feuille d'appel PDF"
+                onClick={() => setActiveTab('REGISTER')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  activeTab === 'REGISTER'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                <Printer className="w-4 h-4" />
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>Registre</span>
               </button>
+            </div>
 
-              <button
-                type="button"
-                onClick={handleSaveCall}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Enregistrer</span>
-              </button>
-            </>
-          )}
-
-          {attendanceRecords.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowDeleteAllModal(true)}
-              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer"
-              title="Vider toutes les présences enregistrées"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Barre de Contrôle & Synthèse Compacte (Unifiée) */}
-      <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs space-y-2.5">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Classe */}
-          <div className="flex items-center gap-2 flex-1 min-w-[170px]">
-            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Classe :</span>
+            {/* Classe select */}
             <select
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
-              className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
+              className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer max-w-[150px] shrink-0"
+              title="Sélectionner la classe"
             >
               {classes.map(cls => (
                 <option key={cls.id} value={cls.id}>
@@ -429,46 +363,98 @@ export const AttendanceModule: React.FC = () => {
                 </option>
               ))}
             </select>
-          </div>
 
-          {/* Date de l'appel */}
-          <div className="flex items-center gap-2 flex-1 min-w-[150px]">
-            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">Date :</span>
+            {/* Date input */}
             <input
               type="date"
               value={selectedDate}
               onChange={e => setSelectedDate(e.target.value)}
-              className="w-full py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
+              className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer shrink-0"
+              title="Date de l'appel"
             />
+
+            {/* Inlined Search */}
+            <div className="relative flex-1 min-w-[140px] max-w-[260px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Rechercher élève..."
+                className="w-full pl-7 pr-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+              />
+            </div>
           </div>
 
-          {/* Recherche */}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par élève ou matricule..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-slate-400"
-            />
+          {/* Action buttons */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-lg transition-all cursor-pointer"
+              title="Scanner le QR Code"
+            >
+              <Camera className="w-3.5 h-3.5 text-slate-700" />
+              <span className="hidden sm:inline">Scanner</span>
+            </button>
+
+            {activeTab === 'CALL' && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleMarkAllPresent}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-200 transition-all cursor-pointer"
+                  title="Marquer tous les élèves de la classe présents"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  <span>Tous Présents</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportDailyPdf}
+                  className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer"
+                  title="Imprimer la feuille d'appel PDF"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveCall}
+                  className="flex items-center gap-1 px-3 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-xs transition-all cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Enregistrer</span>
+                </button>
+              </>
+            )}
+
+            {attendanceRecords.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllModal(true)}
+                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                title="Vider toutes les présences"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Synthèse typographique en 1 ligne (remplace les 6 grosses cartes) */}
+        {/* Micro-synthèse d'assiduité sur une ligne discrète */}
         {activeTab === 'CALL' && (
-          <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 font-medium">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span>Effectif : <strong className="text-slate-900 font-mono">{dailyStats.total}</strong> élèves</span>
-              <span aria-hidden="true">·</span>
-              <span>Présents : <strong className="text-emerald-700 font-mono">{dailyStats.presents}</strong></span>
-              <span aria-hidden="true">·</span>
-              <span>Retards : <strong className="text-amber-700 font-mono">{dailyStats.lates}</strong></span>
-              <span aria-hidden="true">·</span>
-              <span>Absences : <strong className="text-rose-700 font-mono">{dailyStats.absJustified + dailyStats.absUnjustified}</strong></span>
-              <span aria-hidden="true">·</span>
-              <span>Taux d'assiduité : <strong className="text-blue-900 font-mono">{dailyStats.rate}%</strong></span>
-            </div>
+          <div className="pt-1 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[11px] text-slate-500 font-medium">
+            <span>Effectif : <strong className="text-slate-900 font-mono">{dailyStats.total}</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>Présents : <strong className="text-emerald-700 font-mono">{dailyStats.presents}</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>Retards : <strong className="text-amber-700 font-mono">{dailyStats.lates}</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>Absences : <strong className="text-rose-700 font-mono">{dailyStats.absJustified + dailyStats.absUnjustified}</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>Assiduité : <strong className="text-blue-900 font-mono">{dailyStats.rate}%</strong></span>
           </div>
         )}
       </div>
@@ -488,14 +474,14 @@ export const AttendanceModule: React.FC = () => {
 
       {/* TAB 1: APPPEL QUOTIDIEN */}
       {activeTab === 'CALL' && (
-        <div className="space-y-3.5">
+        <div className="space-y-2">
           {/* Student List for Attendance Marking */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
             {filteredStudents.length === 0 ? (
-              <div className="p-12 text-center text-slate-400 space-y-3">
-                <User className="w-12 h-12 mx-auto stroke-1 text-slate-300" />
-                <p className="text-sm font-bold">Aucun élève trouvé dans cette classe pour ces critères.</p>
-                <p className="text-xs text-slate-400">Veuillez sélectionner une autre classe ou vérifier la liste des élèves inscrit(e)s.</p>
+              <div className="p-8 text-center text-slate-400 space-y-2">
+                <User className="w-8 h-8 mx-auto stroke-1 text-slate-300" />
+                <p className="text-xs font-bold">Aucun élève trouvé dans cette classe pour ces critères.</p>
+                <p className="text-[11px] text-slate-400">Veuillez sélectionner une autre classe ou vérifier la liste des élèves inscrit(e)s.</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -506,7 +492,7 @@ export const AttendanceModule: React.FC = () => {
                   return (
                     <div
                       key={student.id}
-                      className={`p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+                      className={`p-2 sm:p-2.5 flex flex-col md:flex-row md:items-center justify-between gap-2 transition-all ${
                         state.status === 'PRESENT'
                           ? 'hover:bg-slate-50/80'
                           : state.status === 'LATE'
@@ -517,11 +503,11 @@ export const AttendanceModule: React.FC = () => {
                       }`}
                     >
                       {/* Left: Student Identity */}
-                      <div className="flex items-center gap-3.5 min-w-[240px]">
-                        <span className="text-xs font-black text-slate-400 w-6 shrink-0">
+                      <div className="flex items-center gap-2.5 min-w-[220px]">
+                        <span className="text-[11px] font-black text-slate-400 w-5 shrink-0">
                           #{String(idx + 1).padStart(2, '0')}
                         </span>
-                        <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-700 text-xs shrink-0 overflow-hidden">
+                        <div className="w-8 h-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center font-black text-slate-700 text-xs shrink-0 overflow-hidden">
                           {student.photoUrl ? (
                             <img src={student.photoUrl} alt={student.firstName} className="w-full h-full object-cover" />
                           ) : (
@@ -529,29 +515,29 @@ export const AttendanceModule: React.FC = () => {
                           )}
                         </div>
                         <div>
-                          <div className="font-black text-slate-900 text-sm tracking-tight flex items-center gap-2">
+                          <div className="font-bold text-slate-900 text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
                             <span>{student.lastName.toUpperCase()} {student.firstName}</span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                               {student.gender === 'F' ? 'Fille' : 'Garçon'}
                             </span>
                           </div>
-                          <div className="text-[11px] font-bold text-slate-400 flex items-center gap-2 mt-0.5">
-                            <span>Matricule: {student.matricule}</span>
+                          <div className="text-[10px] font-semibold text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span>Mat: {student.matricule}</span>
                             <span>•</span>
-                            <span>Parent: {getStudentParentPhone(student) || 'Non renseigné'}</span>
+                            <span>Tél: {getStudentParentPhone(student) || '—'}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Middle: Attendance Status Buttons */}
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1">
                         {/* PRESENT */}
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'PRESENT')}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             state.status === 'PRESENT'
-                              ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600/30'
+                              ? 'bg-emerald-600 text-white shadow-xs ring-1 ring-emerald-600/30'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
@@ -563,9 +549,9 @@ export const AttendanceModule: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'LATE')}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             state.status === 'LATE'
-                              ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-600/30'
+                              ? 'bg-amber-600 text-white shadow-xs ring-1 ring-amber-600/30'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
@@ -577,9 +563,9 @@ export const AttendanceModule: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'ABSENT_JUSTIFIED')}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             state.status === 'ABSENT_JUSTIFIED'
-                              ? 'bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-600/30'
+                              ? 'bg-indigo-600 text-white shadow-xs ring-1 ring-indigo-600/30'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
@@ -591,9 +577,9 @@ export const AttendanceModule: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleStatusChange(student.id, 'ABSENT_UNJUSTIFIED')}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             state.status === 'ABSENT_UNJUSTIFIED'
-                              ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-600/30'
+                              ? 'bg-rose-600 text-white shadow-xs ring-1 ring-rose-600/30'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
@@ -651,81 +637,81 @@ export const AttendanceModule: React.FC = () => {
 
       {/* TAB 2: REGISTRE & RAPPORTS D'ASSIDUITÉ */}
       {activeTab === 'REGISTER' && (
-        <div className="space-y-6">
+        <div className="space-y-2">
           {/* Register Action Bar */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
-              <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">
+              <h2 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
                 Registre Cumulé d'Assiduité — Classe {currentClass?.name}
               </h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Statistiques cumulées des absences, retards et taux de présence pour chaque élève
+              <p className="text-[11px] text-slate-500 font-medium">
+                Statistiques cumulées des absences, retards et taux de présence par élève
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={handleExportCSV}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-2xl text-xs font-bold transition-all cursor-pointer border border-slate-300"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition-all cursor-pointer border border-slate-200"
               >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                <span>Exporter Registre CSV</span>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Export CSV</span>
               </button>
 
               <button
                 onClick={handleExportDailyPdf}
-                className="flex items-center gap-2 px-4 py-2.5 bg-blue-900 hover:bg-blue-800 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-blue-900/20"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
               >
-                <Printer className="w-4 h-4" />
-                <span>Rapport PDF de Classe</span>
+                <Printer className="w-3.5 h-3.5" />
+                <span>Rapport PDF</span>
               </button>
             </div>
           </div>
 
           {/* Table of Cumulative Attendance */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-900 text-white font-black uppercase text-[10px] tracking-wider">
-                    <th className="p-4 rounded-tl-3xl">N°</th>
-                    <th className="p-4">Élève</th>
-                    <th className="p-4 text-center">Jours Marqués</th>
-                    <th className="p-4 text-center">Présences</th>
-                    <th className="p-4 text-center">Retards (Min)</th>
-                    <th className="p-4 text-center">Abs. Justifiées</th>
-                    <th className="p-4 text-center">Abs. Injustifiées</th>
-                    <th className="p-4 text-center">Taux d'Assiduité</th>
-                    <th className="p-4 text-right rounded-tr-3xl">Actions</th>
+                  <tr className="bg-slate-900 text-white font-bold uppercase text-[10px] tracking-wider">
+                    <th className="py-2 px-2.5">N°</th>
+                    <th className="py-2 px-3">Élève</th>
+                    <th className="py-2 px-2.5 text-center">Jours</th>
+                    <th className="py-2 px-2.5 text-center">Présences</th>
+                    <th className="py-2 px-2.5 text-center">Retards</th>
+                    <th className="py-2 px-2.5 text-center">Abs. Just.</th>
+                    <th className="py-2 px-2.5 text-center">Abs. Injust.</th>
+                    <th className="py-2 px-2.5 text-center">Taux Assiduité</th>
+                    <th className="py-2 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-800">
                   {registerSummary.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="p-8 text-center text-slate-400">
+                      <td colSpan={9} className="py-8 text-center text-slate-400">
                         Aucune donnée de présence enregistrée pour cette classe.
                       </td>
                     </tr>
                   ) : (
                     registerSummary.map((item, idx) => (
                       <tr key={item.student.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="p-4 font-black text-slate-400">#{String(idx + 1).padStart(2, '0')}</td>
-                        <td className="p-4">
-                          <div className="font-black text-slate-900 text-sm">
+                        <td className="py-1.5 sm:py-2 px-2.5 font-bold text-slate-400">#{String(idx + 1).padStart(2, '0')}</td>
+                        <td className="py-1.5 sm:py-2 px-3">
+                          <div className="font-bold text-slate-900 text-xs">
                             {item.student.lastName.toUpperCase()} {item.student.firstName}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-bold">
-                            Matricule: {item.student.matricule}
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {item.student.matricule}
                           </div>
                         </td>
-                        <td className="p-4 text-center font-bold text-slate-700">{item.totalDays} jour(s)</td>
-                        <td className="p-4 text-center font-bold text-emerald-600">{item.presents}</td>
-                        <td className="p-4 text-center font-bold text-amber-600">{item.lates}</td>
-                        <td className="p-4 text-center font-bold text-indigo-600">{item.absJustified}</td>
-                        <td className="p-4 text-center font-black text-rose-600">{item.absUnjustified}</td>
-                        <td className="p-4 text-center">
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-bold text-slate-700">{item.totalDays}j</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-bold text-emerald-600">{item.presents}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-bold text-amber-600">{item.lates}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-bold text-indigo-600">{item.absJustified}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center font-bold text-rose-600">{item.absUnjustified}</td>
+                        <td className="py-1.5 sm:py-2 px-2.5 text-center">
                           <span
-                            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black border ${
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${
                               item.rate >= 90
                                 ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                 : item.rate >= 75
@@ -733,13 +719,13 @@ export const AttendanceModule: React.FC = () => {
                                 : 'bg-rose-50 text-rose-800 border-rose-200'
                             }`}
                           >
-                            {item.rate}% {item.rate < 75 ? '⚠️ Alerte' : ''}
+                            {item.rate}% {item.rate < 75 ? '⚠️' : ''}
                           </span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="py-1.5 sm:py-2 px-3 text-right">
                           <button
                             onClick={() => setSelectedStudentForHistory(item.student)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-semibold text-xs inline-flex items-center gap-1 transition-all cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5 text-blue-900" />
                             <span>Historique</span>

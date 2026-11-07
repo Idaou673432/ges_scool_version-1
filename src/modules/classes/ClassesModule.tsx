@@ -67,97 +67,96 @@ export const ClassesModule: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  const filteredClasses = classes.filter(c => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.category.toLowerCase().includes(q) ||
+      (c.classroom && c.classroom.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/80 shadow-2xs">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
-            <GraduationCap className="w-7 h-7 text-blue-900" />
-            <span>Gestion des Classes & Niveaux</span>
-          </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
-            Effectifs • Capacités des salles • Frais de scolarité FCFA
-          </p>
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
+      {/* Entête & Recherche Unifiés Ultra-Compacts */}
+      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Left: Title + Inlined Search */}
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+            <GraduationCap className="w-4 h-4 text-blue-900 shrink-0" />
+            <span>Classes</span>
+            <span className="text-[11px] text-slate-400 font-normal">({filteredClasses.length}/{classes.length})</span>
+          </div>
+
+          <div className="relative flex-1 min-w-[170px] max-w-sm">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher classe, niveau, salle..."
+              className="w-full pl-8 pr-7 py-1 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-slate-400 transition-colors"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {classes.length > 0 && (
             <button
               onClick={() => setShowDeleteAllModal(true)}
-              className="flex items-center gap-2 px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-200 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
             >
-              <Trash2 className="w-4 h-4 text-rose-600" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
               <span>Supprimer Tout ({classes.length})</span>
             </button>
           )}
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            <Plus className="w-4 h-4 text-amber-400" />
-            <span>Créer une Classe</span>
+            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <span>+ Créer une Classe</span>
           </button>
         </div>
       </div>
 
-      {/* Barre de Recherche Épurée */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
-        <Search className="w-4 h-4 text-slate-400 shrink-0" />
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Rechercher une classe (ex: 9ème, TSS, Salle 02, Fondamental)..."
-          className="w-full bg-transparent text-xs font-medium text-slate-900 outline-none placeholder:text-slate-400"
-        />
-        {search && (
-          <button
-            type="button"
-            onClick={() => setSearch('')}
-            className="text-slate-400 hover:text-slate-600 cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-
       {/* Notification Toast */}
       {toastMessage && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+        <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Class Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {classes
-          .filter(c => {
-            const q = search.toLowerCase().trim();
-            if (!q) return true;
-            return (
-              c.name.toLowerCase().includes(q) ||
-              c.category.toLowerCase().includes(q) ||
-              (c.classroom && c.classroom.toLowerCase().includes(q))
-            );
-          })
-          .map((cls) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
+        {filteredClasses.map((cls) => {
             const teacher = teachers.find(t => t.id === cls.mainTeacherId);
             return (
-              <div key={cls.id} className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-2xs space-y-5 flex flex-col justify-between">
+              <div key={cls.id} className="bg-white border border-slate-200/80 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2 flex flex-col justify-between">
                 <div>
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-md border border-slate-200">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                           {cls.category.replace('_', ' ')}
                         </span>
-                        <span className="text-[10px] font-semibold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                        <span className="text-[10px] font-semibold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
                           Passage : {cls.passingGrade ?? (cls.category === 'FONDAMENTAL_1' ? 5 : 10)}/{cls.category === 'FONDAMENTAL_1' ? '10' : '20'}
                         </span>
                       </div>
-                      <h3 className="text-lg font-bold text-slate-900 mt-2.5">
+                      <h3 className="text-base font-bold text-slate-900 mt-1">
                         {cls.name}
                       </h3>
                     </div>
@@ -168,31 +167,31 @@ export const ClassesModule: React.FC = () => {
                           setFormData(cls);
                           setIsModalOpen(true);
                         }}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                         title="Modifier la classe"
                       >
-                        <Edit3 className="w-4 h-4" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => setDeletingClass(cls)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                         title="Supprimer la classe"
                       >
-                        <Trash2 className="w-4 h-4 text-rose-500" />
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-xs pt-4 mt-4 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 mt-2 border-t border-slate-100">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Effectif Inscrit</span>
-                      <p className="font-bold text-slate-900 text-sm mt-0.5 flex items-center gap-1 font-mono">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Effectif</span>
+                      <p className="font-bold text-slate-900 text-xs mt-0.5 flex items-center gap-1 font-mono">
                         <Users className="w-3.5 h-3.5 text-slate-500 font-sans" />
-                        <span>{cls.studentCount || 0} élèves inscrits</span>
+                        <span>{cls.studentCount || 0} inscrits</span>
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Salle d'Étude</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Salle</span>
                       <p className="font-semibold text-slate-700 text-xs mt-0.5 truncate">
                         {cls.classroom || 'Non attribuée'}
                       </p>
@@ -200,17 +199,17 @@ export const ClassesModule: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="pt-3.5 border-t border-slate-100 flex justify-between items-center text-xs">
+                <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mensualité</span>
-                    <p className="font-bold text-emerald-700 text-sm font-mono">
+                    <p className="font-bold text-emerald-700 text-xs sm:text-sm font-mono">
                       {formatFCFA(cls.monthlyFee)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => handlePrintClassList(cls)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl font-bold text-xs transition-colors cursor-pointer border border-slate-200"
+                      className="flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs transition-colors cursor-pointer border border-slate-200"
                       title="Télécharger Liste PDF"
                     >
                       <Printer className="w-3.5 h-3.5 text-slate-600" />

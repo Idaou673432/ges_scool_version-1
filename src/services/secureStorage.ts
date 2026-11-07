@@ -217,6 +217,78 @@ export function isEncrypted(value: string | null): boolean {
   return typeof value === 'string' && value.startsWith(STORAGE_PREFIX);
 }
 
+const EXPIRY_ENVELOPE_PREFIX = '{"__skl_exp":true,';
+
+/**
+ * Liste blanche des clés permanentes et critiques qui ne doivent JAMAIS être supprimées
+ * lors des nettoyages automatiques ou d'urgence.
+ */
+export const PROTECTED_STORAGE_KEYS = new Set<string>([
+  'somasikolo_settings',
+  'somasikolo_users',
+  'somasikolo_students',
+  'somasikolo_classes',
+  'somasikolo_subjects',
+  'somasikolo_teachers',
+  'somasikolo_grades',
+  'somasikolo_payments',
+  'somasikolo_attendance',
+  'somasikolo_audit_logs',
+  'somasikolo_active_user',
+  'somasikolo_active_user_id',
+  'kalangest_cloud_school_code',
+  'kalangest_sidebar_collapsed',
+  'kalangest_qr_autoprint',
+  'kalangest_cash_closures',
+  'soma_expenses',
+  'soma_pending_offline_payments',
+  'kalangest_offline_queue_v1',
+  'somasikolo_scan_history_v1'
+]);
+
+/**
+ * Motifs identifiant les données de travail temporaires, tampons d'impression et caches éphémères
+ */
+export const TEMPORARY_KEY_PATTERNS = [
+  /^(tmp|temp|cache)_/i,
+  /_(tmp|temp|cache)_/i,
+  /_(tmp|temp|cache)$/i,
+  /^soma_(temp|cache|preview|draft)_/i,
+  /^kalangest_(temp|cache|preview|buffer|draft)_/i,
+  /^somasikolo_(temp|cache|preview|draft|buffer)_/i,
+  /_export_buffer_/i,
+  /_ticket_draft_/i,
+  /_print_buffer_/i
+];
+
+/**
+ * Vérifie si une clé est de nature temporaire ou éphémère
+ */
+export function isTemporaryStorageKey(key: string): boolean {
+  if (PROTECTED_STORAGE_KEYS.has(key)) return false;
+  return TEMPORARY_KEY_PATTERNS.some(pattern => pattern.test(key));
+}
+
+export interface StorageCleanOptions {
+  forceAllTemps?: boolean;
+  maxTempAgeMs?: number;
+}
+
+export interface StorageCleanResult {
+  success: boolean;
+  deletedKeys: string[];
+  freedBytes: number;
+  totalStorageBytes: number;
+  remainingKeysCount: number;
+}
+
+export interface StorageUsageInfo {
+  usedBytes: number;
+  usedKb: number;
+  keysCount: number;
+  temporaryKeysCount: number;
+}
+
 /**
  * Interface d'accès au stockage sécurisé (implémentation commune pour local et session)
  */
@@ -236,14 +308,34 @@ export class SecureStorageEngine {
   }
 
   /**
-   * Récupère une valeur brute déchiffrée
+   * Récupère une valeur brute déchiffrée avec gestion automatique de l'expiration TTL
    */
   public getItem(key: string): string | null {
     if (!this.storage) return null;
     try {
       const raw = this.storage.getItem(key);
       if (raw === null) return null;
-      return decryptData(raw, key);
+      const decrypted = decryptData(raw, key);
+      if (!decrypted) return null;
+
+      // Gestion transparente des clés à durée de vie limitée (TTL)
+      if (decrypted.startsWith(EXPIRY_ENVELOPE_PREFIX)) {
+        try {
+          const envelope = JSON.parse(decrypted);
+          if (envelope.__skl_exp) {
+            if (Date.now() > envelope.expiresAt) {
+              // La clé a expiré, suppression immédiate
+              this.removeItem(key);
+              return null;
+            }
+            return envelope.data;
+          }
+        } catch {
+          return decrypted;
+        }
+      }
+
+      return decrypted;
     } catch (e) {
       console.error(`[SecureStorage] Erreur getItem(${key}):`, e);
       return null;
@@ -251,7 +343,7 @@ export class SecureStorageEngine {
   }
 
   /**
-   * Enregistre une valeur sous forme chiffrée
+   * Enregistre une valeur sous forme chiffrée avec protection automatique contre la saturation du quota
    */
   public setItem(key: string, value: string): void {
     if (!this.storage) return;
@@ -259,9 +351,41 @@ export class SecureStorageEngine {
       const strVal = typeof value === 'string' ? value : String(value);
       const encrypted = encryptData(strVal, key);
       this.storage.setItem(key, encrypted);
-    } catch (e) {
+    } catch (e: any) {
+      // Déclenchement automatique du nettoyage d'urgence si le quota du navigateur est saturé
+      if (
+        e?.name === 'QuotaExceededError' ||
+        e?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+        e?.code === 22 ||
+        e?.code === 1014
+      ) {
+        console.warn(`[SecureStorage] Quota de stockage local saturé ! Déclenchement du nettoyage automatique d'urgence...`);
+        this.cleanTemporaryData({ forceAllTemps: true });
+        try {
+          const strVal = typeof value === 'string' ? value : String(value);
+          const encrypted = encryptData(strVal, key);
+          this.storage.setItem(key, encrypted);
+          console.info(`[SecureStorage] Enregistrement réussi après nettoyage d'urgence.`);
+          return;
+        } catch (retryErr) {
+          console.error(`[SecureStorage] Échec persistant après nettoyage:`, retryErr);
+        }
+      }
       console.error(`[SecureStorage] Erreur setItem(${key}):`, e);
     }
+  }
+
+  /**
+   * Enregistre une valeur temporaire avec une durée de validité (TTL en millisecondes)
+   */
+  public setItemWithExpiry(key: string, value: string, ttlMs: number): void {
+    const envelope = {
+      __skl_exp: true,
+      expiresAt: Date.now() + Math.max(1, ttlMs),
+      createdAt: Date.now(),
+      data: String(value)
+    };
+    this.setItem(key, JSON.stringify(envelope));
   }
 
   /**
@@ -291,6 +415,18 @@ export class SecureStorageEngine {
   }
 
   /**
+   * Sérialise et enregistre un objet JSON avec durée d'expiration (TTL)
+   */
+  public setJSONWithExpiry<T>(key: string, value: T, ttlMs: number): void {
+    try {
+      const jsonStr = JSON.stringify(value);
+      this.setItemWithExpiry(key, jsonStr, ttlMs);
+    } catch (e) {
+      console.error(`[SecureStorage] Erreur setJSONWithExpiry pour "${key}":`, e);
+    }
+  }
+
+  /**
    * Supprime une clé
    */
   public removeItem(key: string): void {
@@ -312,6 +448,150 @@ export class SecureStorageEngine {
     } catch (e) {
       console.error('[SecureStorage] Erreur clear:', e);
     }
+  }
+
+  /**
+   * Nettoie automatiquement les données temporaires, expirées ou tampons obsolètes
+   * pour libérer de l'espace sans toucher aux données protégées.
+   */
+  public cleanTemporaryData(options: StorageCleanOptions = {}): StorageCleanResult {
+    if (!this.storage) {
+      return {
+        success: false,
+        deletedKeys: [],
+        freedBytes: 0,
+        totalStorageBytes: 0,
+        remainingKeysCount: 0
+      };
+    }
+
+    const { forceAllTemps = false, maxTempAgeMs = 24 * 60 * 60 * 1000 } = options;
+    const deletedKeys: string[] = [];
+    let freedBytes = 0;
+    const now = Date.now();
+
+    try {
+      const keysToExamine: string[] = [];
+      let totalBytes = 0;
+
+      for (let i = 0; i < this.storage.length; i++) {
+        const k = this.storage.key(i);
+        if (k) {
+          keysToExamine.push(k);
+          const val = this.storage.getItem(k) || '';
+          totalBytes += (k.length + val.length) * 2;
+        }
+      }
+
+      for (const k of keysToExamine) {
+        // Règle absolue : Ne jamais toucher aux données protégées
+        if (PROTECTED_STORAGE_KEYS.has(k)) {
+          continue;
+        }
+
+        const rawVal = this.storage.getItem(k);
+        if (rawVal === null) continue;
+        const keyBytes = (k.length + rawVal.length) * 2;
+
+        // 1. Clé vide ou corrompue
+        if (rawVal === '') {
+          this.storage.removeItem(k);
+          deletedKeys.push(k);
+          freedBytes += keyBytes;
+          continue;
+        }
+
+        // 2. Clé avec enveloppe d'expiration TTL
+        const decrypted = decryptData(rawVal, k);
+        if (decrypted && decrypted.startsWith(EXPIRY_ENVELOPE_PREFIX)) {
+          try {
+            const envelope = JSON.parse(decrypted);
+            if (envelope.__skl_exp) {
+              const isExpired = now > envelope.expiresAt;
+              const isOld = now - (envelope.createdAt || 0) > maxTempAgeMs;
+              if (isExpired || forceAllTemps || isOld) {
+                this.storage.removeItem(k);
+                deletedKeys.push(k);
+                freedBytes += keyBytes;
+                continue;
+              }
+            }
+          } catch {
+            if (forceAllTemps || isTemporaryStorageKey(k)) {
+              this.storage.removeItem(k);
+              deletedKeys.push(k);
+              freedBytes += keyBytes;
+              continue;
+            }
+          }
+        }
+
+        // 3. Clé correspondant aux préfixes de tampons / caches éphémères
+        if (isTemporaryStorageKey(k)) {
+          this.storage.removeItem(k);
+          deletedKeys.push(k);
+          freedBytes += keyBytes;
+          continue;
+        }
+      }
+
+      const remainingKeysCount = this.storage.length;
+      const totalStorageBytes = Math.max(0, totalBytes - freedBytes);
+
+      if (deletedKeys.length > 0) {
+        console.info(
+          `[SecureStorage] Nettoyage automatique : ${deletedKeys.length} clé(s) temporaire(s) supprimée(s), ${(freedBytes / 1024).toFixed(2)} Ko libérés.`
+        );
+      }
+
+      return {
+        success: true,
+        deletedKeys,
+        freedBytes,
+        totalStorageBytes,
+        remainingKeysCount
+      };
+    } catch (e) {
+      console.error('[SecureStorage] Erreur lors du nettoyage automatique:', e);
+      return {
+        success: false,
+        deletedKeys,
+        freedBytes,
+        totalStorageBytes: 0,
+        remainingKeysCount: this.storage.length
+      };
+    }
+  }
+
+  /**
+   * Calcule les métriques d'utilisation de l'espace de stockage
+   */
+  public getStorageUsage(): StorageUsageInfo {
+    if (!this.storage) {
+      return { usedBytes: 0, usedKb: 0, keysCount: 0, temporaryKeysCount: 0 };
+    }
+
+    let usedBytes = 0;
+    let temporaryKeysCount = 0;
+    const keysCount = this.storage.length;
+
+    for (let i = 0; i < keysCount; i++) {
+      const k = this.storage.key(i);
+      if (k) {
+        const val = this.storage.getItem(k) || '';
+        usedBytes += (k.length + val.length) * 2;
+        if (isTemporaryStorageKey(k)) {
+          temporaryKeysCount++;
+        }
+      }
+    }
+
+    return {
+      usedBytes,
+      usedKb: Math.round(usedBytes / 1024),
+      keysCount,
+      temporaryKeysCount
+    };
   }
 
   /**
@@ -340,6 +620,13 @@ export class SecureStorageEngine {
 // Instances globales
 export const secureLocalStorage = new SecureStorageEngine('localStorage');
 export const secureSessionStorage = new SecureStorageEngine('sessionStorage');
+
+/**
+ * Déclencheur global de nettoyage automatique du stockage local
+ */
+export function autoCleanupStorage(options?: StorageCleanOptions): StorageCleanResult {
+  return secureLocalStorage.cleanTemporaryData(options);
+}
 
 /**
  * Migration automatique : chiffre toutes les clés en clair existantes dans localStorage
@@ -384,5 +671,16 @@ export function autoMigrateStorage(): { migrated: number } {
 if (typeof window !== 'undefined') {
   try {
     autoMigrateStorage();
+    
+    // Déclenchement automatique du nettoyage des anciennes clés temporaires
+    if (typeof (window as any).requestIdleCallback === 'function') {
+      (window as any).requestIdleCallback(() => {
+        autoCleanupStorage();
+      });
+    } else {
+      setTimeout(() => {
+        autoCleanupStorage();
+      }, 1500);
+    }
   } catch {}
 }

@@ -146,7 +146,7 @@ export const CardsModule: React.FC = () => {
   }[cardTheme];
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-2 max-w-7xl mx-auto pb-4">
       {/* Dynamic Print Styles for Clean A4 Output */}
       <style>{`
         @media print {
@@ -184,125 +184,125 @@ export const CardsModule: React.FC = () => {
         }
       `}</style>
 
-      {/* Header Banner - Screen Only */}
-      <div className="no-print flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-            <CreditCard className="w-5 h-5 text-amber-400" />
+      {/* Unified Ultra-Compact Toolbar - Screen Only */}
+      <div className="no-print bg-white px-3 py-2 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Left: Title + Face Mode + Class Select + Select All + Search */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+            <CreditCard className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Cartes & Badges</span>
           </div>
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-              Cartes Scolaires & Badges
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Format officiel · QR code d'identification · Impression A4
-            </p>
-          </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 w-full xl:w-auto">
-          {/* Card Face Mode Toggle */}
-          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+          {/* Compact Face Mode Toggle */}
+          <div className="inline-flex bg-slate-100 p-0.5 rounded-lg text-[11px] font-semibold shrink-0">
             <button
+              type="button"
               onClick={() => setCardFaceMode('RECTO')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                cardFaceMode === 'RECTO' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                cardFaceMode === 'RECTO' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Recto
             </button>
             <button
+              type="button"
               onClick={() => setCardFaceMode('VERSO')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                cardFaceMode === 'VERSO' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                cardFaceMode === 'VERSO' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Verso
             </button>
             <button
+              type="button"
               onClick={() => setCardFaceMode('BOTH')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                cardFaceMode === 'BOTH' ? 'bg-slate-900 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                cardFaceMode === 'BOTH' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Recto + Verso
+              Recto+Verso
             </button>
           </div>
 
+          {/* Class Filter */}
+          <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-lg px-2 py-1 transition-colors shrink-0">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Classe</span>
+            <select
+              value={selectedClassId}
+              onChange={e => setSelectedClassId(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[130px] sm:max-w-[170px] truncate"
+            >
+              <option value="ALL">Toutes ({classes.length})</option>
+              {classes.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Select All Button */}
           <button
-            onClick={() => setIsScannerOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-            title="Scanner le QR Code d'un badge ou d'une carte scolaire avec votre caméra"
+            type="button"
+            onClick={toggleSelectAll}
+            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-colors cursor-pointer shrink-0"
           >
-            <Camera className="w-4 h-4 text-emerald-200" />
-            <span>Scanner QR</span>
+            {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
+              <CheckSquare className="w-3.5 h-3.5 text-slate-900" />
+            ) : (
+              <Square className="w-3.5 h-3.5 text-slate-400" />
+            )}
+            <span>Tout ({filteredStudents.length})</span>
+          </button>
+
+          {/* Search Input */}
+          <div className="relative w-36 sm:w-48 shrink-0">
+            <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-6 pr-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400"
+            />
+          </div>
+        </div>
+
+        {/* Right: Action Buttons */}
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsScannerOpen(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+            title="Scanner QR Code"
+          >
+            <Camera className="w-3.5 h-3.5 text-emerald-200" />
+            <span className="hidden sm:inline">Scanner</span>
           </button>
 
           <button
+            type="button"
             onClick={() => PdfService.generateStudentCardsBatchPdf(studentsToPrint, classes, settings)}
             disabled={studentsToPrint.length === 0}
-            className="flex items-center gap-2 px-3.5 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 text-slate-950 font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
             title="Télécharger directement un document PDF A4 prêt à imprimer"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
             <span>PDF A4 ({studentsToPrint.length})</span>
           </button>
 
           <button
+            type="button"
             onClick={handlePrint}
             disabled={studentsToPrint.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-semibold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            <Printer className="w-4 h-4 text-amber-400" />
+            <Printer className="w-3.5 h-3.5 text-amber-400" />
             <span>Imprimer ({studentsToPrint.length})</span>
           </button>
         </div>
       </div>
 
-      {/* Toolbar & Filters - Screen Only */}
-      <div className="no-print bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          {/* Select All Button */}
-          <button
-            onClick={toggleSelectAll}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
-          >
-            {selectedStudentIds.length === filteredStudents.length && filteredStudents.length > 0 ? (
-              <CheckSquare className="w-4 h-4 text-slate-900" />
-            ) : (
-              <Square className="w-4 h-4 text-slate-400" />
-            )}
-            <span>Tout sélectionner ({filteredStudents.length})</span>
-          </button>
-
-          {/* Class Filter */}
-          <select
-            value={selectedClassId}
-            onChange={e => setSelectedClassId(e.target.value)}
-            className="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
-          >
-            <option value="ALL">Toutes les classes</option>
-            {classes.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Search Field */}
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Rechercher par élève ou matricule..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:border-slate-400"
-          />
-        </div>
-      </div>
-
       {/* Main Grid of ID Cards (Wider Layout - 2 columns max) */}
-      <div id="printable-card-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+      <div id="printable-card-grid" className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 max-w-6xl mx-auto">
         {filteredStudents.map(std => {
           const studentClass = classes.find(c => c.id === std.classId);
           const qrUrl = studentQrs[std.id];

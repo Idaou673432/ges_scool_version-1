@@ -8,6 +8,7 @@ import { useSchool } from '../../contexts/SchoolContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
 import { SchoolEnabledFeatures } from '../../types';
+import { secureLocalStorage } from '../../services/secureStorage';
 
 const MONTH_OPTIONS = [
   'Septembre', 'Octobre', 'Novembre', 'Décembre', 
@@ -53,6 +54,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   const [testResult, setTestResult] = useState<'IDLE' | 'SUCCESS' | 'FAIL'>('IDLE');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
+  const [storageStats, setStorageStats] = useState(() => secureLocalStorage.getStorageUsage());
+  const [cleanToast, setCleanToast] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>(initialTab || 'INFO');
   
   useEffect(() => {
@@ -279,6 +282,17 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
     updateSettings(updated);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
+  };
+
+  const handleCleanStorage = () => {
+    const res = secureLocalStorage.cleanTemporaryData({ forceAllTemps: true });
+    setStorageStats(secureLocalStorage.getStorageUsage());
+    if (res.deletedKeys.length > 0) {
+      setCleanToast(`Nettoyage réussi : ${res.deletedKeys.length} clé(s) temporaire(s) supprimée(s), ${(res.freedBytes / 1024).toFixed(1)} Ko libérés !`);
+    } else {
+      setCleanToast(`Stockage déjà optimisé : aucune clé temporaire superflue.`);
+    }
+    setTimeout(() => setCleanToast(null), 4000);
   };
 
   const FEATURES_CONFIG: Array<{
@@ -915,6 +929,63 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* NETTOYAGE & OPTIMISATION DU STOCKAGE LOCAL */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-100 text-slate-800 rounded-xl flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-5 h-5 text-slate-700" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Nettoyage Automatique & Espace de Stockage
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Supprime automatiquement les tampons, caches éphémères et clés expirées pour préserver les performances du navigateur.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCleanStorage}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <span>Nettoyer le cache maintenant</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Espace Utilisé</div>
+                <div className="text-sm font-bold text-slate-800 font-mono mt-0.5">{storageStats.usedKb} Ko</div>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Total Clés Stockées</div>
+                <div className="text-sm font-bold text-slate-800 font-mono mt-0.5">{storageStats.keysCount}</div>
+              </div>
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Clés Temporaires</div>
+                <div className="text-sm font-bold text-slate-800 font-mono mt-0.5">{storageStats.temporaryKeysCount}</div>
+              </div>
+              <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200/60">
+                <div className="text-[10px] font-bold uppercase text-emerald-600">Nettoyage Auto</div>
+                <div className="text-xs font-bold text-emerald-800 flex items-center gap-1 mt-0.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Actif & Sécurisé</span>
+                </div>
+              </div>
+            </div>
+
+            {cleanToast && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{cleanToast}</span>
+              </div>
+            )}
           </div>
 
         </div>

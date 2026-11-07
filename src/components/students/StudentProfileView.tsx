@@ -273,31 +273,31 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const cleanPhone = (student.parent?.fatherPhone || student.parent?.motherPhone || '').replace(/[^0-9]/g, '');
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fadeIn">
+    <div className="space-y-2 max-w-7xl mx-auto pb-4 animate-fadeIn">
       
       {/* Barre Supérieure de Navigation & Retour */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-2.5">
           {onBack && (
             <button
               type="button"
               onClick={onBack}
-              className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 transition-colors cursor-pointer border border-slate-200"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors cursor-pointer border border-slate-200"
               title="Retourner à la liste des élèves"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
           )}
 
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-center gap-2.5">
             {student.photoUrl ? (
               <img
                 src={student.photoUrl}
                 alt={student.firstName}
-                className="w-12 h-12 rounded-xl object-cover border border-slate-200 shadow-2xs shrink-0"
+                className="w-9 h-9 rounded-lg object-cover border border-slate-200 shadow-2xs shrink-0"
               />
             ) : (
-              <div className="w-12 h-12 rounded-xl bg-slate-900 text-white font-bold flex items-center justify-center text-sm shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-slate-900 text-white font-bold flex items-center justify-center text-xs shrink-0">
                 {student.firstName.charAt(0)}{student.lastName.charAt(0)}
               </div>
             )}
