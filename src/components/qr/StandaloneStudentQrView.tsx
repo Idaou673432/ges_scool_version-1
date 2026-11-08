@@ -1279,14 +1279,6 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
               <span className="hidden sm:inline">Coller JSON</span>
             </button>
 
-            <button
-              onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-950/40 transition-colors cursor-pointer"
-              title="Scanner le QR Code d'un autre élève"
-            >
-              <Camera className="w-3.5 h-3.5 text-emerald-200" />
-              <span className="hidden sm:inline">Scanner QR</span>
-            </button>
 
             {exitHandler && (
               <button
@@ -1371,14 +1363,6 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsScannerOpen(true)}
-                  className="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Activer la Caméra pour Scanner</span>
-                </button>
 
                 <button
                   type="button"
@@ -2054,13 +2038,6 @@ export const StandaloneStudentQrView: React.FC<StandaloneStudentQrViewProps> = (
                 <span>{copiedLink ? 'Lien Copié !' : 'Partager'}</span>
               </button>
 
-              <button
-                onClick={() => setIsScannerOpen(true)}
-                className="py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-800 flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <Camera className="w-4 h-4 text-emerald-400" />
-                <span>Scanner Suivant</span>
-              </button>
 
               <button
                 onClick={() => setShowRawInspector(true)}

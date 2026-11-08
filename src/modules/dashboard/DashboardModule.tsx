@@ -34,17 +34,8 @@ export const DashboardModule: React.FC<DashboardProps> = ({
   onViewStudentProfile
 }) => {
   const { stats, students, classes, payments, settings, generateReportCard, isFeatureEnabled } = useSchool();
-  const [activeDashboardTab, setActiveDashboardTab] = useState<'OVERVIEW' | 'ACADEMIC' | 'SCANS'>('OVERVIEW');
-  const [historyCount, setHistoryCount] = useState<number>(0);
+  const [activeDashboardTab, setActiveDashboardTab] = useState<'OVERVIEW' | 'ACADEMIC'>('OVERVIEW');
   const [localViewingStudent, setLocalViewingStudent] = useState<Student | null>(null);
-
-  useEffect(() => {
-    setHistoryCount(ScanHistoryService.getHistory().length);
-    const unsubscribe = ScanHistoryService.subscribe((updated) => {
-      setHistoryCount(updated.length);
-    });
-    return () => unsubscribe();
-  }, []);
 
   const handleSelectStudent = (student: Student) => {
     if (onViewStudentProfile) {
@@ -115,31 +106,46 @@ export const DashboardModule: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-2 max-w-7xl mx-auto pb-4">
       
-      {/* 1. Entête Épuré de l'Accueil */}
-      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
-              <School className="w-4 h-4 text-amber-400" />
-            </div>
-            <div>
-              <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
-                {settings.schoolName || 'Tableau de bord'}
-              </h1>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Année scolaire {settings.currentAcademicYear} {settings.academyName ? `· ${settings.academyName}` : ''} {settings.capName ? `· ${settings.capName}` : ''}
-              </p>
-            </div>
-          </div>
+      {/* Barre d'Action & Navigation Ultra-Compacte de l'Accueil */}
+      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Left: Tab Switcher (Vue Générale / Résultats & Réussite) */}
+        <div className="flex bg-slate-100 p-0.5 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setActiveDashboardTab('OVERVIEW')}
+            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+              activeDashboardTab === 'OVERVIEW'
+                ? 'bg-white text-slate-900 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 font-semibold'
+            }`}
+          >
+            <School className="w-3.5 h-3.5" />
+            <span>Vue Générale</span>
+          </button>
+
+          {isFeatureEnabled('grades') && (
+            <button
+              type="button"
+              onClick={() => setActiveDashboardTab('ACADEMIC')}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+                activeDashboardTab === 'ACADEMIC'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 font-semibold'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>Résultats & Réussite</span>
+            </button>
+          )}
         </div>
 
-        {/* Actions Rapides Essentielles */}
-        <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
+        {/* Right: Actions Rapides (SANS Scanner QR) */}
+        <div className="flex items-center gap-1.5 shrink-0">
           {isFeatureEnabled('students') && (
             <button
               type="button"
               onClick={() => onNavigate('students')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Inscrire Élève</span>
@@ -150,147 +156,22 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('payments')}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
               <CreditCard className="w-3.5 h-3.5" />
               <span>Encaisser</span>
             </button>
           )}
 
-          {isFeatureEnabled('qrScanner') && onOpenQrScanner && (
-            <button
-              type="button"
-              onClick={onOpenQrScanner}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Scanner QR</span>
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
-            title="Générer le rapport officiel pour le Ministère de l'Éducation Nationale"
+            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer border border-slate-200"
+            title="Générer le rapport officiel MEN"
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
             <span>Rapport MEN</span>
           </button>
-        </div>
-      </div>
-
-      {/* 2. Les Chiffres Clés de l'Établissement - Synthèse Épurée */}
-      <div className="bg-white border border-slate-200 rounded-xl p-2.5 sm:p-3 shadow-2xs">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-          {/* Effectif Global */}
-          {isFeatureEnabled('students') && (
-            <div 
-              onClick={() => onNavigate('students')}
-              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
-            >
-              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Effectif Total</span>
-              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
-                {stats.totalStudents} <span className="text-xs font-normal text-slate-400">élèves</span>
-              </p>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {maleCount}G · {femaleCount}F
-              </p>
-            </div>
-          )}
-
-          {/* Classes */}
-          {isFeatureEnabled('classes') && (
-            <div 
-              onClick={() => onNavigate('classes')}
-              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
-            >
-              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Classes & Salles</span>
-              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
-                {classes.length} <span className="text-xs font-normal text-slate-400">classes</span>
-              </p>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {stats.totalTeachers} enseignants
-              </p>
-            </div>
-          )}
-
-          {/* Recettes */}
-          {isFeatureEnabled('payments') && (
-            <div 
-              onClick={() => onNavigate('cashier')}
-              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
-            >
-              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Recettes de Caisse</span>
-              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
-                {formatFCFA(stats.totalRevenueFCFA)}
-              </p>
-              <p className="text-[11px] text-slate-400 font-medium">
-                Exercice scolaire en cours
-              </p>
-            </div>
-          )}
-
-          {/* Moyenne */}
-          {isFeatureEnabled('grades') && (
-            <div 
-              onClick={() => onNavigate('grades')}
-              className="pt-2 sm:pt-0 sm:px-3 cursor-pointer group"
-            >
-              <span className="text-[11px] font-semibold text-slate-500 block group-hover:text-slate-900 transition-colors">Moyenne Établissement</span>
-              <p className="text-xl font-bold text-slate-900 tabular-nums font-mono mt-0.5">
-                {schoolAverage} <span className="text-xs font-normal text-slate-400">/ 20</span>
-              </p>
-              <p className="text-[11px] text-slate-400 font-medium">
-                {getMaliScoreAppreciation(parseFloat(schoolAverage), 20).appreciation}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 3. Sélecteur de Vue de l'Accueil (Vue Générale / Résultats Académiques / Historique Scans) */}
-      <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
-        <div className="flex items-center gap-1 p-0.5 bg-slate-200/60 rounded-lg overflow-x-auto">
-          <button
-            onClick={() => setActiveDashboardTab('OVERVIEW')}
-            className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-              activeDashboardTab === 'OVERVIEW'
-                ? 'bg-white text-slate-900 shadow-2xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <School className="w-3.5 h-3.5" />
-            <span>Vue Générale</span>
-          </button>
-
-          {isFeatureEnabled('grades') && (
-            <button
-              onClick={() => setActiveDashboardTab('ACADEMIC')}
-              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                activeDashboardTab === 'ACADEMIC'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" />
-              <span>Résultats & Réussite</span>
-            </button>
-          )}
-
-          {isFeatureEnabled('qrScanner') && (
-            <button
-              onClick={() => setActiveDashboardTab('SCANS')}
-              className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-                activeDashboardTab === 'SCANS'
-                  ? 'bg-white text-slate-900 shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Scans QR ({historyCount})</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -445,14 +326,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
         <AcademicSuccessCharts onNavigateToGrades={() => onNavigate('grades')} />
       )}
 
-      {/* VUE 3 : HISTORIQUE DES SCANS QR */}
-      {activeDashboardTab === 'SCANS' && isFeatureEnabled('qrScanner') && (
-        <ScanHistoryPanel 
-          onViewStudentProfile={handleSelectStudent}
-          onOpenQrScanner={onOpenQrScanner}
-          onNavigateToCards={() => onNavigate('cards')}
-        />
-      )}
+
 
       {/* Modal fiche élève si déclenchée localement */}
       {localViewingStudent && !onViewStudentProfile && (

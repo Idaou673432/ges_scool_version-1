@@ -47,6 +47,7 @@ import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 import { ExcelImportModal } from '../../components/students/ExcelImportModal';
 import { MenOfficialStatsModal } from '../../components/students/MenOfficialStatsModal';
 import { StudentProfileView } from '../../components/students/StudentProfileView';
+import { HorizontalReceiptModal } from '../../components/receipts/HorizontalReceiptModal';
 import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation } from '../../constants/maliEducation';
 
 export const StudentsModule: React.FC = () => {
@@ -460,26 +461,6 @@ export const StudentsModule: React.FC = () => {
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
             <span className="hidden sm:inline">Excel</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsMenStatsOpen(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
-            title="Générer la fiche officielle statistique demandée par le CAP et l'Académie"
-          >
-            <Building2 className="w-3.5 h-3.5 text-slate-600" />
-            <span className="hidden sm:inline">Fiche MEN</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
-            title="Exporter en CSV"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-600" />
-            <span className="hidden sm:inline">CSV</span>
           </button>
 
           {students.length > 0 && (

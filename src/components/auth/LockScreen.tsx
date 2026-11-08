@@ -156,16 +156,6 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
             <ArrowRight className="w-4 h-4" />
           </button>
 
-          {onOpenQrScanner && (
-            <button
-              type="button"
-              onClick={onOpenQrScanner}
-              className="w-full py-3.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
-            >
-              <QrCode className="w-4 h-4 text-emerald-700" />
-              <span>Contrôle & Scan QR Élève (Accès Direct)</span>
-            </button>
-          )}
         </form>
 
         <div className="text-center pt-2 border-t border-slate-100">

@@ -2,8 +2,8 @@
  * SomaSikolo - Saisie des Notes & Évaluations Module
  */
 
-import React, { useState } from 'react';
-import { ClipboardList, Save, CheckCircle2, Award, Edit3, Trash2, User as UserIcon, Plus, History } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { ClipboardList, Save, CheckCircle2, Award, Edit3, Trash2, User as UserIcon, Plus, History, BookOpen, ChevronRight } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { EvaluationType, EvaluationGrade, EvaluationTerm } from '../../types';
 import { getMaliScoreAppreciation, getMaliEvaluationTerms, getTermLabel } from '../../constants/maliEducation';
@@ -13,7 +13,6 @@ import { PromotionManager } from '../../components/grades/PromotionManager';
 export const GradesModule: React.FC = () => {
   const { classes, subjects, students, grades, saveGrade, deleteGrade, deleteAllGrades, settings } = useSchool();
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || '');
   const [evaluationType, setEvaluationType] = useState<EvaluationType>('COMPOSITION');
   const [term, setTerm] = useState<EvaluationTerm>('EVALUATION_1');
   const [activeTab, setActiveTab] = useState<'BATCH' | 'HISTORY' | 'PROMOTION'>('BATCH');
@@ -31,7 +30,45 @@ export const GradesModule: React.FC = () => {
   const isFirstCycle = selectedClassObj?.category === 'FONDAMENTAL_1';
   const currentMaxScore = isFirstCycle ? 10 : 20;
 
+  // Filtrage 100% AUTOMATIQUE des matières assignées à la classe sélectionnée
+  const classSubjects = useMemo(() => {
+    if (!selectedClassObj) return subjects;
+    const filtered = subjects.filter(s => s.classCategory === selectedClassObj.category);
+    return filtered.length > 0 ? filtered : subjects;
+  }, [subjects, selectedClassObj]);
+
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => classSubjects[0]?.id || subjects[0]?.id || '');
+
+  // Synchronisation automatique de la matière dès que la classe change
+  useEffect(() => {
+    if (classSubjects.length > 0) {
+      const exists = classSubjects.some(s => s.id === selectedSubjectId);
+      if (!exists) {
+        setSelectedSubjectId(classSubjects[0].id);
+      }
+    }
+  }, [classSubjects, selectedSubjectId]);
+
+  const currentSubjectObj = classSubjects.find(s => s.id === selectedSubjectId) || classSubjects[0];
   const currentClassStudents = students.filter(s => s.classId === selectedClassId && s.status === 'ACTIF');
+
+  // Pré-chargement automatique des notes existantes dans la base pour cette classe, matière et période
+  useEffect(() => {
+    const loadedScores: Record<string, number> = {};
+    currentClassStudents.forEach(std => {
+      const existing = grades.find(
+        g => g.studentId === std.id &&
+             g.classId === selectedClassId &&
+             g.subjectId === selectedSubjectId &&
+             g.term === term &&
+             g.type === evaluationType
+      );
+      if (existing) {
+        loadedScores[std.id] = existing.score;
+      }
+    });
+    setScoresMap(loadedScores);
+  }, [selectedClassId, selectedSubjectId, term, evaluationType, grades]);
 
   // Grades for selected class & subject
   const currentGradesList = grades.filter(
@@ -39,11 +76,19 @@ export const GradesModule: React.FC = () => {
   );
 
   const handleScoreChange = (studentId: string, val: string) => {
+    if (val === '') {
+      setScoresMap(prev => {
+        const copy = { ...prev };
+        delete copy[studentId];
+        return copy;
+      });
+      return;
+    }
     const scoreNum = Math.min(currentMaxScore, Math.max(0, parseFloat(val) || 0));
     setScoresMap(prev => ({ ...prev, [studentId]: scoreNum }));
   };
 
-  const handleSaveAllGrades = () => {
+  const handleSaveAllGrades = (moveToNextSubject = false) => {
     currentClassStudents.forEach(std => {
       const score = scoresMap[std.id];
       if (score !== undefined) {
@@ -56,13 +101,19 @@ export const GradesModule: React.FC = () => {
           type: evaluationType,
           score,
           maxScore: currentMaxScore,
-          coefficient: evaluationType === 'COMPOSITION' ? 2 : 1
+          coefficient: currentSubjectObj?.coefficient || (evaluationType === 'COMPOSITION' ? 2 : 1)
         });
       }
     });
 
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
+
+    if (moveToNextSubject && classSubjects.length > 1) {
+      const currentIdx = classSubjects.findIndex(s => s.id === selectedSubjectId);
+      const nextIdx = (currentIdx + 1) % classSubjects.length;
+      setSelectedSubjectId(classSubjects[nextIdx].id);
+    }
   };
 
   const handleUpdateSingleGrade = (e: React.FormEvent) => {
@@ -139,14 +190,14 @@ export const GradesModule: React.FC = () => {
                 ))}
               </select>
 
-              {/* Matière */}
+              {/* Matière (filtrée automatiquement selon la classe) */}
               <select
                 value={selectedSubjectId}
                 onChange={e => setSelectedSubjectId(e.target.value)}
-                className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer max-w-[160px]"
-                title="Sélectionner la matière"
+                className="py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer max-w-[170px]"
+                title="Matière sélectionnée"
               >
-                {subjects.map(s => (
+                {classSubjects.map(s => (
                   <option key={s.id} value={s.id}>{s.name} (Coef {s.coefficient})</option>
                 ))}
               </select>
@@ -205,7 +256,7 @@ export const GradesModule: React.FC = () => {
             {activeTab === 'BATCH' && (
               <button
                 type="button"
-                onClick={handleSaveAllGrades}
+                onClick={() => handleSaveAllGrades(false)}
                 className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-2xs transition-all cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5 text-slate-300" />
@@ -228,43 +279,122 @@ export const GradesModule: React.FC = () => {
         </div>
       </div>
 
+      {/* Ruban des Matières Automatique & 100% Lisible */}
+      {(activeTab === 'BATCH' || activeTab === 'HISTORY') && (
+        <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex items-center gap-1.5 overflow-x-auto text-xs">
+          <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">
+            <BookOpen className="w-3.5 h-3.5 text-blue-900" />
+            <span>Matières ({classSubjects.length}) :</span>
+          </div>
+          {classSubjects.map((sub) => {
+            const isSelected = sub.id === selectedSubjectId;
+            const enteredCount = currentClassStudents.filter(std =>
+              grades.some(g => g.studentId === std.id && g.classId === selectedClassId && g.subjectId === sub.id && g.term === term && g.type === evaluationType)
+            ).length;
+            const isComplete = currentClassStudents.length > 0 && enteredCount === currentClassStudents.length;
+
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => setSelectedSubjectId(sub.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                  isSelected
+                    ? 'bg-blue-900 text-white shadow-2xs font-bold'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                }`}
+                title={`Matière : ${sub.name} (Coefficient ${sub.coefficient})`}
+              >
+                <span>{sub.name}</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  isSelected ? 'bg-blue-800 text-blue-200 font-bold' : 'bg-slate-200/80 text-slate-600'
+                }`}>
+                  Coef {sub.coefficient}
+                </span>
+                {enteredCount > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+                    isComplete
+                      ? isSelected ? 'bg-emerald-400 text-slate-950' : 'bg-emerald-100 text-emerald-800'
+                      : isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {enteredCount}/{currentClassStudents.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {savedSuccess && (
         <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>Opération effectuée avec succès dans la base de données.</span>
+          <span>Notes enregistrées avec succès dans la base de données.</span>
         </div>
       )}
 
       {activeTab === 'PROMOTION' ? (
         <PromotionManager selectedClassId={selectedClassId} term={term} />
       ) : activeTab === 'BATCH' ? (
-        /* Saisie Épurée et Rapide */
+        /* Saisie Épurée, Rapide et Lisible */
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+          <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900 uppercase text-[11px]">
+                {currentSubjectObj?.name}
+              </span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-50 text-blue-900 border border-blue-200">
+                Coefficient {currentSubjectObj?.coefficient || 1}
+              </span>
+              <span className="text-slate-400 hidden sm:inline">•</span>
+              <span className="text-slate-600 text-xs hidden sm:inline">
+                {selectedClassObj?.name} • Barème : note sur {currentMaxScore}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {classSubjects.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleSaveAllGrades(true)}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-lg border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Enregistrer cette matière et passer automatiquement à la matière suivante"
+                >
+                  <span>Enregistrer & Suivant</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <table className="w-full text-left border-collapse text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 font-bold text-[11px] text-slate-500 uppercase tracking-wider">
+            <thead className="bg-slate-50/70 border-b border-slate-200 font-bold text-[10px] text-slate-500 uppercase tracking-wider">
               <tr>
-                <th className="py-2 px-3">Élève & Matricule</th>
-                <th className="py-2 px-3 w-36 text-center">Note sur {currentMaxScore}</th>
-                <th className="py-2 px-3">Appréciation</th>
+                <th className="py-1.5 px-3">Élève & Matricule</th>
+                <th className="py-1.5 px-3 w-40 text-center">Note sur {currentMaxScore}</th>
+                <th className="py-1.5 px-3">Appréciation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {currentClassStudents.map((std) => {
-                const currentScore = scoresMap[std.id] ?? (isFirstCycle ? 6 : 12);
-                const { appreciation } = getMaliScoreAppreciation(currentScore, currentMaxScore);
+                const currentScore = scoresMap[std.id];
+                const hasScore = currentScore !== undefined;
+                const { appreciation } = hasScore 
+                  ? getMaliScoreAppreciation(currentScore, currentMaxScore)
+                  : { appreciation: 'En attente de note' };
 
                 return (
                   <tr key={std.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-1.5 px-3">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2">
                         {std.photoUrl ? (
                           <img
                             src={std.photoUrl}
                             alt=""
-                            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            className="w-7 h-7 rounded-lg object-cover border border-slate-200 shrink-0"
                           />
                         ) : (
-                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs shrink-0">
+                          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-[10px] shrink-0 border border-slate-200">
                             {std.firstName[0]}{std.lastName[0]}
                           </div>
                         )}
@@ -284,14 +414,18 @@ export const GradesModule: React.FC = () => {
                         step="0.25"
                         min="0"
                         max={currentMaxScore}
-                        value={scoresMap[std.id] ?? ''}
-                        placeholder={isFirstCycle ? "6" : "12"}
+                        value={hasScore ? currentScore : ''}
+                        placeholder={isFirstCycle ? "Ex: 7" : "Ex: 14"}
                         onChange={e => handleScoreChange(std.id, e.target.value)}
-                        className="w-20 py-1 px-1.5 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 outline-none focus:bg-white focus:border-slate-800 transition-colors"
+                        className={`w-24 py-1 px-2 text-center font-mono font-bold text-xs border rounded-lg outline-none transition-colors ${
+                          hasScore 
+                            ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950 font-black' 
+                            : 'bg-slate-50 border-slate-200 text-slate-600'
+                        }`}
                       />
                     </td>
                     <td className="py-1.5 px-3">
-                      <span className="text-xs font-medium text-slate-700">
+                      <span className={`text-xs ${hasScore ? 'font-semibold text-slate-800' : 'text-slate-400 italic text-[11px]'}`}>
                         {appreciation}
                       </span>
                     </td>

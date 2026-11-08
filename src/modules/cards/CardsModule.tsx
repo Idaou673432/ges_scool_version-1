@@ -268,15 +268,6 @@ export const CardsModule: React.FC = () => {
 
         {/* Right: Action Buttons */}
         <div className="flex items-center gap-1.5 ml-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsScannerOpen(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-            title="Scanner QR Code"
-          >
-            <Camera className="w-3.5 h-3.5 text-emerald-200" />
-            <span className="hidden sm:inline">Scanner</span>
-          </button>
 
           <button
             type="button"

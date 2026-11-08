@@ -124,94 +124,60 @@ export const PromotionManager: React.FC<PromotionManagerProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* Toast Notification */}
       {promotedToast && (
-        <div className="p-4 bg-emerald-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-3 shadow-lg shadow-emerald-500/20 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
+        <div className="p-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{promotedToast}</span>
         </div>
       )}
 
-      {/* Class Threshold & Overview Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-8 rounded-[2.5rem] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 bg-amber-400/20 border border-amber-400/30 text-amber-300 font-black text-[10px] uppercase tracking-widest rounded-full">
-              Seuil d'Admission : {classPassingGrade.toFixed(2)} / {maxScore}
-            </span>
-            <span className="text-xs font-bold text-slate-300">
-              Classe de départ : <strong className="text-white">{currentClass.name}</strong>
-            </span>
+      {/* Barre Unifiée Ultra-Compacte : Passations & Promotions */}
+      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+        {/* Left: Titre, Classe & Seuil */}
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
+            <Award className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Promotions</span>
+            <span className="text-slate-400 font-normal">({currentClass.name})</span>
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight mt-3 flex items-center gap-3">
-            <Award className="w-7 h-7 text-amber-400" />
-            <span>Passations & Promotions Générales</span>
-          </h2>
-          <p className="text-xs text-slate-300 mt-1 max-w-xl">
-            Si la moyenne générale de l'élève est supérieure ou égale à <strong className="text-amber-300">{classPassingGrade} / {maxScore}</strong>, l'élève est déclaré <strong className="text-emerald-400">PROMU(E)</strong>. Sinon, il est déclaré <strong className="text-rose-400">REDOUBLANT(E)</strong>.
-          </p>
-        </div>
 
-        {/* Global Action */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-          <button
-            onClick={handlePromoteAllAdmitted}
-            disabled={promotedCount === 0}
-            className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
-          >
-            <Zap className="w-4 h-4" />
-            <span>Promouvoir Tout ({promotedCount} Admis)</span>
-          </button>
-        </div>
-      </div>
+          <span className="px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-800 font-bold text-[10px] rounded-md shrink-0">
+            Seuil : {classPassingGrade.toFixed(2)} / {maxScore}
+          </span>
 
-      {/* Summary KPI Badges */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Élèves Évalués</span>
-            <p className="text-2xl font-black text-slate-900 mt-1">{classStudents.length}</p>
-          </div>
-          <div className="p-3 bg-blue-50 text-blue-900 rounded-2xl">
-            <Users className="w-6 h-6" />
+          {/* Synthèse Métriques en ligne */}
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium pl-1 border-l border-slate-200 shrink-0">
+            <span>Évalués : <strong className="text-slate-800 font-mono">{classStudents.length}</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>Promus : <strong className="text-emerald-700 font-mono">{promotedCount}</strong> <span className="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded text-[10px]">{classStudents.length > 0 ? Math.round((promotedCount / classStudents.length) * 100) : 0}%</span></span>
+            <span aria-hidden="true">·</span>
+            <span>Redoublants : <strong className="text-rose-700 font-mono">{retainedCount}</strong></span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Promus (Moy. &ge; {classPassingGrade})</span>
-            <p className="text-2xl font-black text-emerald-600 mt-1">
-              {promotedCount} <span className="text-xs font-bold text-slate-400">({classStudents.length > 0 ? Math.round((promotedCount / classStudents.length) * 100) : 0}%)</span>
-            </p>
-          </div>
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-600">Redoublants (Moy. &lt; {classPassingGrade})</span>
-            <p className="text-2xl font-black text-rose-600 mt-1">
-              {retainedCount} <span className="text-xs font-bold text-slate-400">({classStudents.length > 0 ? Math.round((retainedCount / classStudents.length) * 100) : 0}%)</span>
-            </p>
-          </div>
-          <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl">
-            <XCircle className="w-6 h-6" />
-          </div>
-        </div>
+        {/* Right: Action Promouvoir Tout */}
+        <button
+          type="button"
+          onClick={handlePromoteAllAdmitted}
+          disabled={promotedCount === 0}
+          className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs rounded-lg shadow-2xs transition-all cursor-pointer shrink-0"
+        >
+          <Zap className="w-3.5 h-3.5" />
+          <span>Promouvoir Tout ({promotedCount} Admis)</span>
+        </button>
       </div>
 
       {/* Promotion Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div className="p-6 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-blue-900" />
-            <span>Liste des Élèves de {currentClass.name} - Décisions de Conseil</span>
-          </h3>
-          <span className="text-xs font-bold text-slate-400">
-            Seuil de passage fixe : {classPassingGrade} / {maxScore}
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+          <span className="font-bold text-slate-800 flex items-center gap-1.5">
+            <GraduationCap className="w-4 h-4 text-blue-900" />
+            <span>Décisions de Conseil — {currentClass.name}</span>
+          </span>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Moyenne requise &ge; {classPassingGrade} / {maxScore}
           </span>
         </div>
 
@@ -222,88 +188,88 @@ export const PromotionManager: React.FC<PromotionManagerProps> = ({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100/80 text-slate-500 font-black uppercase text-[10px] tracking-widest border-b border-slate-200">
+              <thead className="bg-slate-100 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
                 <tr>
-                  <th className="p-4 pl-6">Élève & Matricule</th>
-                  <th className="p-4 text-center">Moyenne Générale</th>
-                  <th className="p-4 text-center">Note de Passage</th>
-                  <th className="p-4 text-center">Décision d'Admission</th>
-                  <th className="p-4">Classe de Destination</th>
-                  <th className="p-4 text-right pr-6">Action</th>
+                  <th className="py-2 px-3">Élève & Matricule</th>
+                  <th className="py-2 px-2 text-center">Moyenne</th>
+                  <th className="py-2 px-2 text-center">Seuil</th>
+                  <th className="py-2 px-2 text-center">Décision</th>
+                  <th className="py-2 px-3">Classe Destination</th>
+                  <th className="py-2 px-3 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {studentResults.map(({ student, average, isPassing, resultStatus }, idx) => {
                   const targetClassId = targetClassMap[student.id] || defaultNextClass?.id || '';
                   return (
                     <tr key={student.id || `prom-${student.matricule || idx}`} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="p-4 pl-6">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs ${
+                      <td className="py-1.5 sm:py-2 px-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
                             student.gender === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-blue-100 text-blue-700'
                           }`}>
                             {student.firstName[0]}{student.lastName[0]}
                           </div>
-                          <div>
-                            <span className="font-black text-slate-900 text-sm block">
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-900 text-xs block truncate">
                               {student.firstName} {student.lastName}
                             </span>
-                            <span className="text-[10px] font-mono font-bold text-slate-400">
+                            <span className="text-[10px] font-mono text-slate-400">
                               {student.matricule}
                             </span>
                           </div>
                         </div>
                       </td>
 
-                      <td className="p-4 text-center">
-                        <span className={`text-base font-black ${
+                      <td className="py-1.5 sm:py-2 px-2 text-center">
+                        <span className={`text-xs font-bold font-mono ${
                           isPassing ? 'text-emerald-700' : 'text-rose-600'
                         }`}>
                           {average.toFixed(2)}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-bold block">/ {maxScore}</span>
+                        <span className="text-[10px] text-slate-400 font-normal"> / {maxScore}</span>
                       </td>
 
-                      <td className="p-4 text-center font-bold text-slate-500">
-                        {classPassingGrade.toFixed(2)} / {maxScore}
+                      <td className="py-1.5 sm:py-2 px-2 text-center text-xs font-mono text-slate-500">
+                        {classPassingGrade.toFixed(2)}
                       </td>
 
-                      <td className="p-4 text-center">
+                      <td className="py-1.5 sm:py-2 px-2 text-center">
                         {isPassing ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full font-black text-[10px] uppercase tracking-wider">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md font-bold text-[10px]">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                             <span>PROMU(E)</span>
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-100 text-rose-800 border border-rose-300 rounded-full font-black text-[10px] uppercase tracking-wider">
-                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                            <span>REDOUBLANT(E)</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-800 border border-rose-200 rounded-md font-bold text-[10px]">
+                            <XCircle className="w-3 h-3 text-rose-600" />
+                            <span>REDOUBLANT</span>
                           </span>
                         )}
                       </td>
 
-                      <td className="p-4">
+                      <td className="py-1.5 sm:py-2 px-3">
                         <select
                           value={targetClassId}
                           onChange={e => setTargetClassMap(prev => ({ ...prev, [student.id]: e.target.value }))}
-                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
+                          className="w-full py-1 px-2 bg-slate-50 border border-slate-200 rounded-lg font-medium text-xs text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
                         >
                           {classes.map(c => (
                             <option key={c.id} value={c.id}>
-                              {c.name} {c.id === currentClass.id ? '(Maintenir / Redoublement)' : ''}
+                              {c.name} {c.id === currentClass.id ? '(Maintenir)' : ''}
                             </option>
                           ))}
                         </select>
                       </td>
 
-                      <td className="p-4 text-right pr-6">
+                      <td className="py-1.5 sm:py-2 px-3 text-right">
                         <button
+                          type="button"
                           onClick={() => handlePromoteSingle(student, targetClassId)}
                           disabled={!targetClassId || targetClassId === student.classId}
-                          className="flex items-center gap-1.5 ml-auto px-4 py-2 bg-blue-900 hover:bg-blue-950 disabled:opacity-30 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 disabled:opacity-30 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
                         >
-                          <span>Promouvoir</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <span>Affecter</span>
                         </button>
                       </td>
                     </tr>

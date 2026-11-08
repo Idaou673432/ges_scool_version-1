@@ -388,15 +388,6 @@ export const AttendanceModule: React.FC = () => {
 
           {/* Action buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsScannerOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs rounded-lg transition-all cursor-pointer"
-              title="Scanner le QR Code"
-            >
-              <Camera className="w-3.5 h-3.5 text-slate-700" />
-              <span className="hidden sm:inline">Scanner</span>
-            </button>
 
             {activeTab === 'CALL' && (
               <>
@@ -639,50 +630,52 @@ export const AttendanceModule: React.FC = () => {
       {activeTab === 'REGISTER' && (
         <div className="space-y-2">
           {/* Register Action Bar */}
-          <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div>
-              <h2 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
-                Registre Cumulé d'Assiduité — Classe {currentClass?.name}
-              </h2>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Statistiques cumulées des absences, retards et taux de présence par élève
-              </p>
+          <div className="bg-white rounded-xl px-3 py-1.5 border border-slate-200/90 shadow-2xs flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900">
+                Registre Cumulé — {currentClass?.name}
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                ({registerSummary.length} élèves)
+              </span>
             </div>
 
             <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 onClick={handleExportCSV}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition-all cursor-pointer border border-slate-200"
+                className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold transition-all cursor-pointer border border-slate-200"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Export CSV</span>
+                <span>CSV</span>
               </button>
 
               <button
+                type="button"
                 onClick={handleExportDailyPdf}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                className="flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>Rapport PDF</span>
+                <span>PDF</span>
               </button>
             </div>
           </div>
 
           {/* Table of Cumulative Attendance */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-900 text-white font-bold uppercase text-[10px] tracking-wider">
-                    <th className="py-2 px-2.5">N°</th>
-                    <th className="py-2 px-3">Élève</th>
-                    <th className="py-2 px-2.5 text-center">Jours</th>
-                    <th className="py-2 px-2.5 text-center">Présences</th>
-                    <th className="py-2 px-2.5 text-center">Retards</th>
-                    <th className="py-2 px-2.5 text-center">Abs. Just.</th>
-                    <th className="py-2 px-2.5 text-center">Abs. Injust.</th>
-                    <th className="py-2 px-2.5 text-center">Taux Assiduité</th>
-                    <th className="py-2 px-3 text-right">Actions</th>
+                  <tr className="bg-slate-100 text-slate-600 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                    <th className="py-1.5 px-2.5">N°</th>
+                    <th className="py-1.5 px-3">Élève</th>
+                    <th className="py-1.5 px-2 text-center">Jours</th>
+                    <th className="py-1.5 px-2 text-center">Présences</th>
+                    <th className="py-1.5 px-2 text-center">Retards</th>
+                    <th className="py-1.5 px-2 text-center">Abs. Just.</th>
+                    <th className="py-1.5 px-2 text-center">Abs. Injust.</th>
+                    <th className="py-1.5 px-2 text-center">Taux Assiduité</th>
+                    <th className="py-1.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium text-slate-800">

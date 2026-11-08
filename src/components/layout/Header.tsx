@@ -81,58 +81,58 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="no-print h-14 sm:h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20">
+    <header className="no-print h-10 sm:h-11 bg-white border-b border-slate-200/90 px-2.5 sm:px-4 flex items-center justify-between shrink-0 z-20">
       
-      {/* 1. GAUCHE : Menu + Nom Établissement (Simple & Net) */}
-      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      {/* 1. GAUCHE : Menu + Nom Établissement (Compact & Net) */}
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
         {/* Toggle Mobile */}
         <button
           type="button"
           onClick={onOpenMobileMenu}
-          className="lg:hidden p-1.5 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          className="lg:hidden p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           title="Ouvrir le menu"
           aria-label="Ouvrir le menu"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="w-4 h-4" />
         </button>
 
         {/* Toggle Desktop Sidebar (Icone seule, ultra-propre) */}
         <button
           type="button"
           onClick={onToggleSidebarCollapse}
-          className="hidden lg:flex p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          className="hidden lg:flex p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
           title={isSidebarCollapsed ? "Agrandir le menu" : "Réduire le menu"}
           aria-label={isSidebarCollapsed ? "Agrandir le menu" : "Réduire le menu"}
         >
           {isSidebarCollapsed ? (
-            <PanelLeftOpen className="w-5 h-5" />
+            <PanelLeftOpen className="w-4 h-4" />
           ) : (
-            <PanelLeftClose className="w-5 h-5" />
+            <PanelLeftClose className="w-4 h-4" />
           )}
         </button>
 
         {/* Nom Établissement & Année */}
-        <div className="flex items-center gap-2 truncate">
-          <span className="font-bold text-sm sm:text-base text-slate-900 truncate">
+        <div className="flex items-center gap-1.5 truncate">
+          <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
             {settings.schoolName || 'KalanGest'}
           </span>
           {settings.currentAcademicYear && (
-            <span className="hidden md:inline text-xs font-semibold text-slate-400 font-mono">
+            <span className="hidden md:inline text-[10px] font-semibold text-slate-400 font-mono">
               ({settings.currentAcademicYear})
             </span>
           )}
         </div>
       </div>
 
-      {/* 2. CENTRE : Recherche Simple */}
-      <div className="hidden md:flex items-center relative w-64 lg:w-80 mx-4">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      {/* 2. CENTRE : Recherche Simple Ultra-Compacte */}
+      <div className="hidden md:flex items-center relative w-56 lg:w-72 mx-2">
+        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
           value={search}
           onChange={handleSearchChange}
           placeholder="Rechercher élève, classe..."
-          className="w-full pl-9 pr-8 py-1.5 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 focus:border-slate-400 rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none transition-colors"
+          className="w-full pl-8 pr-7 py-1 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200/90 focus:border-slate-400 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none transition-colors h-7"
         />
         {search && (
           <button
@@ -141,24 +141,24 @@ export const Header: React.FC<HeaderProps> = ({
               setSearch('');
               if (onSearchQuery) onSearchQuery('');
             }}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3" />
           </button>
         )}
       </div>
 
-      {/* 3. DROITE : Notifications, Verrouillage & Menu Utilisateur */}
-      <div className="flex items-center gap-1 sm:gap-1.5">
+      {/* 3. DROITE : Barre de Contrôles Fusionnée & Compacte */}
+      <div className="flex items-center gap-1 bg-slate-100/70 p-0.5 rounded-lg border border-slate-200/80">
         
         {/* Loupe recherche sur Mobile */}
         <button
           type="button"
           onClick={() => setShowMobileSearch(!showMobileSearch)}
-          className="md:hidden p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+          className="md:hidden p-1 text-slate-600 hover:text-slate-900 hover:bg-white rounded-md transition-colors cursor-pointer"
           title="Rechercher"
         >
-          <Search className="w-4.5 h-4.5" />
+          <Search className="w-3.5 h-3.5" />
         </button>
 
         {/* Notifications (Cloche avec pastille rouge si alertes) */}
@@ -169,46 +169,46 @@ export const Header: React.FC<HeaderProps> = ({
               setShowNotifications(!showNotifications);
               setShowUserMenu(false);
             }}
-            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg relative transition-colors cursor-pointer"
+            className="p-1 text-slate-600 hover:text-slate-900 hover:bg-white rounded-md relative transition-colors cursor-pointer"
             title="Notifications"
           >
-            <Bell className="w-4.5 h-4.5" />
+            <Bell className="w-3.5 h-3.5" />
             {pendingPayments.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
+              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-rose-500 rounded-full ring-1 ring-white" />
             )}
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white border border-slate-200 rounded-2xl shadow-xl py-3 z-50 text-xs">
-              <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
-                <span className="font-bold text-slate-900 uppercase text-[11px]">
+            <div className="absolute right-0 mt-1.5 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-50 text-xs">
+              <div className="px-3 pb-2 border-b border-slate-100 flex items-center justify-between">
+                <span className="font-bold text-slate-900 uppercase text-[10px]">
                   Alertes de Scolarité
                 </span>
-                <span className="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                <span className="bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded-full font-bold text-[10px]">
                   {pendingPayments.length} retard(s)
                 </span>
               </div>
 
               <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
                 {pendingPayments.slice(0, 5).map((p) => (
-                  <div key={p.id} className="p-3 hover:bg-slate-50 flex items-start gap-2.5">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div key={p.id} className="p-2.5 hover:bg-slate-50 flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 truncate">
                         {p.studentName} ({p.className})
                       </p>
-                      <p className="text-slate-500 text-[11px]">
+                      <p className="text-slate-500 text-[10px]">
                         Reste : <strong className="text-rose-600 font-mono">{p.remainingAmount.toLocaleString()} FCFA</strong>
                       </p>
                     </div>
                   </div>
                 ))}
 
-                <div className="p-3 hover:bg-slate-50 flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                <div className="p-2.5 hover:bg-slate-50 flex items-start gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-semibold text-slate-900">Synchronisation Active</p>
-                    <p className="text-slate-500 text-[11px]">Données sécurisées en direct sur le Cloud.</p>
+                    <p className="font-semibold text-slate-900 text-xs">Synchronisation Active</p>
+                    <p className="text-slate-500 text-[10px]">Données sécurisées en direct sur le Cloud.</p>
                   </div>
                 </div>
               </div>
@@ -221,17 +221,14 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onLock}
-            className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+            className="p-1 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
             title="Verrouiller l'application (Code PIN)"
           >
-            <Lock className="w-4.5 h-4.5" />
+            <Lock className="w-3.5 h-3.5" />
           </button>
         )}
 
-        {/* Séparateur discret */}
-        <div className="h-5 w-px bg-slate-200 mx-1 hidden sm:block" />
-
-        {/* Menu Utilisateur / Profil */}
+        {/* Menu Utilisateur / Profil fusionné dans le même bloc de contrôle */}
         <div className="relative" ref={userMenuRef}>
           <button
             type="button"
@@ -239,46 +236,31 @@ export const Header: React.FC<HeaderProps> = ({
               setShowUserMenu(!showUserMenu);
               setShowNotifications(false);
             }}
-            className="flex items-center gap-2 p-1 pl-1.5 sm:pr-2 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-1.5 py-0.5 bg-white hover:bg-slate-50 rounded-md border border-slate-200/90 shadow-2xs transition-colors cursor-pointer"
             title="Options du compte"
           >
-            <div className="w-7 h-7 rounded-full bg-blue-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+            <div className="w-5 h-5 rounded-full bg-blue-900 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
               {currentUser?.fullName?.charAt(0) || 'A'}
             </div>
-            <span className="hidden sm:inline font-bold text-xs text-slate-800 max-w-[100px] truncate">
+            <span className="hidden sm:inline font-semibold text-xs text-slate-800 max-w-[80px] truncate">
               {currentUser?.fullName?.split(' ')[0] || 'Admin'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:inline" />
+            <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>
 
-          {/* Menu Déroulant Élégant */}
+          {/* Menu Déroulant */}
           {showUserMenu && (
-            <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 text-xs">
+            <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 z-50 text-xs">
               {/* Entête utilisateur */}
-              <div className="px-3 py-2.5 border-b border-slate-100">
+              <div className="px-2.5 py-2 border-b border-slate-100">
                 <p className="font-bold text-slate-900 truncate">{currentUser?.fullName}</p>
-                <p className="text-[11px] text-slate-500 font-medium">
+                <p className="text-[10px] text-slate-500 font-medium">
                   {AuthService.getRoleLabel(currentUser?.role || 'ADMIN')}
                 </p>
               </div>
 
-              {/* Options secondaires regroupées proprement */}
+              {/* Options secondaires */}
               <div className="py-1 space-y-0.5">
-                {/* Scanner QR */}
-                {onOpenQrScanner && isFeatureEnabled('qrScanner') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onOpenQrScanner();
-                    }}
-                    className="w-full px-3 py-2 text-left rounded-xl hover:bg-slate-50 text-slate-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <QrCode className="w-4 h-4 text-blue-900" />
-                    <span>Scanner Carte Élève</span>
-                  </button>
-                )}
-
                 {/* Cloud & Multi-écoles */}
                 <button
                   type="button"
@@ -286,13 +268,13 @@ export const Header: React.FC<HeaderProps> = ({
                     setShowUserMenu(false);
                     setShowCloudModal(true);
                   }}
-                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-slate-50 text-slate-700 flex items-center justify-between transition-colors cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-slate-50 text-slate-700 flex items-center justify-between transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Cloud className="w-4 h-4 text-emerald-600" />
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Code Cloud</span>
                   </div>
-                  <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-bold">
+                  <span className="font-mono text-[10px] bg-slate-100 px-1 py-0.2 rounded text-slate-600 font-bold">
                     {cloudSchoolCode || 'Principal'}
                   </span>
                 </button>
@@ -304,9 +286,9 @@ export const Header: React.FC<HeaderProps> = ({
                     setShowUserMenu(false);
                     setShowPwaModal(true);
                   }}
-                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-slate-50 text-slate-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Download className="w-4 h-4 text-slate-500" />
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
                   <span>Installer l'application</span>
                 </button>
               </div>
@@ -320,9 +302,9 @@ export const Header: React.FC<HeaderProps> = ({
                       setShowUserMenu(false);
                       onLock();
                     }}
-                    className="w-full px-3 py-2 text-left rounded-xl hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2.5 transition-colors cursor-pointer"
+                    className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    <Lock className="w-4 h-4" />
+                    <Lock className="w-3.5 h-3.5" />
                     <span>Verrouiller l'écran</span>
                   </button>
                 </div>
@@ -332,18 +314,18 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Barre de recherche plein écran sur Mobile */}
+      {/* Barre de recherche sur Mobile */}
       {showMobileSearch && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-slate-200 p-3 shadow-md z-30 flex items-center gap-2">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-slate-200 px-3 py-1.5 shadow-md z-30 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               autoFocus
               value={search}
               onChange={handleSearchChange}
               placeholder="Rechercher élève, classe..."
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none"
+              className="w-full pl-8 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none h-7"
             />
           </div>
           <button
@@ -353,9 +335,9 @@ export const Header: React.FC<HeaderProps> = ({
               setSearch('');
               if (onSearchQuery) onSearchQuery('');
             }}
-            className="p-2 text-slate-400 hover:text-slate-800 rounded-xl hover:bg-slate-100"
+            className="p-1 text-slate-400 hover:text-slate-800 rounded-lg hover:bg-slate-100"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}

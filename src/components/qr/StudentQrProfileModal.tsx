@@ -173,17 +173,7 @@ export const StudentQrProfileModal: React.FC<StudentQrProfileModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {onScanAnother && (
-              <button
-                type="button"
-                onClick={onScanAnother}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all cursor-pointer border border-white/15"
-                title="Scanner un autre QR code"
-              >
-                <QrCode className="w-3.5 h-3.5 text-amber-300" />
-                <span>Re-scanner</span>
-              </button>
-            )}
+
             <button
               type="button"
               onClick={onClose}
@@ -671,16 +661,7 @@ export const StudentQrProfileModal: React.FC<StudentQrProfileModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {onScanAnother && (
-              <button
-                type="button"
-                onClick={onScanAnother}
-                className="px-5 py-2.5 bg-blue-900 hover:bg-blue-800 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-              >
-                <QrCode className="w-3.5 h-3.5 text-amber-300" />
-                <span>Scanner un Autre Élève</span>
-              </button>
-            )}
+
 
             <button
               type="button"

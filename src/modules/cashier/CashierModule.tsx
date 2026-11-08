@@ -24,7 +24,8 @@ import {
   Building2, 
   Check, 
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Eye
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { Payment, Expense, ExpenseCategory, DailyCashClosure } from '../../types';
@@ -34,6 +35,7 @@ import { PdfService } from '../../services/pdfService';
 import { cloudSyncService } from '../../services/cloudSyncService';
 import { DailyCashClosureModal } from '../../components/payments/DailyCashClosureModal';
 import { ReceiptVerificationModal } from '../../components/receipts/ReceiptVerificationModal';
+import { HorizontalReceiptModal } from '../../components/receipts/HorizontalReceiptModal';
 
 export const CashierModule: React.FC = () => {
   const { payments, settings, cloudSchoolCode } = useSchool();
@@ -422,25 +424,15 @@ export const CashierModule: React.FC = () => {
                           {formatFCFA(p.amountPaid)}
                         </td>
                         <td className="py-1.5 sm:py-2 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
+                          <div className="flex items-center justify-end">
                             <button
                               type="button"
-                              onClick={() => {
-                                setSelectedReceipt(p);
-                                setReceiptFormat('THERMAL');
-                              }}
-                              className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                              title="Réimprimer le reçu thermique (80mm)"
+                              onClick={() => setSelectedReceipt(p)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Visualiser la quittance officielle (format horizontal détaillé)"
                             >
-                              <Printer className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => PdfService.generateReceiptPdf(p, settings, 'download')}
-                              className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                              title="Télécharger le reçu officiel en PDF A5 avec cachet"
-                            >
-                              <Download className="w-3.5 h-3.5" />
+                              <Eye className="w-3.5 h-3.5 text-slate-600" />
+                              <span>Quittance</span>
                             </button>
                           </div>
                         </td>
@@ -699,47 +691,13 @@ export const CashierModule: React.FC = () => {
         />
       )}
 
-      {/* Modal Réimpression Reçu */}
-      {selectedReceipt && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <span className="font-bold text-slate-900 text-xs">Quittance N° {selectedReceipt.receiptNumber}</span>
-              <button onClick={() => setSelectedReceipt(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-1.5 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <p><strong>Élève :</strong> {selectedReceipt.studentName}</p>
-              <p><strong>Classe :</strong> {selectedReceipt.className}</p>
-              <p><strong>Montant :</strong> <span className="font-mono font-bold text-emerald-700">{formatFCFA(selectedReceipt.amountPaid)}</span></p>
-              <p><strong>Date :</strong> {new Date(selectedReceipt.paymentDate).toLocaleDateString('fr-FR')}</p>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  PdfService.generateReceiptPosTicketPdf(selectedReceipt, settings, 'print');
-                }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                <Printer className="w-4 h-4" />
-                <span>Ticket (80mm)</span>
-              </button>
-              <button
-                onClick={() => {
-                  PdfService.generateReceiptPdf(selectedReceipt, settings, 'download');
-                }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>PDF A5 Cachet</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Quittance Horizontale Haute Fidélité */}
+      <HorizontalReceiptModal
+        isOpen={Boolean(selectedReceipt)}
+        payment={selectedReceipt}
+        settings={settings}
+        onClose={() => setSelectedReceipt(null)}
+      />
     </div>
   );
 };

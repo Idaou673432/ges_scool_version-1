@@ -564,35 +564,35 @@ export const BulletinsModule: React.FC = () => {
                   <button
                     key={std.id}
                     onClick={() => setActiveStudentId(std.id)}
-                    className={`w-full text-left p-2.5 sm:p-3 rounded-xl text-xs transition-all flex items-center justify-between cursor-pointer border ${
+                    className={`w-full text-left py-1.5 px-2 rounded-lg text-xs transition-colors flex items-center justify-between cursor-pointer border ${
                       isSelected
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm font-bold'
-                        : 'bg-slate-50/70 text-slate-800 border-slate-200/70 hover:bg-slate-100 font-medium'
+                        ? 'bg-blue-900 text-white border-blue-900 shadow-2xs font-bold'
+                        : 'bg-slate-50/80 text-slate-800 border-slate-200/70 hover:bg-slate-100 font-medium'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {/* Clean rank badge without emojis */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* Clean rank badge */}
                       <div className="shrink-0">
                         {rank === 1 ? (
-                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-black text-[10px] shadow-2xs ${
+                          <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.2 rounded font-bold text-[9px] ${
                             isSelected ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-900 border border-amber-300'
                           }`}>
                             1er
                           </span>
                         ) : rank === 2 ? (
-                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                          <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.2 rounded font-bold text-[9px] ${
                             isSelected ? 'bg-slate-700 text-slate-100' : 'bg-slate-200 text-slate-800 border border-slate-300'
                           }`}>
                             2e
                           </span>
                         ) : rank === 3 ? (
-                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                          <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.2 rounded font-bold text-[9px] ${
                             isSelected ? 'bg-amber-800 text-amber-100' : 'bg-amber-50 text-amber-800 border border-amber-300'
                           }`}>
                             3e
                           </span>
                         ) : rank !== null ? (
-                          <span className={`inline-flex items-center justify-center min-w-[28px] px-1.5 py-0.5 rounded-md font-bold text-[10px] ${
+                          <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.2 rounded font-semibold text-[9px] ${
                             isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600 border border-slate-200'
                           }`}>
                             {rank}e
@@ -604,11 +604,11 @@ export const BulletinsModule: React.FC = () => {
                         <img
                           src={std.photoUrl}
                           alt={std.firstName}
-                          className="w-7 h-7 rounded-lg object-cover border border-white/20 shrink-0"
+                          className="w-6 h-6 rounded-md object-cover border border-white/20 shrink-0"
                         />
                       ) : (
                         <div
-                          className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center text-[10px] shrink-0 ${
+                          className={`w-6 h-6 rounded-md font-bold flex items-center justify-center text-[9px] shrink-0 ${
                             isSelected ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-700'
                           }`}
                         >
@@ -617,18 +617,18 @@ export const BulletinsModule: React.FC = () => {
                       )}
 
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-xs">{std.lastName} {std.firstName}</p>
-                        <p className={`text-[10px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} font-mono`}>
+                        <p className="truncate font-semibold text-xs leading-tight">{std.lastName} {std.firstName}</p>
+                        <p className={`text-[10px] ${isSelected ? 'text-slate-300' : 'text-slate-400'} font-mono leading-tight`}>
                           {std.matricule}
                         </p>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0 ml-2">
-                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold font-mono ${
+                    <div className="text-right shrink-0 ml-1.5">
+                      <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-bold font-mono ${
                         isSelected ? 'bg-white/20 text-white' : avg >= passThreshold ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                       }`}>
-                        {avg.toFixed(2)} / {cardMax}
+                        {avg.toFixed(2)}
                       </span>
                     </div>
                   </button>
@@ -659,110 +659,95 @@ export const BulletinsModule: React.FC = () => {
                 <p className="font-medium">Sélectionnez un élève dans la liste à gauche pour saisir ses notes et afficher son bulletin.</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {/* Direct Student Navigation Stepper */}
-                <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-slate-100/90 rounded-xl border border-slate-200 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={handlePrevStudent}
-                    disabled={!hasPrevStudent}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 shadow-2xs cursor-pointer"
-                    title="Aller à l'élève précédent"
-                  >
-                    <ChevronLeft className="w-4 h-4 text-slate-600" />
-                    <span>Élève précédent</span>
-                  </button>
+              <div className="space-y-2">
+                {/* Barre Unifiée Ultra-Compacte : Navigation & En-tête de Bulletin */}
+                <div className="bg-slate-900 text-white px-3 py-2 rounded-xl border border-slate-800 shadow-2xs space-y-1.5 text-xs">
+                  {/* Ligne 1 : Stepper Navigation + Identité Élève + Moyenne & Rang */}
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* Stepper rapide */}
+                      <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700/80 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handlePrevStudent}
+                          disabled={!hasPrevStudent}
+                          className="p-1 rounded-md hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors cursor-pointer"
+                          title="Élève précédent"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-[10px] font-mono font-bold text-slate-300 px-1.5">
+                          {activeStudentIndex + 1}/{classStudents.length}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleNextStudent}
+                          disabled={!hasNextStudent}
+                          className="p-1 rounded-md hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white transition-colors cursor-pointer"
+                          title="Élève suivant"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
 
-                  <div className="text-center">
-                    <p className="text-xs font-black text-slate-900 tracking-wide">
-                      Élève {activeStudentIndex + 1} sur {classStudents.length}
-                    </p>
-                    <p className="text-[10px] text-slate-500 font-medium">
-                      {studentSortMode === 'RANK' ? 'Trié par rang officiel (1er au dernier)' : 'Ordre alphabétique'}
-                    </p>
+                      {/* Identité Élève */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <h2 className="font-bold text-white text-xs sm:text-sm tracking-wide truncate">
+                            {activeReportCard.studentName}
+                          </h2>
+                          <span className="text-[10px] text-amber-300 font-mono shrink-0">
+                            ({activeReportCard.className})
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-mono block leading-tight">
+                          Matricule : {activeReportCard.studentMatricule || '---'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Moyenne & Rang */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <div className="flex items-baseline gap-1 justify-end">
+                          <span className="text-sm sm:text-base font-bold font-mono text-amber-300">
+                            {activeReportCard.generalAverage.toFixed(2)}
+                          </span>
+                          <span className="text-[10px] text-slate-400">/ {activeReportCard.maxScore || 20}</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-emerald-400 block leading-tight">
+                          Rang : {activeReportCard.rankInClass}{activeReportCard.rankInClass === 1 ? 'er' : 'e'} / {activeReportCard.totalClassStudents}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleNextStudent}
-                    disabled={!hasNextStudent}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all disabled:opacity-35 disabled:cursor-not-allowed bg-blue-900 hover:bg-blue-800 text-white shadow-2xs cursor-pointer"
-                    title="Passer à l'élève suivant pour continuer la saisie"
-                  >
-                    <span>Élève suivant</span>
-                    <ChevronRight className="w-4 h-4 text-white" />
-                  </button>
-                </div>
+                  {/* Ligne 2 : Ruban de Métriques & Formule en 1 ligne */}
+                  <div className="pt-1.5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-300">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span>Points : <strong className="text-white font-mono">{activeReportCard.totalPoints.toFixed(2)}</strong></span>
+                      <span aria-hidden="true" className="text-slate-600">·</span>
+                      <span>Coefs : <strong className="text-white font-mono">{activeReportCard.totalCoefficients}</strong></span>
+                      <span aria-hidden="true" className="text-slate-600">·</span>
+                      <span>Moy. Classe : <strong className="text-white font-mono">{activeReportCard.classOverallAverage.toFixed(2)}</strong></span>
+                      <span aria-hidden="true" className="text-slate-600">·</span>
+                      <span>Mention : <strong className="text-emerald-400">{activeReportCard.directorDecision}</strong></span>
+                    </div>
 
-                {/* Bulletin Header Badge */}
-                <div className="bg-slate-900 text-white p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm border border-slate-800">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300">
-                      RÉPUBLIQUE DU MALI • MEN
+                    <span className="text-[9px] text-slate-400 italic">
+                      {activeReportCard.maxScore === 10
+                        ? 'Formule : (N.Classe + Compos) / 2'
+                        : 'Formule : (N.Classe + Compos) / 3'}
                     </span>
-                    <h2 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white">
-                      {activeReportCard.studentName}
-                    </h2>
-                    <p className="text-xs text-slate-300 font-mono">
-                      Matricule : {activeReportCard.studentMatricule || '---'} • Classe : {activeReportCard.className}
-                    </p>
-                  </div>
-
-                  <div className="text-left sm:text-right bg-white/10 px-4 py-3 rounded-xl border border-white/10 shrink-0">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-300 block">
-                      Moyenne Générale
-                    </span>
-                    <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
-                      {activeReportCard.generalAverage.toFixed(2)}
-                      <span className="text-xs text-white/60 font-sans"> / {activeReportCard.maxScore || 20}</span>
-                    </span>
-                    <p className="text-[10px] font-semibold text-emerald-300 mt-0.5">
-                      Rang : {activeReportCard.rankInClass}{activeReportCard.rankInClass === 1 ? 'er' : 'e'} sur {activeReportCard.totalClassStudents} élèves
-                    </p>
-                  </div>
-                </div>
-
-                {/* Summary Metrics Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs">
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Total Points</span>
-                    <p className="font-mono font-bold text-slate-900 text-sm">{activeReportCard.totalPoints.toFixed(2)} pts</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Total Coefs</span>
-                    <p className="font-mono font-bold text-slate-900 text-sm">{activeReportCard.totalCoefficients}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Moyenne Classe</span>
-                    <p className="font-mono font-bold text-slate-900 text-sm">{activeReportCard.classOverallAverage.toFixed(2)} / {activeReportCard.maxScore || 20}</p>
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Mention / Décision</span>
-                    <p className="font-bold text-emerald-700 text-xs truncate mt-0.5">{activeReportCard.directorDecision}</p>
                   </div>
                 </div>
 
                 {/* Interactive Grade Table with Direct Input */}
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-blue-900" />
-                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                        {activeReportCard.maxScore === 10 ? 'Notes des Matières (1er Cycle — Barème /10)' : 'Notes des Matières (Barème Officiel /20 et /40)'}
-                      </h3>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-500 italic bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                      {activeReportCard.maxScore === 10
-                        ? 'Formule : Moyenne = (N.Classe + Compos) / 2'
-                        : 'Formule : Moyenne = (N.Classe + Compos) / 3'}
-                    </span>
-                  </div>
-
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-slate-100 font-black text-[10px] uppercase tracking-widest text-slate-600 border-b border-slate-200">
-                        <tr>
-                          <th className="py-3 px-4">Matières</th>
+                <div className="border border-slate-200/90 rounded-xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-slate-100 font-bold text-[10px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
+                      <tr>
+                        <th className="py-2 px-3">Matières</th>
                           <th className="py-3 px-2 text-center w-32">
                             N.Classe /{activeReportCard.maxScore === 10 ? 10 : 20}
                           </th>
@@ -843,10 +828,9 @@ export const BulletinsModule: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
-                </div>
 
                 {/* Editable Teacher Observation & Conseil de Classe */}
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/90 space-y-1.5">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
                     Appréciation générale du Conseil de Classe
                   </label>
@@ -883,40 +867,38 @@ export const BulletinsModule: React.FC = () => {
       {/* ----------------- SAISIE RAPIDE PAR CLASSE MODAL ----------------- */}
       {showBatchModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]">
             {/* Modal Header */}
-            <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-500/20 border border-amber-500/30 rounded-2xl">
-                  <Edit3 className="w-5 h-5 text-amber-400" />
-                </div>
+            <div className="px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-4 h-4 text-amber-400 shrink-0" />
                 <div>
-                  <h2 className="text-base font-black uppercase tracking-wide">Saisie Rapide des Notes de Classe</h2>
-                  <p className="text-xs text-slate-400 font-bold">
+                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wide">Saisie Rapide des Notes de Classe</h2>
+                  <p className="text-[10px] text-slate-400">
                     {currentClass?.name || 'Classe'} • {getTermLabel(selectedTerm, settings.evaluationMonths)}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowBatchModal(false)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-full transition-colors cursor-pointer"
+                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1">
+            <div className="p-3 overflow-y-auto space-y-2.5 flex-1 custom-scrollbar">
               {/* Subject Selector */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="w-full sm:w-auto flex-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 block mb-1">
-                    Sélectionner la Matière à Renseigner
+              <div className="bg-slate-50 p-2 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                <div className="w-full sm:w-auto flex-1 flex items-center gap-2">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
+                    Matière :
                   </label>
                   <select
                     value={batchSubjectId}
                     onChange={e => setBatchSubjectId(e.target.value)}
-                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                    className="flex-1 py-1 px-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-slate-400 cursor-pointer"
                   >
                     {subjects
                       .filter(s => !currentClass || s.classCategory === currentClass.category)
@@ -928,32 +910,32 @@ export const BulletinsModule: React.FC = () => {
                   </select>
                 </div>
 
-                <div className="text-xs font-bold text-slate-500 bg-white p-3 rounded-xl border border-slate-200 shrink-0">
+                <div className="text-[11px] font-semibold text-slate-500 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
                   <span>Barème : </span>
-                  <span className="text-amber-700 font-black">N.Classe /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 20}</span>
+                  <span className="text-amber-800 font-bold">N.Classe /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 20}</span>
                   <span className="text-slate-400 mx-1.5">•</span>
-                  <span className="text-purple-700 font-black">Compos /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 40}</span>
+                  <span className="text-purple-800 font-bold">Compos /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 40}</span>
                 </div>
               </div>
 
               {/* Students Grid Table */}
-              <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-100 font-black text-[10px] uppercase tracking-widest text-slate-600 border-b border-slate-200">
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-100 font-bold text-[10px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-4">#</th>
-                      <th className="py-3 px-4">Élève</th>
-                      <th className="py-3 px-2 text-center w-32">
+                      <th className="py-1.5 px-2.5">#</th>
+                      <th className="py-1.5 px-3">Élève</th>
+                      <th className="py-1.5 px-2 text-center w-28">
                         N.Classe /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 20}
                       </th>
-                      <th className="py-3 px-2 text-center w-32">
+                      <th className="py-1.5 px-2 text-center w-28">
                         Compos /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 40}
                       </th>
-                      <th className="py-3 px-2 text-center w-28">Moy.G</th>
-                      <th className="py-3 px-4 text-center">Appréciation</th>
+                      <th className="py-1.5 px-2 text-center w-24">Moy.G</th>
+                      <th className="py-1.5 px-3 text-center">Appréciation</th>
                     </tr>
                   </thead>
-                  <tbody className="text-xs font-bold text-slate-800 divide-y divide-slate-100 bg-white">
+                  <tbody className="text-xs font-medium text-slate-800 divide-y divide-slate-100 bg-white">
                     {totalClassStudents.map((std, idx) => {
                       const card = generateReportCard(std.id, selectedTerm);
                       const subjAvg = card?.subjectAverages.find(sa => sa.subjectId === batchSubjectId);
@@ -965,12 +947,12 @@ export const BulletinsModule: React.FC = () => {
 
                       return (
                         <tr key={std.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-4 font-mono font-bold text-slate-400">{idx + 1}</td>
-                          <td className="py-3 px-4">
-                            <p className="font-black text-slate-900">{std.lastName} {std.firstName}</p>
+                          <td className="py-1.5 px-2.5 font-mono text-slate-400 font-bold">{idx + 1}</td>
+                          <td className="py-1.5 px-3">
+                            <p className="font-bold text-slate-900 text-xs">{std.lastName} {std.firstName}</p>
                             <p className="text-[10px] font-mono text-slate-400">{std.matricule}</p>
                           </td>
-                          <td className="py-2 px-2 text-center">
+                          <td className="py-1 px-2 text-center">
                             <input
                               type="number"
                               step="0.25"
@@ -1007,10 +989,10 @@ export const BulletinsModule: React.FC = () => {
                                   });
                                 }
                               }}
-                              className="w-24 py-1.5 px-2 text-center font-mono font-black text-xs text-amber-950 bg-amber-50 border-2 border-amber-200 focus:border-amber-600 focus:bg-white rounded-xl outline-none transition-all"
+                              className="w-20 py-1 px-1.5 text-center font-mono font-bold text-xs text-amber-950 bg-amber-50 border border-amber-300 focus:border-amber-600 focus:bg-white rounded-lg outline-none transition-all"
                             />
                           </td>
-                          <td className="py-2 px-2 text-center">
+                          <td className="py-1 px-2 text-center">
                             <input
                               type="number"
                               step="0.25"
@@ -1047,14 +1029,14 @@ export const BulletinsModule: React.FC = () => {
                                   });
                                 }
                               }}
-                              className="w-24 py-1.5 px-2 text-center font-mono font-black text-xs text-purple-950 bg-purple-50 border-2 border-purple-200 focus:border-purple-600 focus:bg-white rounded-xl outline-none transition-all"
+                              className="w-20 py-1 px-1.5 text-center font-mono font-bold text-xs text-purple-950 bg-purple-50 border border-purple-300 focus:border-purple-600 focus:bg-white rounded-lg outline-none transition-all"
                             />
                           </td>
-                          <td className="py-2 px-2 text-center font-mono font-black text-blue-900 bg-blue-50/50 rounded-xl">
-                            {finalVal.toFixed(2)} / {maxScore}
+                          <td className="py-1.5 px-2 text-center font-mono font-bold text-blue-900 bg-blue-50/50">
+                            {finalVal.toFixed(2)}
                           </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${badgeColor}`}>
+                          <td className="py-1.5 px-3 text-center">
+                            <span className={`inline-block px-2 py-0.2 rounded-md text-[9px] font-bold uppercase border ${badgeColor}`}>
                               {appreciation}
                             </span>
                           </td>
@@ -1067,13 +1049,14 @@ export const BulletinsModule: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <p className="text-xs font-bold text-slate-500 italic">
+            <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <p className="text-[11px] text-slate-500 italic">
                 Enregistrement automatique au fur et à mesure de la saisie.
               </p>
               <button
+                type="button"
                 onClick={() => setShowBatchModal(false)}
-                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-sm"
+                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg cursor-pointer shadow-2xs"
               >
                 Fermer
               </button>
