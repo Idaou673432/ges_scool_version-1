@@ -109,6 +109,7 @@ export const CashierModule: React.FC = () => {
   });
   const [expenseError, setExpenseError] = useState<string | null>(null);
   const [expenseToDeleteModal, setExpenseToDeleteModal] = useState<Expense | null>(null);
+  const [showDeleteAllExpensesModal, setShowDeleteAllExpensesModal] = useState(false);
 
   // Clôtures journalières de caisse
   const [closures, setClosures] = useState<DailyCashClosure[]>(() => {
@@ -213,6 +214,18 @@ export const CashierModule: React.FC = () => {
       setToastMessage('Dépense supprimée avec succès. Le solde de la caisse a été mis à jour.');
       setTimeout(() => setToastMessage(null), 3000);
     }
+  };
+
+  // Suppression de toutes les dépenses
+  const handleDeleteAllExpensesConfirm = () => {
+    expenses.forEach(e => {
+      cloudSyncService.deleteExpense(e.id, cloudSchoolCode);
+    });
+    setExpenses([]);
+    secureLocalStorage.setJSON('soma_expenses', []);
+    setShowDeleteAllExpensesModal(false);
+    setToastMessage('Toutes les dépenses ont été supprimées. Le solde de la caisse a été recalculé.');
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleSaveClosure = (newClosure: DailyCashClosure) => {
@@ -338,9 +351,24 @@ export const CashierModule: React.FC = () => {
 
           {/* Right: Quick Action Buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {cashTab === 'EXPENSES' && expenses.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllExpensesModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                title="Supprimer toutes les dépenses enregistrées"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Supprimer Tout ({expenses.length})</span>
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => setIsExpenseModalOpen(true)}
+              onClick={() => {
+                setExpenseError(null);
+                setIsExpenseModalOpen(true);
+              }}
               className="flex items-center gap-1 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
             >
               <MinusCircle className="w-3.5 h-3.5" />
@@ -514,14 +542,15 @@ export const CashierModule: React.FC = () => {
                         <td className="py-1.5 sm:py-2 px-3 text-right font-mono font-bold text-rose-700 tabular-nums">
                           -{formatFCFA(exp.amount)}
                         </td>
-                        <td className="py-1.5 sm:py-2 px-2 text-center">
+                        <td className="py-1.5 sm:py-2 px-3 text-right">
                           <button
                             type="button"
                             onClick={() => setExpenseToDeleteModal(exp)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Supprimer cette dépense"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+                            title="Supprimer cette dépense et recréditer la caisse"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Supprimer</span>
                           </button>
                         </td>
                       </tr>
@@ -597,10 +626,10 @@ export const CashierModule: React.FC = () => {
         </div>
       )}
 
-      {/* Modal d'Enregistrement de Dépense */}
+      {/* Modal d'Enregistrement de Dépense avec Refus Strict si Caisse Insuffisante */}
       {isExpenseModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
                 <MinusCircle className="w-5 h-5 text-rose-600" />
@@ -624,126 +653,156 @@ export const CashierModule: React.FC = () => {
               </span>
             </div>
 
-            {expenseError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-800 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                <span>{expenseError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddExpenseSubmit} className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Motif / Description *</label>
-                <input
-                  type="text"
-                  required
-                  value={expenseFormData.description}
-                  onChange={e => setExpenseFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Ex: Achat de craies blanches et registres"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Montant (FCFA) *</label>
-                  <input
-                    type="number"
-                    required
-                    min="100"
-                    step="500"
-                    value={expenseFormData.amount}
-                    onChange={e => setExpenseFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                    className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs font-mono font-bold outline-none focus:bg-white ${
-                      Number(expenseFormData.amount) > netBalance || netBalance <= 0
-                        ? 'border-rose-400 text-rose-700 bg-rose-50/50'
-                        : 'border-slate-200 text-slate-900'
-                    }`}
-                  />
-                  {Number(expenseFormData.amount) > netBalance && (
-                    <span className="text-[10px] text-rose-600 font-bold block mt-1">
-                      ⚠️ Refus : Dépasse le solde en caisse ({formatFCFA(Math.max(0, netBalance))})
-                    </span>
-                  )}
-                  {netBalance <= 0 && (
-                    <span className="text-[10px] text-rose-600 font-bold block mt-1">
-                      ⚠️ Caisse vide : aucune dépense autorisée.
-                    </span>
-                  )}
+            {/* RÈGLE STRICTE : REFUS SI CAISSE VIDE (netBalance <= 0) */}
+            {netBalance <= 0 ? (
+              <div className="p-3.5 bg-rose-50 border-2 border-rose-300 rounded-xl text-rose-950 space-y-2">
+                <div className="flex items-center gap-2 font-black text-xs text-rose-700">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>⛔ OPÉRATION REFUSÉE : CAISSE VIDE (0 F CFA)</span>
                 </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Catégorie</label>
-                  <select
-                    value={expenseFormData.category}
-                    onChange={e => setExpenseFormData(prev => ({ ...prev, category: e.target.value as ExpenseCategory }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
-                  >
-                    <option value="SALAIRE">Salaires vacataires</option>
-                    <option value="ELECTRICITE_EAU">Électricité EDM / Eau</option>
-                    <option value="FOURNITURES">Fournitures & Craies</option>
-                    <option value="CARBURANT">Carburant groupe</option>
-                    <option value="REPARATION">Entretien & Travaux</option>
-                    <option value="AUTRES">Autres dépenses</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Bénéficiaire</label>
-                  <input
-                    type="text"
-                    value={expenseFormData.beneficiary}
-                    onChange={e => setExpenseFormData(prev => ({ ...prev, beneficiary: e.target.value }))}
-                    placeholder="Nom du bénéficiaire"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Mode de règlement</label>
-                  <select
-                    value={expenseFormData.paymentMethod}
-                    onChange={e => setExpenseFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
-                  >
-                    <option value="ESPECES">Espèces</option>
-                    <option value="ORANGE_MONEY">Orange Money</option>
-                    <option value="MOOV_MONEY">Moov Money</option>
-                    <option value="VIREMENT">Virement bancaire</option>
-                    <option value="CHEQUE">Chèque</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
+                  Le système interdit formellement d'enregistrer une dépense si le solde de la caisse est nul ou insuffisant. 
+                  Vous devez d'abord encaisser des frais scolaires pour réapprovisionner la trésorerie.
+                </p>
                 <button
                   type="button"
-                  onClick={() => setIsExpenseModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                  onClick={() => {
+                    setIsExpenseModalOpen(false);
+                    setCashTab('RECEIPTS');
+                  }}
+                  className="w-full py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer text-center"
                 >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={
-                    !expenseFormData.amount ||
-                    Number(expenseFormData.amount) <= 0 ||
-                    Number(expenseFormData.amount) > netBalance ||
-                    netBalance <= 0
-                  }
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  Valider la Dépense
+                  Fermer et Voir les Recettes / Reçus
                 </button>
               </div>
-            </form>
+            ) : (
+              <>
+                {expenseError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-800 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <span>{expenseError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleAddExpenseSubmit} className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Motif / Description *</label>
+                    <input
+                      type="text"
+                      required
+                      value={expenseFormData.description}
+                      onChange={e => setExpenseFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Ex: Achat de craies blanches et registres"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-600 block">Montant (FCFA) *</label>
+                        <button
+                          type="button"
+                          onClick={() => setExpenseFormData(prev => ({ ...prev, amount: netBalance }))}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+                        >
+                          Max ({formatFCFA(netBalance)})
+                        </button>
+                      </div>
+                      <input
+                        type="number"
+                        required
+                        min="100"
+                        step="500"
+                        value={expenseFormData.amount}
+                        onChange={e => setExpenseFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                        className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs font-mono font-bold outline-none focus:bg-white ${
+                          Number(expenseFormData.amount) > netBalance
+                            ? 'border-rose-400 text-rose-700 bg-rose-50/50'
+                            : 'border-slate-200 text-slate-900'
+                        }`}
+                      />
+                      {Number(expenseFormData.amount) > netBalance && (
+                        <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg text-[10px] text-rose-700 font-bold mt-1">
+                          ⛔ Refus strict : Le montant dépasse les {formatFCFA(netBalance)} en caisse.
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Catégorie</label>
+                      <select
+                        value={expenseFormData.category}
+                        onChange={e => setExpenseFormData(prev => ({ ...prev, category: e.target.value as ExpenseCategory }))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
+                      >
+                        <option value="SALAIRE">Salaires vacataires</option>
+                        <option value="ELECTRICITE_EAU">Électricité EDM / Eau</option>
+                        <option value="FOURNITURES">Fournitures & Craies</option>
+                        <option value="CARBURANT">Carburant groupe</option>
+                        <option value="REPARATION">Entretien & Travaux</option>
+                        <option value="AUTRES">Autres dépenses</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Bénéficiaire</label>
+                      <input
+                        type="text"
+                        value={expenseFormData.beneficiary}
+                        onChange={e => setExpenseFormData(prev => ({ ...prev, beneficiary: e.target.value }))}
+                        placeholder="Nom du bénéficiaire"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Mode de règlement</label>
+                      <select
+                        value={expenseFormData.paymentMethod}
+                        onChange={e => setExpenseFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
+                      >
+                        <option value="ESPECES">Espèces</option>
+                        <option value="ORANGE_MONEY">Orange Money</option>
+                        <option value="MOOV_MONEY">Moov Money</option>
+                        <option value="VIREMENT">Virement bancaire</option>
+                        <option value="CHEQUE">Chèque</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsExpenseModalOpen(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        !expenseFormData.amount ||
+                        Number(expenseFormData.amount) <= 0 ||
+                        Number(expenseFormData.amount) > netBalance ||
+                        netBalance <= 0
+                      }
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                    >
+                      Valider la Dépense
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* Modal Confirmation Suppression Dépense */}
+      {/* Modal Confirmation Suppression Dépense Individuelle */}
       {expenseToDeleteModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-200">
@@ -773,6 +832,42 @@ export const CashierModule: React.FC = () => {
                 className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
               >
                 Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmation Suppression de TOUTES les Dépenses */}
+      {showDeleteAllExpensesModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-200">
+            <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-bold text-slate-900">Supprimer Toutes les Dépenses ?</h3>
+              <p className="text-xs text-slate-500">
+                Vous vous apprêtez à supprimer définitivement les <strong className="text-slate-800">{expenses.length} dépenses</strong> enregistrées pour un total de <strong className="text-rose-700">{formatFCFA(totalExpenses)}</strong>.
+              </p>
+              <p className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 p-2 rounded-lg mt-2">
+                Le solde net de la caisse sera immédiatement recrédité de {formatFCFA(totalExpenses)}.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllExpensesModal(false)}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAllExpensesConfirm}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Oui, Tout Supprimer
               </button>
             </div>
           </div>

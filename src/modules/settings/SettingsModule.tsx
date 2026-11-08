@@ -6,13 +6,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, 
   ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Check,
-  GraduationCap, Building2, Wrench, Globe, Sparkles, BookOpen
+  GraduationCap, Building2, Wrench, Globe, Sparkles, BookOpen, Users, UserPlus,
+  Edit3, UserCheck, AlertCircle, RefreshCw, Phone, Mail, Shield, Search, X
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel, MALI_DEFAULT_CLASSES, MALI_DEFAULT_SUBJECTS } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
-import { SchoolEnabledFeatures, SchoolCategory } from '../../types';
+import { SchoolEnabledFeatures, SchoolCategory, User, UserRole } from '../../types';
 import { secureLocalStorage } from '../../services/secureStorage';
+import { AuthService } from '../../services/authService';
 
 const MONTH_OPTIONS = [
   'Septembre', 'Octobre', 'Novembre', 'Décembre', 
@@ -21,7 +24,7 @@ const MONTH_OPTIONS = [
 ];
 
 export interface SettingsModuleProps {
-  initialTab?: 'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA';
+  initialTab?: 'INFO' | 'USERS_ROLES' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA';
 }
 
 export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'INFO' }) => {
@@ -65,7 +68,195 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   const [showPwaModal, setShowPwaModal] = useState(false);
   const [storageStats, setStorageStats] = useState(() => secureLocalStorage.getStorageUsage());
   const [cleanToast, setCleanToast] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'INFO' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>(initialTab || 'INFO');
+  const [activeTab, setActiveTab] = useState<'INFO' | 'USERS_ROLES' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>(initialTab || 'INFO');
+
+  const { users, currentUser, saveUser, deleteUser, loginAsUser } = useAuth();
+
+  // User Management State (Multi-Rôles & Mots de passe)
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [userEditing, setUserEditing] = useState<User | null>(null);
+  const [userDeleting, setUserDeleting] = useState<User | null>(null);
+  const [showUserPasswords, setShowUserPasswords] = useState<Record<string, boolean>>({});
+  const [userModalError, setUserModalError] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('ALL');
+
+  const [userFormData, setUserFormData] = useState<{
+    fullName: string;
+    username: string;
+    role: UserRole;
+    password: string;
+    email: string;
+    phone: string;
+    active: boolean;
+  }>({
+    fullName: '',
+    username: '',
+    role: 'DIRECTEUR',
+    password: '',
+    email: '',
+    phone: '',
+    active: true
+  });
+
+  const handleOpenAddUser = () => {
+    setUserEditing(null);
+    setUserFormData({
+      fullName: '',
+      username: '',
+      role: 'DIRECTEUR',
+      password: '',
+      email: '',
+      phone: '',
+      active: true
+    });
+    setUserModalError(null);
+    setIsUserModalOpen(true);
+  };
+
+  const handleOpenEditUser = (u: User) => {
+    setUserEditing(u);
+    setUserFormData({
+      fullName: u.fullName,
+      username: u.username,
+      role: u.role,
+      password: u.password || '',
+      email: u.email || '',
+      phone: u.phone || '',
+      active: u.active
+    });
+    setUserModalError(null);
+    setIsUserModalOpen(true);
+  };
+
+  const handleSaveUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userFormData.fullName.trim()) {
+      setUserModalError('Veuillez saisir le nom complet de l\'utilisateur.');
+      return;
+    }
+    if (!userFormData.username.trim()) {
+      setUserModalError('Veuillez saisir un identifiant / nom d\'utilisateur.');
+      return;
+    }
+    if (!userFormData.password.trim()) {
+      setUserModalError('Veuillez définir un mot de passe ou code PIN.');
+      return;
+    }
+
+    const cleanUsername = userFormData.username.trim().toLowerCase();
+    const duplicate = users.find(u => 
+      u.username.toLowerCase() === cleanUsername &&
+      (!userEditing || u.id !== userEditing.id)
+    );
+    if (duplicate) {
+      setUserModalError(`L'identifiant "${cleanUsername}" est déjà utilisé par un autre compte.`);
+      return;
+    }
+
+    saveUser({
+      ...(userEditing ? { id: userEditing.id } : {}),
+      fullName: userFormData.fullName.trim(),
+      username: cleanUsername,
+      role: userFormData.role,
+      password: userFormData.password.trim(),
+      email: userFormData.email.trim(),
+      phone: userFormData.phone.trim(),
+      active: userFormData.active
+    });
+
+    setIsUserModalOpen(false);
+    setUserEditing(null);
+    setCleanToast(`Compte "${userFormData.fullName}" (${userFormData.role}) enregistré.`);
+    setTimeout(() => setCleanToast(null), 3000);
+  };
+
+  const handleConfirmDeleteUser = () => {
+    if (!userDeleting) return;
+
+    if (userDeleting.role === 'ADMIN') {
+      const adminCount = users.filter(u => u.role === 'ADMIN').length;
+      if (adminCount <= 1) {
+        alert('Action bloquée : Vous ne pouvez pas supprimer le seul compte Administrateur.');
+        setUserDeleting(null);
+        return;
+      }
+    }
+
+    deleteUser(userDeleting.id);
+    setCleanToast(`Le compte "${userDeleting.fullName}" a été supprimé.`);
+    setUserDeleting(null);
+    setTimeout(() => setCleanToast(null), 3000);
+  };
+
+  const toggleShowPasswordForUser = (userId: string) => {
+    setShowUserPasswords(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
+  const getRoleInfo = (role: UserRole) => {
+    switch (role) {
+      case 'DIRECTEUR':
+        return {
+          label: 'Directeur Général',
+          color: 'bg-indigo-50 text-indigo-900 border-indigo-200',
+          desc: 'Direction générale, validation globale, pédagogie, clôtures et finances'
+        };
+      case 'COMPTABLE':
+        return {
+          label: 'Chef Comptable',
+          color: 'bg-emerald-50 text-emerald-900 border-emerald-200',
+          desc: 'Encaissements, gestion caisse, dépenses, clôtures journalières et relances'
+        };
+      case 'SECRETAIRE':
+        return {
+          label: 'Secrétaire Général(e)',
+          color: 'bg-amber-50 text-amber-950 border-amber-200',
+          desc: 'Inscriptions des élèves, registres, cartes d\'identité scolaires et scolarité'
+        };
+      case 'ENSEIGNANT':
+        return {
+          label: 'Enseignant / Professeur',
+          color: 'bg-sky-50 text-sky-900 border-sky-200',
+          desc: 'Saisie des notes, devoirs, compositions et assiduité de ses classes'
+        };
+      case 'ADMIN':
+        return {
+          label: 'Administrateur Système',
+          color: 'bg-slate-900 text-white border-slate-900',
+          desc: 'Accès superviseur complet, configuration de l\'école et sécurité'
+        };
+      case 'LECTURE_SEULE':
+        return {
+          label: 'Consultation Seule',
+          color: 'bg-slate-100 text-slate-700 border-slate-200',
+          desc: 'Lecture des listes et rapports sans droit d\'écriture'
+        };
+      default:
+        return {
+          label: role,
+          color: 'bg-slate-100 text-slate-700 border-slate-200',
+          desc: 'Accès standard'
+        };
+    }
+  };
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false;
+      if (!userSearch.trim()) return true;
+      const q = userSearch.toLowerCase().trim();
+      return (
+        u.fullName.toLowerCase().includes(q) ||
+        u.username.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q) ||
+        (u.phone && u.phone.includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q))
+      );
+    });
+  }, [users, userRoleFilter, userSearch]);
   
   useEffect(() => {
     if (initialTab) {
@@ -503,6 +694,16 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('USERS_ROLES')}
+            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+              activeTab === 'USERS_ROLES' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
+            }`}
+          >
+            <Users className="w-3 h-3 text-amber-400" />
+            <span>Comptes & Rôles ({users.length})</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('LOGO_SECURITY')}
             className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
               activeTab === 'LOGO_SECURITY' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
@@ -717,14 +918,14 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
               </div>
 
               {/* SÉLECTEUR RAPIDE DU TYPE D'ÉTABLISSEMENT & ATTRIBUTS */}
-              <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-2">
+              <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-3 sm:p-3.5 space-y-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-1.5">
                   <div className="flex items-center gap-1.5 text-slate-800">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span className="font-bold text-xs">Type d'Établissement & Attributs Automatiques</span>
+                    <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span className="font-bold text-xs sm:text-sm">Type d'Établissement & Attributs Automatiques</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    Configure instantanément les barèmes (/10 ou /20), cycles et matières adaptées
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Configure instantanément barèmes (/10 ou /20), seuils de passage, examens et cycles
                   </span>
                 </div>
 
@@ -734,14 +935,14 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                   <button
                     type="button"
                     onClick={() => handleApplySchoolTypePreset('ECOLE_FONDAMENTALE')}
-                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                       formData.schoolCategory === 'ECOLE_FONDAMENTALE'
-                        ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/10 shadow-xs'
+                        ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
                         : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-sm">
                         🏫
                       </div>
                       {formData.schoolCategory === 'ECOLE_FONDAMENTALE' && (
@@ -749,21 +950,21 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                       )}
                     </div>
                     <div className="font-bold text-xs text-slate-900 leading-tight">École Fondamentale</div>
-                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">1ère à 9ème DEF • /10 & /20</div>
+                    <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">1ère à 9ème DEF • /10 & /20</div>
                   </button>
 
                   {/* Option 2: Lycée Général */}
                   <button
                     type="button"
                     onClick={() => handleApplySchoolTypePreset('LYCEE')}
-                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                       formData.schoolCategory === 'LYCEE'
-                        ? 'bg-white border-blue-500 ring-2 ring-blue-500/10 shadow-xs'
+                        ? 'bg-white border-blue-500 ring-2 ring-blue-500/20 shadow-xs'
                         : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-sm">
                         🎓
                       </div>
                       {formData.schoolCategory === 'LYCEE' && (
@@ -771,21 +972,21 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                       )}
                     </div>
                     <div className="font-bold text-xs text-slate-900 leading-tight">Lycée Général</div>
-                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">10ème à 12ème BAC • /20</div>
+                    <div className="text-[10px] text-blue-700 font-semibold mt-0.5">10ème à 12ème BAC • /20</div>
                   </button>
 
                   {/* Option 3: Professionnel */}
                   <button
                     type="button"
                     onClick={() => handleApplySchoolTypePreset('PROFESSIONNEL')}
-                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                       formData.schoolCategory === 'PROFESSIONNEL'
-                        ? 'bg-white border-amber-500 ring-2 ring-amber-500/10 shadow-xs'
+                        ? 'bg-white border-amber-500 ring-2 ring-amber-500/20 shadow-xs'
                         : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="w-6 h-6 rounded-md bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-sm">
                         ⚙️
                       </div>
                       {formData.schoolCategory === 'PROFESSIONNEL' && (
@@ -793,50 +994,85 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                       )}
                     </div>
                     <div className="font-bold text-xs text-slate-900 leading-tight">Professionnel & BT</div>
-                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">CAP 1&2 • BT1&2 • Métiers</div>
+                    <div className="text-[10px] text-amber-700 font-semibold mt-0.5">CAP 1&2 • BT 1&2 • /20</div>
                   </button>
 
                   {/* Option 4: Complexe */}
                   <button
                     type="button"
                     onClick={() => handleApplySchoolTypePreset('COMPLEXE')}
-                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer relative ${
                       formData.schoolCategory === 'COMPLEXE'
-                        ? 'bg-white border-purple-500 ring-2 ring-purple-500/10 shadow-xs'
+                        ? 'bg-white border-purple-500 ring-2 ring-purple-500/20 shadow-xs'
                         : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="w-6 h-6 rounded-md bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-sm">
                         🌐
                       </div>
                       {formData.schoolCategory === 'COMPLEXE' && (
                         <span className="w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
                       )}
                     </div>
-                    <div className="font-bold text-xs text-slate-900 leading-tight">Complexe / Mixte</div>
-                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">Tous cycles d'enseignement</div>
+                    <div className="font-bold text-xs text-slate-900 leading-tight">Complexe Scolaire</div>
+                    <div className="text-[10px] text-purple-700 font-semibold mt-0.5">Tous cycles • Mixte</div>
                   </button>
                 </div>
 
-                {/* Actions d'import rapide et informations sur le type sélectionné */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/80 text-[11px]">
-                  <div className="text-slate-600 font-medium flex items-center gap-1.5">
-                    <span className="font-bold text-slate-800">Type actif :</span>
-                    <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-bold text-[10px]">
-                      {getCategoryLabel(formData.schoolCategory)}
-                    </span>
+                {/* Synthèse des Attributs Appliqués Instantanément */}
+                <div className="bg-white rounded-lg border border-slate-200/90 p-2.5 space-y-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Barème & Passage</span>
+                      <span className="font-bold text-slate-900 text-xs">
+                        {formData.schoolCategory === 'ECOLE_FONDAMENTALE' && '1er Cycle : /10 (≥5/10) • 2nd Cycle : /20 (≥10/20)'}
+                        {formData.schoolCategory === 'LYCEE' && 'Barème Officiel /20 (Admis si Moyenne ≥ 10.00/20)'}
+                        {formData.schoolCategory === 'PROFESSIONNEL' && 'Barème Officiel /20 (Admis si Moyenne ≥ 10.00/20)'}
+                        {formData.schoolCategory === 'COMPLEXE' && 'Mixte 1er Cycle /10 et Secondaire /20'}
+                      </span>
+                    </div>
+
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Cycles & Niveaux</span>
+                      <span className="font-bold text-slate-900 text-xs">
+                        {formData.schoolCategory === 'ECOLE_FONDAMENTALE' && '1ère à 6ème (1er Cycle) + 7ème à 9ème DEF'}
+                        {formData.schoolCategory === 'LYCEE' && '10ème Commune + 11ème & 12ème BAC (TSE, TSEXP, etc.)'}
+                        {formData.schoolCategory === 'PROFESSIONNEL' && 'CAP 1 & 2 (Métiers) • BT 1 & 2 (Technique)'}
+                        {formData.schoolCategory === 'COMPLEXE' && 'Fondamental 1 & 2 + Lycée + Professionnel'}
+                      </span>
+                    </div>
+
+                    <div className="p-2 bg-slate-50 rounded-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Examen Préparé</span>
+                      <span className="font-bold text-slate-900 text-xs">
+                        {formData.schoolCategory === 'ECOLE_FONDAMENTALE' && 'DEF (Diplôme d\'Études Fondamentales)'}
+                        {formData.schoolCategory === 'LYCEE' && 'BAC (Baccalauréat Malien)'}
+                        {formData.schoolCategory === 'PROFESSIONNEL' && 'CAP & BT (Brevet de Technicien)'}
+                        {formData.schoolCategory === 'COMPLEXE' && 'DEF, BAC Malien & BT'}
+                      </span>
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleGenerateDefaultClassesAndSubjects(formData.schoolCategory || 'ECOLE_FONDAMENTALE')}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-md shadow-2xs transition-colors cursor-pointer text-[10px]"
-                    title="Génère automatiquement les classes et matières officielles pour ce type d'établissement"
-                  >
-                    <BookOpen className="w-3 h-3 text-slate-950" />
-                    <span>Charger les classes & matières officielles ({getCategoryLabel(formData.schoolCategory).split('/')[0].trim()})</span>
-                  </button>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-600 font-medium">
+                      <span className="font-bold text-slate-800">Statut actuel :</span>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-bold text-[10px]">
+                        {getCategoryLabel(formData.schoolCategory)}
+                      </span>
+                      <span>({classes.length} classes, {subjects.length} matières actives)</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateDefaultClassesAndSubjects(formData.schoolCategory || 'ECOLE_FONDAMENTALE')}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg shadow-2xs transition-colors cursor-pointer text-xs"
+                      title="Génère automatiquement les classes et matières officielles pour ce type d'établissement"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-slate-950" />
+                      <span>⚡ Charger les classes & matières officielles ({getCategoryLabel(formData.schoolCategory).split('/')[0].trim()})</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -925,7 +1161,225 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </form>
           )}
 
-          {/* ================= TAB 2: LOGO & SECURITE (ULTRA-COMPACT) ================= */}
+          {/* ================= TAB: COMPTES & MULTI-RÔLES ================= */}
+          {activeTab === 'USERS_ROLES' && (
+            <div className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-4 shadow-2xs space-y-3">
+              {/* Header & Bouton Ajouter */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-900" />
+                    <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
+                      Gestion des Utilisateurs & Accès Multi-Rôles
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px]">
+                      {filteredUsers.length} compte(s)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Définissez les accès pour le Directeur, Chef Comptable, Secrétaire, Enseignants avec leurs mots de passe d'accès.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddUser}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-amber-400" />
+                  <span>+ Ajouter un Utilisateur</span>
+                </button>
+              </div>
+
+              {/* Toolbar: Filtre par rôle & Recherche */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Rôles :</span>
+                  {[
+                    { id: 'ALL', label: 'Tous' },
+                    { id: 'DIRECTEUR', label: 'Directeur' },
+                    { id: 'COMPTABLE', label: 'Comptable' },
+                    { id: 'SECRETAIRE', label: 'Secrétaire' },
+                    { id: 'ENSEIGNANT', label: 'Enseignant' },
+                    { id: 'ADMIN', label: 'Admin' }
+                  ].map(rf => (
+                    <button
+                      key={rf.id}
+                      type="button"
+                      onClick={() => setUserRoleFilter(rf.id)}
+                      className={`px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors cursor-pointer ${
+                        userRoleFilter === rf.id
+                          ? 'bg-slate-900 text-white shadow-2xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {rf.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="relative min-w-[180px] max-w-xs flex-1">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={userSearch}
+                    onChange={e => setUserSearch(e.target.value)}
+                    placeholder="Rechercher nom, login, tél..."
+                    className="w-full pl-8 pr-6 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                  {userSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Tableau des Utilisateurs */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        <th className="py-2 px-3">Utilisateur</th>
+                        <th className="py-2 px-2.5">Rôle & Permissions</th>
+                        <th className="py-2 px-2.5">Identifiant</th>
+                        <th className="py-2 px-2.5">Mot de Passe</th>
+                        <th className="py-2 px-2.5">Contact</th>
+                        <th className="py-2 px-2 text-center">Statut</th>
+                        <th className="py-2 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
+                            Aucun compte utilisateur ne correspond aux critères.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredUsers.map(u => {
+                          const roleInfo = getRoleInfo(u.role);
+                          const isCurrent = currentUser?.id === u.id;
+                          const isPasswordShown = Boolean(showUserPasswords[u.id]);
+
+                          return (
+                            <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2 px-3">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs uppercase ${
+                                    u.role === 'ADMIN' ? 'bg-slate-900 text-white' :
+                                    u.role === 'DIRECTEUR' ? 'bg-indigo-100 text-indigo-900' :
+                                    u.role === 'COMPTABLE' ? 'bg-emerald-100 text-emerald-900' :
+                                    u.role === 'SECRETAIRE' ? 'bg-amber-100 text-amber-900' :
+                                    'bg-sky-100 text-sky-900'
+                                  }`}>
+                                    {u.fullName.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-slate-900">{u.fullName}</span>
+                                      {isCurrent && (
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] bg-blue-100 text-blue-900 font-bold">
+                                          Actif
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono block">ID: {u.id}</span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-2 px-2.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${roleInfo.color}`}>
+                                  {roleInfo.label}
+                                </span>
+                                <span className="text-[10px] text-slate-500 block truncate max-w-[200px]" title={roleInfo.desc}>
+                                  {roleInfo.desc}
+                                </span>
+                              </td>
+
+                              <td className="py-2 px-2.5">
+                                <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
+                                  {u.username}
+                                </span>
+                              </td>
+
+                              <td className="py-2 px-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-xs font-semibold text-slate-800">
+                                    {isPasswordShown ? (u.password || 'Non défini') : '••••••••'}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleShowPasswordForUser(u.id)}
+                                    className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                    title={isPasswordShown ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                                  >
+                                    {isPasswordShown ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                  </button>
+                                </div>
+                              </td>
+
+                              <td className="py-2 px-2.5 text-[11px] text-slate-600">
+                                {u.phone ? <div className="font-mono">{u.phone}</div> : <span className="text-slate-300">-</span>}
+                                {u.email && <div className="text-[10px] text-slate-400 truncate max-w-[150px]">{u.email}</div>}
+                              </td>
+
+                              <td className="py-2 px-2 text-center">
+                                <span className={`inline-block w-2 h-2 rounded-full ${u.active ? 'bg-emerald-500' : 'bg-slate-300'}`} title={u.active ? 'Actif' : 'Désactivé'} />
+                              </td>
+
+                              <td className="py-2 px-3 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {!isCurrent && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        loginAsUser(u.id);
+                                        setCleanToast(`Session basculée sur ${u.fullName} (${roleInfo.label}).`);
+                                        setTimeout(() => setCleanToast(null), 3000);
+                                      }}
+                                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-semibold text-[11px] transition-colors cursor-pointer"
+                                      title="Se connecter avec ce compte"
+                                    >
+                                      Basculer
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditUser(u)}
+                                    className="p-1 text-slate-500 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                                    title="Modifier le compte ou mot de passe"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setUserDeleting(u)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                                    title="Supprimer ce compte"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= TAB 3: LOGO & SECURITE (ULTRA-COMPACT) ================= */}
           {activeTab === 'LOGO_SECURITY' && (
             <div className="space-y-2.5">
               {/* BLOC 1: LOGO & CACHET EN GRILLE COMPACTE */}
@@ -1659,6 +2113,198 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </form>
           )}
         </>
+      )}
+
+      {/* Modal Création / Modification Utilisateur */}
+      {isUserModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-4 shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-900 flex items-center justify-center font-bold text-xs">
+                  <Users className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  {userEditing ? 'Modifier le Compte Utilisateur' : 'Ajouter un Nouvel Utilisateur'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsUserModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {userModalError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold text-rose-800 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span>{userModalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveUserSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Nom Complet *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Dr. Ousmane COULIBALY"
+                  value={userFormData.fullName}
+                  onChange={e => setUserFormData({ ...userFormData, fullName: e.target.value })}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Identifiant / Login *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ex: directeur, comptable"
+                    value={userFormData.username}
+                    onChange={e => setUserFormData({ ...userFormData, username: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono font-medium text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Rôle & Attribution *</label>
+                  <select
+                    value={userFormData.role}
+                    onChange={e => setUserFormData({ ...userFormData, role: e.target.value as UserRole })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-semibold text-slate-800 outline-none focus:border-slate-400 cursor-pointer"
+                  >
+                    <option value="DIRECTEUR">Directeur Général</option>
+                    <option value="COMPTABLE">Chef Comptable</option>
+                    <option value="SECRETAIRE">Secrétaire Général(e)</option>
+                    <option value="ENSEIGNANT">Enseignant / Professeur</option>
+                    <option value="ADMIN">Administrateur Système</option>
+                    <option value="LECTURE_SEULE">Consultation Seule</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-700 block">Mot de Passe d'Accès *</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const randomPin = Math.floor(1000 + Math.random() * 9000).toString();
+                      setUserFormData(prev => ({ ...prev, password: randomPin }));
+                    }}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 font-bold cursor-pointer"
+                  >
+                    Générer PIN auto
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Code d'accès ou mot de passe"
+                    value={userFormData.password}
+                    onChange={e => setUserFormData({ ...userFormData, password: e.target.value })}
+                    className="w-full px-3 py-1.5 pr-8 bg-slate-50 border border-slate-200 rounded-lg font-mono font-bold text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                  <Key className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Téléphone (WhatsApp)</label>
+                  <input
+                    type="tel"
+                    placeholder="+223 76 00 11 22"
+                    value={userFormData.phone}
+                    onChange={e => setUserFormData({ ...userFormData, phone: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Email</label>
+                  <input
+                    type="email"
+                    placeholder="nom@ecole.edu.ml"
+                    value={userFormData.email}
+                    onChange={e => setUserFormData({ ...userFormData, email: e.target.value })}
+                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="user-active-check"
+                  checked={userFormData.active}
+                  onChange={e => setUserFormData({ ...userFormData, active: e.target.checked })}
+                  className="w-4 h-4 rounded text-blue-900 cursor-pointer"
+                />
+                <label htmlFor="user-active-check" className="font-semibold text-slate-700 cursor-pointer">
+                  Compte actif (autorisé à se connecter au système)
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsUserModalOpen(false)}
+                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  {userEditing ? 'Mettre à jour' : 'Créer l\'utilisateur'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmation Suppression Utilisateur */}
+      {userDeleting && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-3.5 shadow-xl border border-slate-200 text-center">
+            <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Supprimer cet Utilisateur ?</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Voulez-vous supprimer le compte de <strong className="text-slate-800">{userDeleting.fullName}</strong> ({userDeleting.role}) ?
+              </p>
+              <p className="text-[11px] text-rose-600 font-semibold bg-rose-50 p-2 rounded-lg mt-2">
+                Cet utilisateur ne pourra plus accéder à la plateforme.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setUserDeleting(null)}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteUser}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg cursor-pointer"
+              >
+                Oui, Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* PWA Installation Modal */}

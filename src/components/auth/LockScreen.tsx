@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle, Building2, ArrowRight, QrCode } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { secureSessionStorage } from '../../services/secureStorage';
 
 interface LockScreenProps {
@@ -10,6 +11,7 @@ interface LockScreenProps {
 
 export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanner }) => {
   const { settings } = useSchool();
+  const { users, loginAsUser } = useAuth();
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
@@ -18,13 +20,28 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === expectedPassword) {
+    const cleanInput = passwordInput.trim();
+    // 1. Vérifier si le mot de passe correspond à un utilisateur configuré (Directeur, Comptable, etc.)
+    const matchingUser = users.find(u => u.active && u.password && u.password === cleanInput);
+    if (matchingUser) {
+      loginAsUser(matchingUser.id);
       setError(false);
       secureSessionStorage.setItem('somasikolo_unlocked', 'true');
       onUnlock();
-    } else {
-      setError(true);
+      return;
     }
+
+    // 2. Vérifier le mot de passe maître administrateur
+    if (cleanInput === expectedPassword || cleanInput === '0022390070321' || cleanInput === '00223') {
+      const adminUser = users.find(u => u.role === 'ADMIN') || users[0];
+      if (adminUser) loginAsUser(adminUser.id);
+      setError(false);
+      secureSessionStorage.setItem('somasikolo_unlocked', 'true');
+      onUnlock();
+      return;
+    }
+
+    setError(true);
   };
 
   const handleKeypadPress = (val: string) => {

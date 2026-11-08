@@ -15,6 +15,9 @@ interface AuthContextType {
   logout: () => void;
   hasPermission: (permission: string) => boolean;
   switchRoleSimulated: (role: UserRole) => void;
+  saveUser: (user: Partial<User>) => User;
+  deleteUser: (userId: string) => boolean;
+  reloadUsers: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,15 +26,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    storageService.initDatabase();
+  const reloadUsers = () => {
     const loadedUsers = storageService.getUsers();
     setUsers(loadedUsers);
-
-    // Default to Admin or Directeur for initial view
     const savedActiveId = secureLocalStorage.getItem('somasikolo_active_user_id');
     const defaultUser = loadedUsers.find(u => u.id === savedActiveId) || loadedUsers[0];
-    setCurrentUser(defaultUser);
+    if (defaultUser) {
+      setCurrentUser(defaultUser);
+    }
+  };
+
+  useEffect(() => {
+    storageService.initDatabase();
+    reloadUsers();
   }, []);
 
   const loginAsUser = (userId: string) => {
@@ -58,6 +65,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const saveUser = (user: Partial<User>): User => {
+    const saved = storageService.saveUser(user);
+    const updatedUsers = storageService.getUsers();
+    setUsers(updatedUsers);
+    if (currentUser && currentUser.id === saved.id) {
+      setCurrentUser(saved);
+    }
+    return saved;
+  };
+
+  const deleteUser = (userId: string): boolean => {
+    const res = storageService.deleteUser(userId);
+    if (res) {
+      const updatedUsers = storageService.getUsers();
+      setUsers(updatedUsers);
+      if (currentUser && currentUser.id === userId) {
+        const nextUser = updatedUsers[0] || null;
+        setCurrentUser(nextUser);
+        if (nextUser) {
+          secureLocalStorage.setItem('somasikolo_active_user_id', nextUser.id);
+        } else {
+          secureLocalStorage.removeItem('somasikolo_active_user_id');
+        }
+      }
+    }
+    return res;
+  };
+
   const hasPermission = (permission: string): boolean => {
     if (!currentUser) return false;
     return AuthService.hasPermission(currentUser.role, permission);
@@ -71,7 +106,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginAsUser,
         logout,
         hasPermission,
-        switchRoleSimulated
+        switchRoleSimulated,
+        saveUser,
+        deleteUser,
+        reloadUsers
       }}
     >
       {children}

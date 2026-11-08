@@ -2,8 +2,8 @@
  * SomaSikolo - Classes & Niveaux Module
  */
 
-import React, { useState } from 'react';
-import { GraduationCap, Plus, Edit3, Trash2, Users, Building2, BookOpen, Printer, FileText, Search, X, CheckCircle2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { GraduationCap, Plus, Edit3, Trash2, Users, Building2, BookOpen, Printer, FileText, Search, X, CheckCircle2, Sparkles } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { SchoolClass, SchoolLevelCategory } from '../../types';
 import { formatFCFA, MALI_SCHOOL_LEVEL_CATEGORIES } from '../../constants/maliEducation';
@@ -44,6 +44,44 @@ export const ClassesModule: React.FC = () => {
     if (settings.schoolCategory === 'PROFESSIONNEL') return 'BT1';
     return '7ème';
   };
+
+  const classSuggestions = useMemo(() => {
+    if (settings.schoolCategory === 'LYCEE') {
+      return [
+        { name: '10ème Commune', category: 'LYCEE', level: '10ème', fee: 30000 },
+        { name: '11ème Sciences', category: 'LYCEE', level: '11ème', fee: 30000 },
+        { name: '11ème Lettres', category: 'LYCEE', level: '11ème', fee: 30000 },
+        { name: '12ème TSE', category: 'LYCEE', level: '12ème', fee: 35000 },
+        { name: '12ème TSEXP', category: 'LYCEE', level: '12ème', fee: 35000 },
+        { name: '12ème TSECO', category: 'LYCEE', level: '12ème', fee: 35000 },
+        { name: '12ème TSS', category: 'LYCEE', level: '12ème', fee: 35000 },
+        { name: '12ème TAL', category: 'LYCEE', level: '12ème', fee: 35000 },
+      ];
+    }
+    if (settings.schoolCategory === 'PROFESSIONNEL') {
+      return [
+        { name: 'CAP 1 Mécanique', category: 'PROFESSIONNEL_CAP', level: 'CAP1', fee: 25000 },
+        { name: 'CAP 2 Mécanique', category: 'PROFESSIONNEL_CAP', level: 'CAP2', fee: 25000 },
+        { name: 'BT1 Comptabilité', category: 'TECHNIQUE_BT', level: 'BT1', fee: 30000 },
+        { name: 'BT2 Comptabilité', category: 'TECHNIQUE_BT', level: 'BT2', fee: 35000 },
+        { name: 'BT1 Secrétariat', category: 'TECHNIQUE_BT', level: 'BT1', fee: 30000 },
+        { name: 'BT2 Secrétariat', category: 'TECHNIQUE_BT', level: 'BT2', fee: 35000 },
+        { name: 'BT1 Électricité', category: 'TECHNIQUE_BT', level: 'BT1', fee: 30000 },
+        { name: 'BT2 Électricité', category: 'TECHNIQUE_BT', level: 'BT2', fee: 35000 },
+      ];
+    }
+    return [
+      { name: '1ère Année A', category: 'FONDAMENTAL_1', level: '1ère', fee: 15000 },
+      { name: '2ème Année A', category: 'FONDAMENTAL_1', level: '2ème', fee: 15000 },
+      { name: '3ème Année A', category: 'FONDAMENTAL_1', level: '3ème', fee: 15000 },
+      { name: '4ème Année A', category: 'FONDAMENTAL_1', level: '4ème', fee: 15000 },
+      { name: '5ème Année A', category: 'FONDAMENTAL_1', level: '5ème', fee: 15000 },
+      { name: '6ème Année A', category: 'FONDAMENTAL_1', level: '6ème', fee: 15000 },
+      { name: '7ème Année A', category: 'FONDAMENTAL_2', level: '7ème', fee: 20000 },
+      { name: '8ème Année A', category: 'FONDAMENTAL_2', level: '8ème', fee: 20000 },
+      { name: '9ème Année DEF', category: 'FONDAMENTAL_2', level: '9ème', fee: 25000 },
+    ];
+  }, [settings.schoolCategory]);
 
   const [formData, setFormData] = useState<Partial<SchoolClass>>({
     name: '',
@@ -239,9 +277,45 @@ export const ClassesModule: React.FC = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h2 className="text-base font-bold text-slate-900">
-              {selectedClass ? 'Modifier la Classe' : 'Nouvelle Classe'}
-            </h2>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h2 className="text-sm font-bold text-slate-900">
+                {selectedClass ? 'Modifier la Classe' : 'Nouvelle Classe'}
+              </h2>
+              <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded">
+                Type : {settings.schoolCategory === 'LYCEE' ? 'Lycée' : settings.schoolCategory === 'PROFESSIONNEL' ? 'Professionnel' : 'École Fondamentale'}
+              </span>
+            </div>
+
+            {/* Suggestions en 1 clic pour accélérer la saisie */}
+            {!selectedClass && (
+              <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1">
+                <div className="flex items-center gap-1 text-[10px] font-bold text-slate-700">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>Remplissage Rapide ({settings.schoolCategory === 'LYCEE' ? 'Lycée' : settings.schoolCategory === 'PROFESSIONNEL' ? 'Professionnel' : 'École Fondamentale'}) :</span>
+                </div>
+                <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                  {classSuggestions.map(sug => (
+                    <button
+                      key={sug.name}
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          name: sug.name,
+                          category: sug.category as any,
+                          level: sug.level,
+                          passingGrade: sug.category === 'FONDAMENTAL_1' ? 5 : 10,
+                          monthlyFee: sug.fee
+                        }));
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-white hover:bg-amber-50 hover:border-amber-300 text-slate-800 text-[10px] font-semibold border border-slate-200 transition-all cursor-pointer shadow-2xs"
+                    >
+                      {sug.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
               <div>

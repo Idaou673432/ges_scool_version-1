@@ -48,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileMenu
 }) => {
   const { settings, payments, cloudSchoolCode, isFeatureEnabled } = useSchool();
-  const { currentUser } = useAuth();
+  const { currentUser, users, loginAsUser } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
@@ -292,6 +292,40 @@ export const Header: React.FC<HeaderProps> = ({
                   <span>Installer l'application</span>
                 </button>
               </div>
+
+              {/* Basculer de compte / Multi-Rôles */}
+              {users.length > 1 && (
+                <div className="py-1 border-t border-slate-100">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-2.5 block mb-1">
+                    Changer de compte ({users.length}) :
+                  </span>
+                  <div className="max-h-36 overflow-y-auto space-y-0.5 px-0.5">
+                    {users.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          loginAsUser(u.id);
+                          setShowUserMenu(false);
+                        }}
+                        className={`w-full px-2 py-1 text-left rounded-md flex items-center justify-between text-xs transition-colors cursor-pointer ${
+                          currentUser?.id === u.id ? 'bg-slate-100 font-bold text-slate-900' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="truncate mr-1">
+                          <span className="block truncate text-[11px] font-semibold">{u.fullName}</span>
+                          <span className="text-[9px] text-slate-500 block truncate">{AuthService.getRoleLabel(u.role)}</span>
+                        </div>
+                        {currentUser?.id === u.id ? (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Compte actif" />
+                        ) : (
+                          <span className="text-[9px] text-blue-600 font-bold hover:underline">Basculer</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Verrouiller */}
               {onLock && (

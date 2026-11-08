@@ -62,6 +62,7 @@ const INITIAL_USERS: User[] = [
     fullName: 'Moh&IB',
     email: 'admin@ecole.edu.ml',
     role: 'ADMIN',
+    password: '0022390070321',
     phone: '+223 76 00 11 22',
     active: true,
     createdAt: new Date().toISOString(),
@@ -72,6 +73,7 @@ const INITIAL_USERS: User[] = [
     fullName: 'Dr. Ousmane COULIBALY',
     email: 'directeur@ecole.edu.ml',
     role: 'DIRECTEUR',
+    password: 'directeur123',
     phone: '+223 66 33 44 55',
     active: true,
     createdAt: new Date().toISOString(),
@@ -82,6 +84,7 @@ const INITIAL_USERS: User[] = [
     fullName: 'Mme. Fatoumata SISSOKO',
     email: 'secretaire@ecole.edu.ml',
     role: 'SECRETAIRE',
+    password: 'secretaire123',
     phone: '+223 75 88 99 00',
     active: true,
     createdAt: new Date().toISOString(),
@@ -92,6 +95,7 @@ const INITIAL_USERS: User[] = [
     fullName: 'M. Ibrahim TRAORÉ',
     email: 'comptable@ecole.edu.ml',
     role: 'COMPTABLE',
+    password: 'comptable123',
     phone: '+223 65 11 22 33',
     active: true,
     createdAt: new Date().toISOString(),
@@ -102,6 +106,7 @@ const INITIAL_USERS: User[] = [
     fullName: 'Prof. Bakary KANÉ',
     email: 'bakary.kane@ecole.edu.ml',
     role: 'ENSEIGNANT',
+    password: 'enseignant123',
     phone: '+223 70 44 55 66',
     active: true,
     createdAt: new Date().toISOString(),
@@ -580,16 +585,80 @@ class StorageService {
     const users = this.getItem(STORAGE_KEYS.USERS, INITIAL_USERS);
     let updated = false;
     const sanitized = users.map(u => {
-      if ((u.username === 'admin' || u.role === 'ADMIN') && (u.fullName === 'M. Amadou DIARRA' || u.fullName === 'Administrateur')) {
-        updated = true;
-        return { ...u, fullName: 'Moh&IB' };
+      let mod = false;
+      let userObj = { ...u };
+      if ((userObj.username === 'admin' || userObj.role === 'ADMIN') && (userObj.fullName === 'M. Amadou DIARRA' || userObj.fullName === 'Administrateur')) {
+        mod = true;
+        userObj.fullName = 'Moh&IB';
       }
-      return u;
+      if (!userObj.password) {
+        mod = true;
+        if (userObj.role === 'ADMIN') userObj.password = '0022390070321';
+        else if (userObj.role === 'DIRECTEUR') userObj.password = 'directeur123';
+        else if (userObj.role === 'COMPTABLE') userObj.password = 'comptable123';
+        else if (userObj.role === 'SECRETAIRE') userObj.password = 'secretaire123';
+        else if (userObj.role === 'ENSEIGNANT') userObj.password = 'enseignant123';
+        else userObj.password = '1234';
+      }
+      if (mod) updated = true;
+      return userObj;
     });
     if (updated) {
       this.setItem(STORAGE_KEYS.USERS, sanitized);
     }
     return sanitized;
+  }
+
+  public saveUser(user: Partial<User>): User {
+    const users = this.getUsers();
+    let saved: User;
+    if (user.id) {
+      const idx = users.findIndex(u => u.id === user.id);
+      if (idx >= 0) {
+        saved = { ...users[idx], ...user };
+        users[idx] = saved;
+      } else {
+        saved = {
+          id: user.id,
+          username: user.username || `user-${Date.now().toString().slice(-4)}`,
+          fullName: user.fullName || 'Nouvel Utilisateur',
+          email: user.email || '',
+          role: user.role || 'SECRETAIRE',
+          phone: user.phone || '',
+          active: user.active ?? true,
+          password: user.password || '1234',
+          createdAt: user.createdAt || new Date().toISOString()
+        };
+        users.push(saved);
+      }
+    } else {
+      saved = {
+        id: `u-${Date.now()}`,
+        username: user.username || `user-${Date.now().toString().slice(-4)}`,
+        fullName: user.fullName || 'Nouvel Utilisateur',
+        email: user.email || '',
+        role: user.role || 'SECRETAIRE',
+        phone: user.phone || '',
+        active: user.active ?? true,
+        password: user.password || '1234',
+        createdAt: new Date().toISOString()
+      };
+      users.push(saved);
+    }
+    this.setItem(STORAGE_KEYS.USERS, users);
+    this.addAuditLog('UTILISATEUR', 'GESTION_ROLES', `Enregistrement utilisateur ${saved.fullName} (${saved.role})`);
+    return saved;
+  }
+
+  public deleteUser(userId: string): boolean {
+    const users = this.getUsers();
+    const filtered = users.filter(u => u.id !== userId);
+    if (filtered.length !== users.length) {
+      this.setItem(STORAGE_KEYS.USERS, filtered);
+      this.addAuditLog('UTILISATEUR_SUPPRESSION', 'GESTION_ROLES', `Suppression de l'utilisateur ${userId}`);
+      return true;
+    }
+    return false;
   }
 
   // --- STUDENTS ---
