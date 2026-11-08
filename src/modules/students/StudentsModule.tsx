@@ -80,6 +80,7 @@ export const StudentsModule: React.FC = () => {
   const [deletingStudent, setDeletingStudent] = useState<{ id: string; name: string } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [previewReceiptPayment, setPreviewReceiptPayment] = useState<Payment | null>(null);
 
   // Modal d'encaissement et solde direct pour un élève spécifique
   const [paymentModalStudent, setPaymentModalStudent] = useState<Student | null>(null);
@@ -304,11 +305,11 @@ export const StudentsModule: React.FC = () => {
     });
 
     setPaymentModalStudent(null);
-    setToastMessage(`Paiement de ${formatFCFA(amt)} validé ! Reçu N° ${newPayment.receiptNumber} émis.`);
-    setTimeout(() => setToastMessage(null), 4000);
+    setToastMessage(`Paiement de ${formatFCFA(amt)} validé !`);
+    setTimeout(() => setToastMessage(null), 3500);
 
-    // Téléchargement automatique du reçu officiel PDF
-    PdfService.generateReceiptPdf(newPayment, settings);
+    // Visionner directement la quittance à l'écran sans téléchargement forcé
+    setPreviewReceiptPayment(newPayment);
   };
 
   // 3. Centralisé : Téléchargement direct de la Carte Scolaire PDF avec QR Code et photo
@@ -1143,6 +1144,14 @@ export const StudentsModule: React.FC = () => {
           onClose={() => setIsMenStatsOpen(false)}
         />
       )}
+
+      {/* Modal Quittance Horizontale Directe */}
+      <HorizontalReceiptModal
+        isOpen={Boolean(previewReceiptPayment)}
+        payment={previewReceiptPayment}
+        settings={settings}
+        onClose={() => setPreviewReceiptPayment(null)}
+      />
     </div>
   );
 };

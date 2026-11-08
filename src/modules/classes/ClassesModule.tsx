@@ -33,26 +33,39 @@ export const ClassesModule: React.FC = () => {
     PdfService.generateClassListPdf(cls.name, classStudents, settings);
   };
 
+  const getDefaultCategory = (): SchoolClass['category'] => {
+    if (settings.schoolCategory === 'LYCEE') return 'LYCEE';
+    if (settings.schoolCategory === 'PROFESSIONNEL') return 'TECHNIQUE_BT';
+    return 'FONDAMENTAL_2';
+  };
+
+  const getDefaultLevel = () => {
+    if (settings.schoolCategory === 'LYCEE') return '10ème';
+    if (settings.schoolCategory === 'PROFESSIONNEL') return 'BT1';
+    return '7ème';
+  };
+
   const [formData, setFormData] = useState<Partial<SchoolClass>>({
     name: '',
-    category: 'FONDAMENTAL_2',
-    level: '7ème',
-    monthlyFee: 20000,
-    inscriptionFee: 15000,
+    category: getDefaultCategory(),
+    level: getDefaultLevel(),
+    monthlyFee: settings.schoolCategory === 'LYCEE' ? 30000 : 20000,
+    inscriptionFee: settings.schoolCategory === 'LYCEE' ? 25000 : 15000,
     classroom: 'Salle 01',
     passingGrade: 10
   });
 
   const handleOpenAdd = () => {
     setSelectedClass(null);
+    const cat = getDefaultCategory();
     setFormData({
       name: '',
-      category: 'FONDAMENTAL_2',
-      level: '7ème',
-      monthlyFee: 20000,
-      inscriptionFee: 15000,
+      category: cat,
+      level: getDefaultLevel(),
+      monthlyFee: settings.schoolCategory === 'LYCEE' ? 30000 : 20000,
+      inscriptionFee: settings.schoolCategory === 'LYCEE' ? 25000 : 15000,
       classroom: 'Salle 01',
-      passingGrade: 10
+      passingGrade: cat === 'FONDAMENTAL_1' ? 5 : 10
     });
     setIsModalOpen(true);
   };

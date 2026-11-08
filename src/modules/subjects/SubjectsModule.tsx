@@ -10,7 +10,7 @@ import { MALI_SCHOOL_LEVEL_CATEGORIES } from '../../constants/maliEducation';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 
 export const SubjectsModule: React.FC = () => {
-  const { subjects, saveSubject, deleteSubject, deleteAllSubjects } = useSchool();
+  const { settings, subjects, saveSubject, deleteSubject, deleteAllSubjects } = useSchool();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubj, setSelectedSubj] = useState<Subject | null>(null);
   const [deletingSubjId, setDeletingSubjId] = useState<string | null>(null);
@@ -18,11 +18,17 @@ export const SubjectsModule: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  const getDefaultCategory = (): Subject['classCategory'] => {
+    if (settings.schoolCategory === 'LYCEE') return 'LYCEE';
+    if (settings.schoolCategory === 'PROFESSIONNEL') return 'TECHNIQUE_BT';
+    return 'FONDAMENTAL_2';
+  };
+
   const [formData, setFormData] = useState<Partial<Subject>>({
     code: '',
     name: '',
     coefficient: 2,
-    classCategory: 'FONDAMENTAL_2',
+    classCategory: getDefaultCategory(),
     order: 1
   });
 
@@ -38,7 +44,7 @@ export const SubjectsModule: React.FC = () => {
       code: '',
       name: '',
       coefficient: 2,
-      classCategory: 'FONDAMENTAL_2',
+      classCategory: getDefaultCategory(),
       order: subjects.length + 1
     });
     setIsModalOpen(true);

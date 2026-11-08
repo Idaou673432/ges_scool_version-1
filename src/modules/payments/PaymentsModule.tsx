@@ -199,8 +199,9 @@ export const PaymentsModule: React.FC = () => {
       const updated = expenses.filter(e => e.id !== expenseToDeleteModal.id);
       setExpenses(updated);
       secureLocalStorage.setJSON('soma_expenses', updated);
+      cloudSyncService.deleteExpense(expenseToDeleteModal.id, cloudSchoolCode);
       setExpenseToDeleteModal(null);
-      setSyncToast('Dépense supprimée avec succès.');
+      setSyncToast('Dépense supprimée avec succès. Le solde de la caisse a été mis à jour.');
       setTimeout(() => setSyncToast(null), 3000);
     }
   };
@@ -435,9 +436,15 @@ export const PaymentsModule: React.FC = () => {
       return;
     }
     // Strict business rule: Expenses cannot exceed available cash/revenue
+    if (netBalance <= 0) {
+      setExpenseError(
+        `Opération refusée : Le solde en caisse est actuellement nul ou négatif (${formatFCFA(netBalance)}). Le système interdit d'engager des dépenses sans recettes préalables.`
+      );
+      return;
+    }
     if (reqAmount > netBalance) {
       setExpenseError(
-        `Opération refusée : Le montant de la dépense (${formatFCFA(reqAmount)}) dépasse le solde disponible en caisse (${formatFCFA(Math.max(0, netBalance))}). Les dépenses ne peuvent pas être supérieures aux recettes.`
+        `Opération refusée : Le montant de la dépense (${formatFCFA(reqAmount)}) dépasse le solde disponible en caisse (${formatFCFA(netBalance)}). Les dépenses ne peuvent pas être supérieures à la caisse disponible.`
       );
       return;
     }
@@ -1879,8 +1886,22 @@ export const PaymentsModule: React.FC = () => {
                     step="500"
                     value={expenseFormData.amount}
                     onChange={e => setExpenseFormData({ ...expenseFormData, amount: Number(e.target.value) })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-rose-700 text-sm outline-none"
+                    className={`w-full p-2.5 bg-slate-50 border rounded-xl font-bold font-mono text-sm outline-none ${
+                      Number(expenseFormData.amount) > netBalance || netBalance <= 0
+                        ? 'border-rose-400 text-rose-700 bg-rose-50/50'
+                        : 'border-slate-200 text-slate-900'
+                    }`}
                   />
+                  {Number(expenseFormData.amount) > netBalance && (
+                    <span className="text-[10px] text-rose-600 font-bold block mt-1">
+                      ⚠️ Refus : Dépasse le solde en caisse ({formatFCFA(Math.max(0, netBalance))})
+                    </span>
+                  )}
+                  {netBalance <= 0 && (
+                    <span className="text-[10px] text-rose-600 font-bold block mt-1">
+                      ⚠️ Caisse vide : aucune dépense ne peut être enregistrée.
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -1934,7 +1955,13 @@ export const PaymentsModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                  disabled={
+                    !expenseFormData.amount ||
+                    Number(expenseFormData.amount) <= 0 ||
+                    Number(expenseFormData.amount) > netBalance ||
+                    netBalance <= 0
+                  }
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   Valider la Dépense
                 </button>
@@ -2159,9 +2186,11 @@ export const PaymentsModule: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => setReceiptModalPayment(p)}
-                                  className="text-slate-700 hover:text-blue-900 font-bold cursor-pointer"
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-xs font-semibold cursor-pointer border border-slate-200"
+                                  title="Visualiser la quittance officielle (format horizontal détaillé)"
                                 >
-                                  Reçu
+                                  <Eye className="w-3 h-3 text-slate-600" />
+                                  <span>Quittance</span>
                                 </button>
                               </td>
                             </tr>

@@ -108,6 +108,7 @@ export const CashierModule: React.FC = () => {
     approvedBy: 'Le Directeur Général'
   });
   const [expenseError, setExpenseError] = useState<string | null>(null);
+  const [expenseToDeleteModal, setExpenseToDeleteModal] = useState<Expense | null>(null);
 
   // Clôtures journalières de caisse
   const [closures, setClosures] = useState<DailyCashClosure[]>(() => {
@@ -156,9 +157,16 @@ export const CashierModule: React.FC = () => {
       setExpenseError('Veuillez saisir un montant supérieur à 0 FCFA.');
       return;
     }
+    // Règle stricte : la dépense ne peut pas être enregistrée si pas d'argent en caisse ou si montant > caisse
+    if (netBalance <= 0) {
+      setExpenseError(
+        `Opération refusée : Le solde en caisse est actuellement nul ou négatif (${formatFCFA(netBalance)}). Le système interdit d'engager des dépenses sans recettes préalables en caisse.`
+      );
+      return;
+    }
     if (reqAmount > netBalance) {
       setExpenseError(
-        `Dépense refusée : Le montant (${formatFCFA(reqAmount)}) dépasse le solde net disponible en caisse (${formatFCFA(Math.max(0, netBalance))}).`
+        `Dépense refusée : Le montant demandé (${formatFCFA(reqAmount)}) dépasse le solde disponible en caisse (${formatFCFA(netBalance)}). Le système refuse toute dépense supérieure à la caisse.`
       );
       return;
     }
@@ -192,6 +200,19 @@ export const CashierModule: React.FC = () => {
     });
     setToastMessage(`Dépense de ${formatFCFA(newExpense.amount)} enregistrée.`);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Suppression d'une dépense
+  const handleDeleteExpenseConfirm = () => {
+    if (expenseToDeleteModal) {
+      const updated = expenses.filter(e => e.id !== expenseToDeleteModal.id);
+      setExpenses(updated);
+      secureLocalStorage.setJSON('soma_expenses', updated);
+      cloudSyncService.deleteExpense(expenseToDeleteModal.id, cloudSchoolCode);
+      setExpenseToDeleteModal(null);
+      setToastMessage('Dépense supprimée avec succès. Le solde de la caisse a été mis à jour.');
+      setTimeout(() => setToastMessage(null), 3000);
+    }
   };
 
   const handleSaveClosure = (newClosure: DailyCashClosure) => {
@@ -460,12 +481,13 @@ export const CashierModule: React.FC = () => {
                     <th className="py-2 px-3">Description & Bénéficiaire</th>
                     <th className="py-2 px-2.5">Mode & Validation</th>
                     <th className="py-2 px-3 text-right">Montant (FCFA)</th>
+                    <th className="py-2 px-2 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {expenses.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                      <td colSpan={7} className="py-8 text-center text-slate-400 font-medium">
                         Aucune dépense enregistrée.
                       </td>
                     </tr>
@@ -491,6 +513,16 @@ export const CashierModule: React.FC = () => {
                         </td>
                         <td className="py-1.5 sm:py-2 px-3 text-right font-mono font-bold text-rose-700 tabular-nums">
                           -{formatFCFA(exp.amount)}
+                        </td>
+                        <td className="py-1.5 sm:py-2 px-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setExpenseToDeleteModal(exp)}
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Supprimer cette dépense"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -579,6 +611,19 @@ export const CashierModule: React.FC = () => {
               </button>
             </div>
 
+            {/* Solde Disponible en Caisse */}
+            <div className={`p-3 rounded-xl border flex items-center justify-between ${
+              netBalance > 0 ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950' : 'bg-rose-50 border-rose-200 text-rose-950'
+            }`}>
+              <div>
+                <span className="font-bold text-xs block">Solde Réel Disponible en Caisse</span>
+                <span className="text-[10px] text-slate-500">Recettes : {formatFCFA(totalCollected)} • Dépenses : {formatFCFA(totalExpenses)}</span>
+              </div>
+              <span className={`font-black font-mono text-sm ${netBalance > 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                {formatFCFA(Math.max(0, netBalance))}
+              </span>
+            </div>
+
             {expenseError && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-semibold text-rose-800 flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
@@ -609,8 +654,22 @@ export const CashierModule: React.FC = () => {
                     step="500"
                     value={expenseFormData.amount}
                     onChange={e => setExpenseFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:border-slate-400"
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs font-mono font-bold outline-none focus:bg-white ${
+                      Number(expenseFormData.amount) > netBalance || netBalance <= 0
+                        ? 'border-rose-400 text-rose-700 bg-rose-50/50'
+                        : 'border-slate-200 text-slate-900'
+                    }`}
                   />
+                  {Number(expenseFormData.amount) > netBalance && (
+                    <span className="text-[10px] text-rose-600 font-bold block mt-1">
+                      ⚠️ Refus : Dépasse le solde en caisse ({formatFCFA(Math.max(0, netBalance))})
+                    </span>
+                  )}
+                  {netBalance <= 0 && (
+                    <span className="text-[10px] text-rose-600 font-bold block mt-1">
+                      ⚠️ Caisse vide : aucune dépense autorisée.
+                    </span>
+                  )}
                 </div>
 
                 <div>
@@ -668,12 +727,54 @@ export const CashierModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                  disabled={
+                    !expenseFormData.amount ||
+                    Number(expenseFormData.amount) <= 0 ||
+                    Number(expenseFormData.amount) > netBalance ||
+                    netBalance <= 0
+                  }
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
                 >
                   Valider la Dépense
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmation Suppression Dépense */}
+      {expenseToDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-xl border border-slate-200">
+            <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-5 h-5" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-sm font-bold text-slate-900">Supprimer cette dépense ?</h3>
+              <p className="text-xs text-slate-500">
+                Voulez-vous supprimer la dépense <strong className="text-slate-800">{expenseToDeleteModal.reference}</strong> ({formatFCFA(expenseToDeleteModal.amount)}) ?
+              </p>
+              <p className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 p-2 rounded-lg mt-2">
+                Le montant sera immédiatement réintégré dans le solde de la caisse.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setExpenseToDeleteModal(null)}
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteExpenseConfirm}
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Confirmer
+              </button>
+            </div>
           </div>
         </div>
       )}

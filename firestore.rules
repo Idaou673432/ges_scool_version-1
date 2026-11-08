@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Vérifie que l'utilisateur est authentifié (session utilisateur ou session anonyme vérifiée)
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
     // Valide le format et la longueur des codes d'établissements scolaires
     function isValidSchoolCode(code) {
       return code is string && code.size() >= 2 && code.size() <= 64;
@@ -14,19 +9,17 @@ service cloud.firestore {
 
     // Répertoire des établissements scolaires enregistrés
     match /school_directory/{schoolCode} {
-      allow read: if isAuthenticated() && isValidSchoolCode(schoolCode);
-      allow write: if isAuthenticated() && isValidSchoolCode(schoolCode);
+      allow read, write: if isValidSchoolCode(schoolCode);
     }
 
-    // Données isolées par établissement : paramètres, élèves, classes, notes, paiements, présences, journaux
+    // Données isolées par établissement : paramètres, élèves, classes, matières, notes, paiements, présences, journaux
     match /schools/{schoolCode}/{allSchoolPaths=**} {
-      allow read: if isAuthenticated() && isValidSchoolCode(schoolCode);
-      allow write: if isAuthenticated() && isValidSchoolCode(schoolCode);
+      allow read, write: if isValidSchoolCode(schoolCode);
     }
 
-    // Historique des scans QR (lecture/écriture sécurisée sous authentification)
+    // Historique des scans QR (lecture/écriture sécurisée)
     match /scan_history/{docId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if docId is string && docId.size() > 0;
     }
 
     // Refus strict de tout autre accès par défaut

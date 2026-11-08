@@ -3,11 +3,15 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Check } from 'lucide-react';
+import { 
+  Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, 
+  ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Check,
+  GraduationCap, Building2, Wrench, Globe, Sparkles, BookOpen
+} from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
-import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel } from '../../constants/maliEducation';
+import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel, MALI_DEFAULT_CLASSES, MALI_DEFAULT_SUBJECTS } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
-import { SchoolEnabledFeatures } from '../../types';
+import { SchoolEnabledFeatures, SchoolCategory } from '../../types';
 import { secureLocalStorage } from '../../services/secureStorage';
 
 const MONTH_OPTIONS = [
@@ -24,10 +28,15 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   const { 
     settings, 
     updateSettings, 
-    cloudSchoolCode 
+    cloudSchoolCode,
+    classes,
+    subjects,
+    saveClass,
+    saveSubject
   } = useSchool();
   const [formData, setFormData] = useState({
     ...settings,
+    schoolCategory: settings.schoolCategory || ('ECOLE_FONDAMENTALE' as SchoolCategory),
     adminPassword: settings.adminPassword || '0022390070321',
     modulesSecurityPin: settings.modulesSecurityPin || '0000',
     evaluationCount: settings.evaluationCount || 9,
@@ -113,6 +122,113 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
     updateSettings(formData);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
+  };
+
+  const getCategoryLabel = (cat?: string) => {
+    switch (cat) {
+      case 'ECOLE_FONDAMENTALE': return 'École Fondamentale / Primaire';
+      case 'LYCEE': return 'Lycée d\'Enseignement Général';
+      case 'PROFESSIONNEL': return 'Formation Professionnelle & Technique';
+      case 'COMPLEXE': return 'Complexe Scolaire / Mixte';
+      default: return 'École Fondamentale / Primaire';
+    }
+  };
+
+  const handleApplySchoolTypePreset = (category: SchoolCategory) => {
+    let newSettings: Partial<typeof formData> = {
+      schoolCategory: category
+    };
+
+    if (category === 'ECOLE_FONDAMENTALE') {
+      newSettings = {
+        ...newSettings,
+        evaluationCount1stCycle: 9,
+        evaluationCount2ndCycle: 9,
+        evaluationsPerTrimester1stCycle: 3,
+        evaluationsPerTrimester2ndCycle: 3,
+        calculationFormula1stCycle: 'MALI_OFFICIAL',
+        calculationFormula2ndCycle: 'MALI_OFFICIAL',
+        classScoreWeight1st: 1,
+        compScoreWeight1st: 1,
+        missingClassScoreBehavior: 'USE_COMP_ONLY',
+        missingCompScoreBehavior: 'USE_CLASS_ONLY'
+      };
+    } else if (category === 'LYCEE') {
+      newSettings = {
+        ...newSettings,
+        evaluationCount2ndCycle: 9,
+        evaluationsPerTrimester2ndCycle: 3,
+        calculationFormula2ndCycle: 'MALI_OFFICIAL',
+        missingClassScoreBehavior: 'USE_COMP_ONLY',
+        missingCompScoreBehavior: 'USE_CLASS_ONLY'
+      };
+    } else if (category === 'PROFESSIONNEL') {
+      newSettings = {
+        ...newSettings,
+        evaluationCount2ndCycle: 9,
+        evaluationsPerTrimester2ndCycle: 3,
+        calculationFormula2ndCycle: 'MALI_OFFICIAL',
+        missingClassScoreBehavior: 'USE_COMP_ONLY',
+        missingCompScoreBehavior: 'USE_CLASS_ONLY'
+      };
+    }
+
+    const merged = { ...formData, ...newSettings };
+    setFormData(merged);
+    updateSettings(merged);
+    setCleanToast(`Configuration appliquée : attributs et barèmes configurés pour "${getCategoryLabel(category)}".`);
+    setTimeout(() => setCleanToast(null), 3500);
+  };
+
+  const handleGenerateDefaultClassesAndSubjects = (category: SchoolCategory) => {
+    let classesToCreate = MALI_DEFAULT_CLASSES;
+    let subjectsToCreate = MALI_DEFAULT_SUBJECTS;
+
+    if (category === 'ECOLE_FONDAMENTALE') {
+      classesToCreate = MALI_DEFAULT_CLASSES.filter(c => c.category === 'FONDAMENTAL_1' || c.category === 'FONDAMENTAL_2');
+      subjectsToCreate = MALI_DEFAULT_SUBJECTS.filter(s => s.classCategory === 'FONDAMENTAL_1' || s.classCategory === 'FONDAMENTAL_2');
+    } else if (category === 'LYCEE') {
+      classesToCreate = MALI_DEFAULT_CLASSES.filter(c => c.category === 'LYCEE');
+      subjectsToCreate = MALI_DEFAULT_SUBJECTS.filter(s => s.classCategory === 'LYCEE');
+    } else if (category === 'PROFESSIONNEL') {
+      classesToCreate = MALI_DEFAULT_CLASSES.filter(c => c.category === 'TECHNIQUE_BT' || c.category === 'PROFESSIONNEL_CAP');
+      subjectsToCreate = MALI_DEFAULT_SUBJECTS.filter(s => s.classCategory === 'TECHNIQUE_BT');
+    }
+
+    let addedClasses = 0;
+    classesToCreate.forEach(cls => {
+      const exists = classes.some(c => c.name.toLowerCase() === cls.name.toLowerCase());
+      if (!exists) {
+        saveClass({
+          name: cls.name,
+          category: cls.category as any,
+          level: cls.level,
+          monthlyFee: cls.fee,
+          inscriptionFee: cls.insFee,
+          classroom: 'Salle Principale',
+          passingGrade: cls.category === 'FONDAMENTAL_1' ? 5 : 10
+        });
+        addedClasses++;
+      }
+    });
+
+    let addedSubjects = 0;
+    subjectsToCreate.forEach(sub => {
+      const exists = subjects.some(s => s.name.toLowerCase() === sub.name.toLowerCase() || s.code.toLowerCase() === sub.code.toLowerCase());
+      if (!exists) {
+        saveSubject({
+          code: sub.code,
+          name: sub.name,
+          coefficient: sub.coefficient,
+          classCategory: sub.classCategory as any,
+          order: sub.order
+        });
+        addedSubjects++;
+      }
+    });
+
+    setCleanToast(`Préréglages importés : ${addedClasses} classe(s) et ${addedSubjects} matière(s) ajoutée(s).`);
+    setTimeout(() => setCleanToast(null), 3500);
   };
 
   const handleMonthChange = (termKey: string, monthValue: string) => {
@@ -438,32 +554,32 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
 
       {/* Si non déverrouillé, afficher l'écran d'accès sécurisé par code PIN pour l'ensemble des paramètres */}
       {!isModulesUnlocked ? (
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-10 shadow-sm max-w-md mx-auto my-6 text-center animate-fadeIn">
+        <div className="bg-white border border-slate-200/90 rounded-xl p-4 sm:p-5 shadow-xs max-w-xs sm:max-w-sm mx-auto my-3 text-center animate-fadeIn">
           {/* Lock Icon */}
-          <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-2xs">
-            <Lock className="w-8 h-8" />
+          <div className="w-10 h-10 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl flex items-center justify-center mx-auto mb-2 shadow-2xs">
+            <Lock className="w-5 h-5" />
           </div>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100/90 text-amber-900 rounded-full text-[11px] font-bold uppercase tracking-wider mb-2">
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Accès Administrateur Protégé</span>
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100/90 text-amber-900 rounded-full text-[10px] font-bold uppercase tracking-wider mb-1">
+            <ShieldAlert className="w-3 h-3" />
+            <span>Accès Protégé</span>
           </div>
 
-          <h2 className="text-xl font-black text-slate-900 mb-2">
+          <h2 className="text-sm font-black text-slate-900 mb-1">
             Accès Sécurisé par Code PIN
           </h2>
-          <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto mb-6">
-            L'accès aux paramètres et la personnalisation de l'établissement requièrent l'autorisation par code PIN.
+          <p className="text-[11px] text-slate-500 font-medium mb-3">
+            Saisissez votre code PIN (par défaut: 0000) pour modifier les paramètres.
           </p>
 
           {/* 4 PIN Digit Dots Display */}
-          <div className="flex justify-center items-center gap-3 mb-6">
+          <div className="flex justify-center items-center gap-2 mb-3">
             {[0, 1, 2, 3].map((idx) => {
               const hasChar = modulesPinInput.length > idx;
               return (
                 <div
                   key={idx}
-                  className={`w-12 h-14 rounded-xl border-2 flex items-center justify-center font-mono text-2xl font-black transition-all ${
+                  className={`w-9 h-10 rounded-lg border-2 flex items-center justify-center font-mono text-lg font-black transition-all ${
                     hasChar
                       ? 'border-slate-900 bg-slate-900 text-white scale-105 shadow-xs'
                       : 'border-slate-200 bg-slate-50 text-slate-400'
@@ -475,8 +591,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             })}
           </div>
 
-          {/* Keyboard input (masqué avec type password et placeholder ••••) */}
-          <div className="mb-4 max-w-xs mx-auto">
+          {/* Keyboard input */}
+          <div className="mb-3 max-w-[200px] mx-auto">
             <input
               type="password"
               inputMode="numeric"
@@ -497,25 +613,25 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                 }
               }}
               placeholder="••••"
-              className="w-full text-center px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-base tracking-widest font-bold focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none"
+              className="w-full text-center px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-sm tracking-widest font-bold focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 outline-none"
             />
           </div>
 
           {pinError && (
-            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
+            <div className="mb-3 p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
               <span>{pinError}</span>
             </div>
           )}
 
           {/* On-screen Keypad */}
-          <div className="max-w-xs mx-auto grid grid-cols-3 gap-2 mb-6">
+          <div className="max-w-[220px] mx-auto grid grid-cols-3 gap-1.5 mb-3">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
               <button
                 key={digit}
                 type="button"
                 onClick={() => handlePinDigitPress(digit)}
-                className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
+                className="py-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-sm rounded-lg transition-all cursor-pointer shadow-2xs font-mono"
               >
                 {digit}
               </button>
@@ -523,21 +639,21 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             <button
               type="button"
               onClick={handlePinClear}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer font-sans"
+              className="py-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all cursor-pointer font-sans"
             >
               Effacer
             </button>
             <button
               type="button"
               onClick={() => handlePinDigitPress('0')}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-lg rounded-xl transition-all cursor-pointer shadow-2xs font-mono"
+              className="py-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 font-bold text-sm rounded-lg transition-all cursor-pointer shadow-2xs font-mono"
             >
               0
             </button>
             <button
               type="button"
               onClick={handlePinBackspace}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center"
+              className="py-1.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-600 font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center"
               title="Supprimer un chiffre"
             >
               ⌫
@@ -545,26 +661,22 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
           </div>
 
           {/* Action Button */}
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => handleVerifyModulesPin()}
-              className="w-full py-3 px-6 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Unlock className="w-4 h-4 text-amber-400" />
-              <span>Déverrouiller les Paramètres</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleVerifyModulesPin()}
+            className="w-full py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider rounded-lg shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <Unlock className="w-3.5 h-3.5 text-amber-400" />
+            <span>Déverrouiller les Paramètres</span>
+          </button>
         </div>
       ) : (
         <>
-          {/* Security Unlock Active Banner */}
-          <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-full flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Accès Administrateur Déverrouillé</span>
-              </span>
+          {/* Security Unlock Active Banner (Ultra-Compact) */}
+          <div className="flex items-center justify-between gap-2 px-3 py-1 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs font-semibold">
+            <div className="flex items-center gap-1.5 text-emerald-800">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Accès Administrateur Déverrouillé</span>
             </div>
 
             <button
@@ -573,692 +685,692 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                 setIsModulesUnlocked(false);
                 setModulesPinInput('');
               }}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-2.5 py-0.5 bg-white hover:bg-slate-100 text-slate-700 font-bold text-[11px] rounded-md border border-slate-300 flex items-center gap-1 transition-colors cursor-pointer"
               title="Reverrouiller l'accès"
             >
-              <Lock className="w-3.5 h-3.5 text-slate-500" />
+              <Lock className="w-3 h-3 text-slate-500" />
               <span>Reverrouiller</span>
             </button>
           </div>
 
           {savedSuccess && (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <div className="p-2 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
               <span>Paramètres mis à jour avec succès.</span>
             </div>
           )}
 
+          {/* ================= TAB 1: FICHE ECOLE (INFO) ================= */}
           {activeTab === 'INFO' && (
-            <form onSubmit={handleSubmit} className="bg-white border border-slate-200/80 rounded-2xl p-6 sm:p-7 shadow-2xs space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Nom Officiel de l'Établissement *</label>
-              <input
-                type="text"
-                required
-                value={formData.schoolName}
-                onChange={e => setFormData({ ...formData, schoolName: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Académie d'Enseignement *</label>
-              <select
-                value={formData.academyName}
-                onChange={e => setFormData({ ...formData, academyName: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 cursor-pointer"
-              >
-                {MALI_ACADEMIES.map(ac => (
-                  <option key={ac} value={ac}>{ac}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Centre d'Animation Pédagogique (CAP) *</label>
-              <input
-                type="text"
-                required
-                value={formData.capName}
-                onChange={e => setFormData({ ...formData, capName: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">N° Agrément / Autorisation MEN *</label>
-              <input
-                type="text"
-                required
-                value={formData.registrationNumber}
-                onChange={e => setFormData({ ...formData, registrationNumber: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Nom du Directeur / Proviseur *</label>
-              <input
-                type="text"
-                required
-                value={formData.directorName}
-                onChange={e => setFormData({ ...formData, directorName: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Année Académique Active *</label>
-              <input
-                type="text"
-                required
-                value={formData.currentAcademicYear}
-                onChange={e => setFormData({ ...formData, currentAcademicYear: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
-                Site Web / URL Publique pour les QR Codes (Optionnel)
-              </label>
-              <input
-                type="url"
-                placeholder="Ex: https://mon-ecole.ml (par défaut l'URL actuelle)"
-                value={formData.website || ''}
-                onChange={e => setFormData({ ...formData, website: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">
-                Laissez vide pour utiliser automatiquement l'URL web actuelle de l'application.
-              </span>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              <Save className="w-4 h-4 text-amber-400" />
-              <span>Sauvegarder les Modifications</span>
-            </button>
-          </div>
-        </form>
-      )}
-
-      {activeTab === 'LOGO_SECURITY' && (
-        <div className="space-y-8">
-          {/* LOGO SECTION */}
-          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-100 text-blue-900 rounded-2xl flex items-center justify-center font-black">
-                <Image className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-900 uppercase">
-                  Logo de l'Établissement
-                </h2>
-                <p className="text-xs font-bold text-slate-400">
-                  Importez ou modifiez le logo officiel apparaissant sur les reçus, bulletins et cartes scolaires.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-8 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-              {/* Logo Preview Box */}
-              <div className="w-32 h-32 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-3 text-center shadow-xs overflow-hidden shrink-0">
-                {formData.logoUrl ? (
-                  <img src={formData.logoUrl} alt="Logo de l'établissement" className="w-full h-full object-contain" />
-                ) : (
-                  <div className="text-slate-300 flex flex-col items-center gap-1">
-                    <Image className="w-8 h-8" />
-                    <span className="text-[10px] font-black uppercase text-slate-400">Aucun Logo</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Logo Action Buttons */}
-              <div className="space-y-4 text-center sm:text-left">
-                <div className="flex flex-wrap gap-3">
-                  <label className="flex items-center gap-2 px-6 py-3 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer shadow-md transition-all">
-                    <Upload className="w-4 h-4" />
-                    <span>Choisir une Image (PNG/JPG)</span>
-                    <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-                  </label>
-
-                  {formData.logoUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, logoUrl: undefined }))}
-                      className="flex items-center gap-2 px-5 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-[10px] uppercase tracking-widest rounded-full transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Supprimer le Logo</span>
-                    </button>
-                  )}
+            <form onSubmit={handleSubmit} className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-4 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="font-bold text-slate-900 text-xs">
+                  Informations Officielles de l'Établissement
                 </div>
-
-                <p className="text-[11px] text-slate-500 font-medium max-w-md">
-                  💡 Format recommandé : PNG carré ou rectangulaire sur fond transparent. Taille maximale : 2 Mo. Ce logo apparaîtra automatiquement sur tous les documents officiels.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* CACHET ET SIGNATURE SECTION */}
-          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-amber-100 text-amber-900 rounded-2xl flex items-center justify-center font-black">
-                <Image className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-slate-900 uppercase">
-                  Cachet & Signature Officielle du Directeur
-                </h2>
-                <p className="text-xs font-bold text-slate-400">
-                  Importez le tampon et la signature numérisée pour authentifier les bulletins et reçus.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center gap-8 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-              <div className="w-32 h-32 bg-white rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center p-3 text-center shadow-xs overflow-hidden shrink-0">
-                {formData.stampUrl ? (
-                  <img src={formData.stampUrl} alt="Cachet et signature" className="w-full h-full object-contain" />
-                ) : (
-                  <div className="text-slate-300 flex flex-col items-center gap-1">
-                    <Image className="w-8 h-8 text-amber-700/40" />
-                    <span className="text-[10px] font-black uppercase text-slate-400">Aucun Cachet</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4 text-center sm:text-left">
-                <div className="flex flex-wrap gap-3">
-                  <label className="flex items-center gap-2 px-6 py-3 bg-amber-800 hover:bg-amber-900 text-white font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer shadow-md transition-all">
-                    <Upload className="w-4 h-4" />
-                    <span>Choisir Cachet / Signature (PNG)</span>
-                    <input type="file" accept="image/*" onChange={handleStampUpload} className="hidden" />
-                  </label>
-
-                  {formData.stampUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, stampUrl: undefined }))}
-                      className="flex items-center gap-2 px-5 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-[10px] uppercase tracking-widest rounded-full transition-all cursor-pointer"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Supprimer le Cachet</span>
-                    </button>
-                  )}
-                </div>
-
-                <p className="text-[11px] text-slate-500 font-medium max-w-md">
-                  💡 Format recommandé : Image PNG sur fond transparent avec le sceau bleu/noir de l'école et la signature. S'imprime automatiquement au bas des bulletins A4.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* MOT DE PASSE SECTION */}
-          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-900 rounded-2xl flex items-center justify-center font-black">
-                  <Key className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 uppercase">
-                    Mot de Passe Administrateur (Code PIN)
-                  </h2>
-                  <p className="text-xs font-bold text-slate-400">
-                    Définissez et modifiez le code de sécurité requis pour les actions sensibles (Comptabilité, Suppression, Accès).
-                  </p>
-                </div>
-              </div>
-
-              <div className="px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2">
-                <Lock className="w-4 h-4 text-emerald-600" />
-                <span>Statut : <strong className="font-mono text-emerald-900 text-sm">Protégé par Code PIN</strong></span>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Nouveau Mot de Passe / Code PIN *
-                  </label>
-                  <div className="relative mt-2">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      required
-                      value={formData.adminPassword}
-                      onChange={e => setFormData({ ...formData, adminPassword: e.target.value })}
-                      className="w-full p-3.5 pr-12 bg-white border border-slate-200 rounded-full text-sm font-black font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-900 tracking-wider"
-                      placeholder="Saisissez un nouveau code"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-bold mt-1.5">
-                    Modifiez et enregistrez pour mettre à jour votre mot de passe de sécurité.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Code PIN de Sécurité (Paramètres & Modules) *
-                  </label>
-                  <div className="relative mt-2">
-                    <input
-                      type="password"
-                      required
-                      maxLength={8}
-                      value={formData.modulesSecurityPin || '0000'}
-                      onChange={e => setFormData({ ...formData, modulesSecurityPin: e.target.value })}
-                      className="w-full p-3.5 bg-white border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-900 outline-none focus:ring-2 focus:ring-blue-900 tracking-wider"
-                      placeholder="••••"
-                    />
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-medium mt-1.5">
-                    Code PIN de sécurité requis pour déverrouiller et modifier les Paramètres ainsi que les Modules.
-                  </p>
-                </div>
-
-                {/* Tester le code */}
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    Tester le Code PIN en direct
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={testPasswordInput}
-                      onChange={e => {
-                        setTestPasswordInput(e.target.value);
-                        setTestResult('IDLE');
-                      }}
-                      placeholder="Saisissez le code pour tester..."
-                      className="flex-1 p-3 bg-white border border-slate-200 rounded-full text-xs font-mono font-bold text-slate-900 outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (testPasswordInput === (formData.adminPassword || '0022390070321')) {
-                          setTestResult('SUCCESS');
-                        } else {
-                          setTestResult('FAIL');
-                        }
-                      }}
-                      className="px-5 py-3 bg-slate-800 hover:bg-slate-900 text-white font-black text-[10px] uppercase tracking-widest rounded-full cursor-pointer"
-                    >
-                      Vérifier
-                    </button>
-                  </div>
-
-                  {testResult === 'SUCCESS' && (
-                    <p className="text-xs font-black text-emerald-600 flex items-center gap-1.5 pt-1">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Code Correct ! Mot de passe valide.</span>
-                    </p>
-                  )}
-                  {testResult === 'FAIL' && (
-                    <p className="text-xs font-black text-rose-600 flex items-center gap-1.5 pt-1">
-                      <ShieldAlert className="w-4 h-4" />
-                      <span>Code Invalide. Le mot de passe ne correspond pas.</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Enregistrer le Logo & Mot de Passe</span>
+                  <Save className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sauvegarder</span>
                 </button>
               </div>
-            </form>
-          </div>
 
-          {/* NETTOYAGE & OPTIMISATION DU STOCKAGE LOCAL */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-slate-100 text-slate-800 rounded-xl flex items-center justify-center shrink-0">
-                  <RotateCcw className="w-5 h-5 text-slate-700" />
+              {/* SÉLECTEUR RAPIDE DU TYPE D'ÉTABLISSEMENT & ATTRIBUTS */}
+              <div className="bg-slate-50/90 border border-slate-200/90 rounded-xl p-2.5 sm:p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 text-slate-800">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="font-bold text-xs">Type d'Établissement & Attributs Automatiques</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-medium">
+                    Configure instantanément les barèmes (/10 ou /20), cycles et matières adaptées
+                  </span>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Nettoyage Automatique & Espace de Stockage
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    Supprime automatiquement les tampons, caches éphémères et clés expirées pour préserver les performances du navigateur.
-                  </p>
-                </div>
-              </div>
 
-              <button
-                type="button"
-                onClick={handleCleanStorage}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer shrink-0"
-              >
-                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-                <span>Nettoyer le cache maintenant</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
-                <div className="text-[10px] font-bold uppercase text-slate-400">Espace Utilisé</div>
-                <div className="text-sm font-bold text-slate-800 font-mono mt-0.5">{storageStats.usedKb} Ko</div>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
-                <div className="text-[10px] font-bold uppercase text-slate-400">Total Clés Stockées</div>
-                <div className="text-sm font-bold text-slate-800 font-mono mt-0.5">{storageStats.keysCount}</div>
-              </div>
-              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60">
-                <div className="text-[10px] font-bold uppercase text-slate-400">Clés Temporaires</div>
-                <div className="text-sm font-bold text-slate-800 font-mono mt-0.5">{storageStats.temporaryKeysCount}</div>
-              </div>
-              <div className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-200/60">
-                <div className="text-[10px] font-bold uppercase text-emerald-600">Nettoyage Auto</div>
-                <div className="text-xs font-bold text-emerald-800 flex items-center gap-1 mt-0.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Actif & Sécurisé</span>
-                </div>
-              </div>
-            </div>
-
-            {cleanToast && (
-              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs animate-fadeIn">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{cleanToast}</span>
-              </div>
-            )}
-          </div>
-
-        </div>
-      )}
-
-      {activeTab === 'FEATURES' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-7 shadow-xs space-y-6 animate-fadeIn">
-
-          {/* Header & Quick Action Presets */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-200">
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                Activation des modules & fonctionnalités
-              </h2>
-              <p className="text-xs text-slate-600 mt-1 max-w-2xl leading-relaxed">
-                Adaptez l'application aux besoins précis de cette école. Les modules désactivés sont automatiquement masqués du menu latéral, de la navigation mobile et du tableau de bord.
-              </p>
-            </div>
-
-            {/* Presets rapides */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleEnableAllFeatures}
-                className="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-medium text-xs rounded-lg transition-colors cursor-pointer"
-                title="Active tous les modules de l'application"
-              >
-                Tout activer (10/10)
-              </button>
-              <button
-                type="button"
-                onClick={handleSetPedagogyOnly}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
-                title="Active la scolarité et les bulletins sans la caisse ni les scans"
-              >
-                Pédagogie seule (Sans caisse)
-              </button>
-              <button
-                type="button"
-                onClick={handleSetEssentialOnly}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
-                title="Configuration légère : Élèves, Classes, Matières, Notes et Bulletins uniquement"
-              >
-                Essentiel & Bulletins
-              </button>
-              <button
-                type="button"
-                onClick={handleSetFinanceOnly}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-lg border border-slate-300 transition-colors cursor-pointer"
-                title="Configuration finance : Élèves, Classes, Caisse et Cartes scolaires"
-              >
-                Caisse & Inscriptions
-              </button>
-            </div>
-          </div>
-
-          {/* Filtres par catégorie de modules */}
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <span className="text-xs font-semibold text-slate-500 mr-1">Filtrer :</span>
-            {(['TOUS', 'Scolarité', 'Pédagogie', 'Évaluations', 'Finance', 'Sécurité & Scan'] as const).map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setFeatureCategoryFilter(cat)}
-                className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
-                  featureCategoryFilter === cat 
-                    ? 'bg-slate-900 text-white' 
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {cat === 'TOUS' ? 'Tous les modules' : cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Notice info */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span>
-              💡 Les réglages sont automatiquement sauvegardés pour l'établissement <strong>{formData.schoolName}</strong> (Code : <span className="font-mono font-bold">{cloudSchoolCode}</span>).
-            </span>
-            <span className="font-semibold text-xs shrink-0 bg-blue-100/70 px-2 py-0.5 rounded text-blue-950">
-              {FEATURES_CONFIG.filter(f => isFeatureActive(f.key)).length} / {FEATURES_CONFIG.length} actifs
-            </span>
-          </div>
-
-          {/* Grid of feature toggles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {FEATURES_CONFIG
-              .filter(feat => featureCategoryFilter === 'TOUS' || feat.category === featureCategoryFilter || (featureCategoryFilter === 'Pédagogie' && feat.category === 'Vie Scolaire'))
-              .map((feat) => {
-              const active = isFeatureActive(feat.key);
-              return (
-                <div
-                  key={feat.key}
-                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
-                    active 
-                      ? 'bg-white border-slate-300 shadow-xs' 
-                      : 'bg-slate-50 border-slate-200 opacity-75'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
-                          {feat.category}
-                        </span>
-                        {feat.isCore && (
-                          <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                            Requis
-                          </span>
-                        )}
+                {/* 4 Cards de Type d'École */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* Option 1: École Fondamentale */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplySchoolTypePreset('ECOLE_FONDAMENTALE')}
+                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                      formData.schoolCategory === 'ECOLE_FONDAMENTALE'
+                        ? 'bg-white border-emerald-500 ring-2 ring-emerald-500/10 shadow-xs'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="w-6 h-6 rounded-md bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs">
+                        🏫
                       </div>
-                      <h3 className="font-bold text-sm text-slate-900 mt-1">
-                        {feat.name}
-                      </h3>
-                      <p className="text-xs text-slate-500 leading-relaxed">
-                        {feat.description}
-                      </p>
+                      {formData.schoolCategory === 'ECOLE_FONDAMENTALE' && (
+                        <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                      )}
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 leading-tight">École Fondamentale</div>
+                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">1ère à 9ème DEF • /10 & /20</div>
+                  </button>
+
+                  {/* Option 2: Lycée Général */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplySchoolTypePreset('LYCEE')}
+                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                      formData.schoolCategory === 'LYCEE'
+                        ? 'bg-white border-blue-500 ring-2 ring-blue-500/10 shadow-xs'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="w-6 h-6 rounded-md bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs">
+                        🎓
+                      </div>
+                      {formData.schoolCategory === 'LYCEE' && (
+                        <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                      )}
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 leading-tight">Lycée Général</div>
+                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">10ème à 12ème BAC • /20</div>
+                  </button>
+
+                  {/* Option 3: Professionnel */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplySchoolTypePreset('PROFESSIONNEL')}
+                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                      formData.schoolCategory === 'PROFESSIONNEL'
+                        ? 'bg-white border-amber-500 ring-2 ring-amber-500/10 shadow-xs'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="w-6 h-6 rounded-md bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-xs">
+                        ⚙️
+                      </div>
+                      {formData.schoolCategory === 'PROFESSIONNEL' && (
+                        <span className="w-4 h-4 rounded-full bg-amber-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                      )}
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 leading-tight">Professionnel & BT</div>
+                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">CAP 1&2 • BT1&2 • Métiers</div>
+                  </button>
+
+                  {/* Option 4: Complexe */}
+                  <button
+                    type="button"
+                    onClick={() => handleApplySchoolTypePreset('COMPLEXE')}
+                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
+                      formData.schoolCategory === 'COMPLEXE'
+                        ? 'bg-white border-purple-500 ring-2 ring-purple-500/10 shadow-xs'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300 hover:bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="w-6 h-6 rounded-md bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs">
+                        🌐
+                      </div>
+                      {formData.schoolCategory === 'COMPLEXE' && (
+                        <span className="w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                      )}
+                    </div>
+                    <div className="font-bold text-xs text-slate-900 leading-tight">Complexe / Mixte</div>
+                    <div className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">Tous cycles d'enseignement</div>
+                  </button>
+                </div>
+
+                {/* Actions d'import rapide et informations sur le type sélectionné */}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/80 text-[11px]">
+                  <div className="text-slate-600 font-medium flex items-center gap-1.5">
+                    <span className="font-bold text-slate-800">Type actif :</span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-bold text-[10px]">
+                      {getCategoryLabel(formData.schoolCategory)}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateDefaultClassesAndSubjects(formData.schoolCategory || 'ECOLE_FONDAMENTALE')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-md shadow-2xs transition-colors cursor-pointer text-[10px]"
+                    title="Génère automatiquement les classes et matières officielles pour ce type d'établissement"
+                  >
+                    <BookOpen className="w-3 h-3 text-slate-950" />
+                    <span>Charger les classes & matières officielles ({getCategoryLabel(formData.schoolCategory).split('/')[0].trim()})</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Nom Officiel *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.schoolName}
+                    onChange={e => setFormData({ ...formData, schoolName: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Académie *</label>
+                  <select
+                    value={formData.academyName}
+                    onChange={e => setFormData({ ...formData, academyName: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400 cursor-pointer"
+                  >
+                    {MALI_ACADEMIES.map(ac => (
+                      <option key={ac} value={ac}>{ac}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">CAP *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.capName}
+                    onChange={e => setFormData({ ...formData, capName: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">N° Agrément / Autorisation *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.registrationNumber}
+                    onChange={e => setFormData({ ...formData, registrationNumber: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Directeur / Proviseur *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.directorName}
+                    onChange={e => setFormData({ ...formData, directorName: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Année Scolaire Active *</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.currentAcademicYear}
+                    onChange={e => setFormData({ ...formData, currentAcademicYear: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    Site Web / URL Publique pour QR Codes (Optionnel)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="Laisser vide pour utiliser automatiquement l'URL web actuelle de l'application"
+                    value={formData.website || ''}
+                    onChange={e => setFormData({ ...formData, website: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:bg-white focus:border-slate-400"
+                  />
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* ================= TAB 2: LOGO & SECURITE (ULTRA-COMPACT) ================= */}
+          {activeTab === 'LOGO_SECURITY' && (
+            <div className="space-y-2.5">
+              {/* BLOC 1: LOGO & CACHET EN GRILLE COMPACTE */}
+              <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-2xs space-y-2">
+                <div className="text-xs font-bold text-slate-900 border-b border-slate-100 pb-1.5">
+                  Logo & Cachet Officiel de l'Établissement
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {/* LOGO */}
+                  <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-dashed border-slate-300 flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-2xs">
+                      {formData.logoUrl ? (
+                        <img src={formData.logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="text-slate-300 flex flex-col items-center">
+                          <Image className="w-5 h-5 text-slate-400" />
+                          <span className="text-[9px] font-bold text-slate-400">Pas de logo</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Toggle Switch */}
-                    <div className="shrink-0 pt-1">
-                      {feat.isCore ? (
-                        <span className="text-xs font-semibold text-slate-400">
-                          Toujours actif
-                        </span>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="text-xs font-bold text-slate-800">Logo Officiel</div>
+                      <p className="text-[10px] text-slate-500 line-clamp-1">Reçus, bulletins et cartes scolaires.</p>
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[10px] rounded-md cursor-pointer transition-colors shadow-2xs">
+                          <Upload className="w-3 h-3 text-amber-400" />
+                          <span>Choisir Image</span>
+                          <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                        </label>
+                        {formData.logoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, logoUrl: undefined }))}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] rounded-md border border-rose-200 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Supprimer</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CACHET */}
+                  <div className="flex items-center gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                    <div className="w-16 h-16 bg-white rounded-lg border border-dashed border-slate-300 flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-2xs">
+                      {formData.stampUrl ? (
+                        <img src={formData.stampUrl} alt="Cachet" className="w-full h-full object-contain" />
                       ) : (
+                        <div className="text-slate-300 flex flex-col items-center">
+                          <Image className="w-5 h-5 text-amber-700/40" />
+                          <span className="text-[9px] font-bold text-slate-400">Pas de sceau</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="text-xs font-bold text-slate-800">Cachet & Signature</div>
+                      <p className="text-[10px] text-slate-500 line-clamp-1">Apparaît au bas des bulletins A4.</p>
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-800 hover:bg-amber-900 text-white font-bold text-[10px] rounded-md cursor-pointer transition-colors shadow-2xs">
+                          <Upload className="w-3 h-3 text-amber-300" />
+                          <span>Choisir Cachet</span>
+                          <input type="file" accept="image/*" onChange={handleStampUpload} className="hidden" />
+                        </label>
+                        {formData.stampUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ ...prev, stampUrl: undefined }))}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] rounded-md border border-rose-200 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Supprimer</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BLOC 2: MOT DE PASSE & CODE PIN (ULTRA COMPACT) */}
+              <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-2xs space-y-2">
+                <form onSubmit={handleSubmit} className="space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                      <Key className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Mot de Passe & Code PIN Administrateur</span>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Save className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Enregistrer les Mots de Passe</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    {/* Mot de passe caisse */}
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                        Mot de Passe / PIN Caisse *
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          required
+                          value={formData.adminPassword}
+                          onChange={e => setFormData({ ...formData, adminPassword: e.target.value })}
+                          className="w-full px-2.5 py-1 pr-8 bg-white border border-slate-300 rounded-md text-xs font-mono font-bold text-slate-900 outline-none"
+                        />
                         <button
                           type="button"
-                          onClick={() => handleToggleFeature(feat.key)}
-                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            active ? 'bg-emerald-600' : 'bg-slate-300'
-                          }`}
-                          role="switch"
-                          aria-checked={active}
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
                         >
-                          <span
-                            aria-hidden="true"
-                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                              active ? 'translate-x-5' : 'translate-x-0'
-                            }`}
-                          />
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Code PIN Paramètres */}
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                        PIN de Sécurité Paramètres (4 chiffres) *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        maxLength={8}
+                        value={formData.modulesSecurityPin || '0000'}
+                        onChange={e => setFormData({ ...formData, modulesSecurityPin: e.target.value })}
+                        className="w-full px-2.5 py-1 bg-white border border-slate-300 rounded-md text-xs font-mono font-bold text-slate-900 outline-none"
+                      />
+                    </div>
+
+                    {/* Tester code */}
+                    <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                        Tester le Code PIN
+                      </label>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="password"
+                          value={testPasswordInput}
+                          onChange={e => {
+                            setTestPasswordInput(e.target.value);
+                            setTestResult('IDLE');
+                          }}
+                          placeholder="Code à tester..."
+                          className="flex-1 px-2.5 py-1 bg-white border border-slate-300 rounded-md text-xs font-mono font-bold text-slate-900 outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (testPasswordInput === (formData.adminPassword || '0022390070321')) {
+                              setTestResult('SUCCESS');
+                            } else {
+                              setTestResult('FAIL');
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] rounded-md cursor-pointer"
+                        >
+                          Tester
+                        </button>
+                      </div>
+                      {testResult === 'SUCCESS' && (
+                        <span className="text-[10px] font-bold text-emerald-600 block mt-0.5">✓ Code Correct</span>
+                      )}
+                      {testResult === 'FAIL' && (
+                        <span className="text-[10px] font-bold text-rose-600 block mt-0.5">✗ Code Invalide</span>
                       )}
                     </div>
                   </div>
+                </form>
+              </div>
 
-                  {/* Status Indicator */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="text-slate-500">
-                      État :
-                    </span>
-                    <span className={`font-semibold ${active ? 'text-emerald-700' : 'text-slate-400'}`}>
-                      {active ? '● Activé dans l\'école' : '○ Masqué et désactivé'}
-                    </span>
+              {/* BLOC 3: STOCKAGE LOCAL & CACHE (BARRE ULTRA COMPACTE) */}
+              <div className="bg-white border border-slate-200/90 rounded-xl px-3 py-2 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-3 text-slate-600">
+                  <div className="flex items-center gap-1 font-bold text-slate-900">
+                    <RotateCcw className="w-3.5 h-3.5 text-blue-900" />
+                    <span>Cache :</span>
                   </div>
+                  <span>Utilisé : <strong className="font-mono text-slate-800">{storageStats.usedKb} Ko</strong></span>
+                  <span className="text-slate-300">·</span>
+                  <span>Clés : <strong className="font-mono text-slate-800">{storageStats.keysCount}</strong></span>
+                  <span className="text-slate-300">·</span>
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    Nettoyage auto actif
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {activeTab === 'EVALUATION_CALENDAR' && (
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Intro Card */}
-          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-blue-100 text-blue-900 rounded-2xl flex items-center justify-center font-black">
-                  <Calendar className="w-6 h-6" />
+                <button
+                  type="button"
+                  onClick={handleCleanStorage}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] rounded-md border border-slate-300 transition-colors cursor-pointer"
+                >
+                  Nettoyer le cache
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ================= TAB 3: MODULES & FONCTIONNALITES (SCREENSHOT 1 COMPACTED) ================= */}
+          {activeTab === 'FEATURES' && (
+            <div className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2.5 animate-fadeIn">
+              {/* Header unifié avec presets intégrés sur 1 ligne */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-blue-900 shrink-0" />
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm">Activation des Modules</span>
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.2 rounded-full font-bold text-[10px]">
+                    {FEATURES_CONFIG.filter(f => isFeatureActive(f.key)).length}/{FEATURES_CONFIG.length} actifs
+                  </span>
                 </div>
-                <div>
-                  <h2 className="text-lg font-black text-slate-900 uppercase">
-                    Configuration des Mois d'Évaluation
-                  </h2>
-                  <p className="text-xs font-bold text-slate-400 mt-0.5">
-                    Modifiez le mois ou la période associée à chaque évaluation (ex: Évaluation N°1 = Octobre)
-                  </p>
+
+                {/* Boutons Presets Rapides Compacts */}
+                <div className="flex flex-wrap items-center gap-1 text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={handleEnableAllFeatures}
+                    className="px-2 py-0.5 bg-blue-900 hover:bg-blue-800 text-white rounded-md transition-colors cursor-pointer"
+                  >
+                    Tout activer (10/10)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSetPedagogyOnly}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Pédagogie seule
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSetEssentialOnly}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Essentiel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSetFinanceOnly}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    Caisse & Inscriptions
+                  </button>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleResetMonths}
-                className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer self-start sm:self-auto"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Réinitialiser par Défaut</span>
-              </button>
-            </div>
+              {/* Ruban Filtres Catégories */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1">Filtrer :</span>
+                  {(['TOUS', 'Scolarité', 'Pédagogie', 'Évaluations', 'Finance', 'Sécurité & Scan'] as const).map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setFeatureCategoryFilter(cat)}
+                      className={`px-2 py-0.5 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                        featureCategoryFilter === cat 
+                          ? 'bg-slate-900 text-white' 
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat === 'TOUS' ? 'Tous' : cat}
+                    </button>
+                  ))}
+                </div>
 
-            {/* NOMBRE D'EVALUATIONS PAR CYCLE (Compact & Léger) */}
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-bold text-slate-700">1er Cycle :</span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Établissement : <strong className="text-slate-700">{formData.schoolName}</strong> ({cloudSchoolCode})
+                </span>
+              </div>
+
+              {/* Grille ultra-compacte des modules (2 colonnes) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                {FEATURES_CONFIG
+                  .filter(feat => featureCategoryFilter === 'TOUS' || feat.category === featureCategoryFilter || (featureCategoryFilter === 'Pédagogie' && feat.category === 'Vie Scolaire'))
+                  .map((feat) => {
+                    const active = isFeatureActive(feat.key);
+                    return (
+                      <div
+                        key={feat.key}
+                        className={`px-3 py-2 rounded-lg border transition-all flex items-center justify-between gap-2.5 ${
+                          active 
+                            ? 'bg-white border-slate-300 shadow-2xs' 
+                            : 'bg-slate-50 border-slate-200 opacity-60'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              {feat.category}
+                            </span>
+                            {feat.isCore && (
+                              <span className="text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                                Requis
+                              </span>
+                            )}
+                            <span className="font-bold text-xs text-slate-900 truncate">
+                              {feat.name}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                            {feat.description}
+                          </p>
+                        </div>
+
+                        {/* Toggle Switch Compact */}
+                        <div className="shrink-0">
+                          {feat.isCore ? (
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                              Actif
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleFeature(feat.key)}
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                active ? 'bg-emerald-600' : 'bg-slate-300'
+                              }`}
+                              role="switch"
+                              aria-checked={active}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  active ? 'translate-x-4' : 'translate-x-0'
+                                }`}
+                              />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* ================= TAB 4: MOIS D'EVALUATIONS (SCREENSHOT 3 COMPACTED) ================= */}
+          {activeTab === 'EVALUATION_CALENDAR' && (
+            <form onSubmit={handleSubmit} className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2.5">
+              {/* Header avec Réinitialiser & Sauvegarder sur la même ligne */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                  <Calendar className="w-4 h-4 text-blue-900 shrink-0" />
+                  <span>Configuration des Mois d'Évaluation</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleResetMonths}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Par Défaut</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Sauvegarder</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Barre compacte des effectifs de mensualités */}
+              <div className="bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700">1er Cycle :</span>
                   <input
                     type="number"
                     min="1"
                     max="12"
                     value={formData.evaluationCount1stCycle ?? 2}
                     onChange={e => setFormData(prev => ({ ...prev, evaluationCount1stCycle: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) }))}
-                    className="w-14 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 text-center outline-none focus:ring-1 focus:ring-slate-400"
+                    className="w-12 py-0.5 px-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900 text-center outline-none"
                   />
-                  <span className="text-[11px] text-slate-500 font-medium">mensualités</span>
+                  <span className="text-[11px] text-slate-500">mensualités</span>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-bold text-slate-700">2ème Cycle & Lycée :</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700">2ème Cycle & Lycée :</span>
                   <input
                     type="number"
                     min="1"
                     max="12"
                     value={formData.evaluationCount2ndCycle ?? 6}
                     onChange={e => setFormData(prev => ({ ...prev, evaluationCount2ndCycle: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) }))}
-                    className="w-14 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 text-center outline-none focus:ring-1 focus:ring-slate-400"
+                    className="w-12 py-0.5 px-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900 text-center outline-none"
                   />
-                  <span className="text-[11px] text-slate-500 font-medium">mensualités</span>
+                  <span className="text-[11px] text-slate-500">mensualités</span>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <span className="text-xs font-bold text-slate-700">Total annuel :</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-700">Total annuel :</span>
                   <input
                     type="number"
                     min="1"
                     max="12"
                     value={formData.evaluationCount || 9}
                     onChange={e => setFormData(prev => ({ ...prev, evaluationCount: Math.max(1, Math.min(12, parseInt(e.target.value) || 9)) }))}
-                    className="w-14 p-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 text-center outline-none focus:ring-1 focus:ring-slate-400"
+                    className="w-12 py-0.5 px-1 bg-white border border-slate-300 rounded text-xs font-bold text-slate-900 text-center outline-none"
                   />
-                  <span className="text-[11px] text-slate-500 font-medium">évals/an</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Évaluations Mensuelles (1er Cycle & Devoirs) */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 bg-amber-100 text-amber-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                    Premier & Second Cycle
-                  </span>
-                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    Liste des {formData.evaluationCount || 9} Évaluations Définies
-                  </h3>
+                  <span className="text-[11px] text-slate-500">évals/an</span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Array.from({ length: formData.evaluationCount || 9 }, (_, i) => {
-                  const num = i + 1;
-                  const key = `EVALUATION_${num}`;
-                  const defaultMonthsMap: Record<number, string> = {
-                    1: 'Octobre', 2: 'Novembre', 3: 'Décembre', 4: 'Janvier', 5: 'Février',
-                    6: 'Mars', 7: 'Avril', 8: 'Mai', 9: 'Juin', 10: 'Juillet', 11: 'Août', 12: 'Septembre'
-                  };
-                  const defaultMonth = defaultMonthsMap[num] || `Mois ${num}`;
-                  const currentMonth = formData.evaluationMonths?.[key] || defaultMonth;
-                  const isStandard = MONTH_OPTIONS.includes(currentMonth);
+              {/* Grille Ultra-Compacte des Évaluations Mensuelles */}
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Évaluations Mensuelles ({formData.evaluationCount || 9} définies) :</span>
+                </div>
 
-                  return (
-                    <div key={key} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-black text-slate-900 uppercase">
-                          Évaluation N°{num}
-                        </label>
-                        <span className="text-[10px] font-bold text-blue-900 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
-                          Mois {num}
-                        </span>
-                      </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                  {Array.from({ length: formData.evaluationCount || 9 }, (_, i) => {
+                    const num = i + 1;
+                    const key = `EVALUATION_${num}`;
+                    const defaultMonthsMap: Record<number, string> = {
+                      1: 'Octobre', 2: 'Novembre', 3: 'Décembre', 4: 'Janvier', 5: 'Février',
+                      6: 'Mars', 7: 'Avril', 8: 'Mai', 9: 'Juin', 10: 'Juillet', 11: 'Août', 12: 'Septembre'
+                    };
+                    const defaultMonth = defaultMonthsMap[num] || `Mois ${num}`;
+                    const currentMonth = formData.evaluationMonths?.[key] || defaultMonth;
+                    const isStandard = MONTH_OPTIONS.includes(currentMonth);
 
-                      <div className="space-y-2">
+                    return (
+                      <div key={key} className="bg-slate-50 p-2 rounded-lg border border-slate-200 space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-bold text-slate-800">Éval N°{num}</span>
+                          <span className="text-[9px] font-bold text-blue-900 bg-blue-100/70 px-1.5 py-0.2 rounded">
+                            M{num}
+                          </span>
+                        </div>
+
                         <select
                           value={isStandard ? currentMonth : 'CUSTOM'}
                           onChange={e => {
@@ -1266,12 +1378,12 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                               handleMonthChange(key, e.target.value);
                             }
                           }}
-                          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
+                          className="w-full py-1 px-1.5 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-800 outline-none cursor-pointer"
                         >
                           {MONTH_OPTIONS.map(m => (
                             <option key={m} value={m}>{m}</option>
                           ))}
-                          <option value="CUSTOM">Personnalisé / Libellé libre...</option>
+                          <option value="CUSTOM">Personnalisé...</option>
                         </select>
 
                         {(!isStandard || currentMonth === 'CUSTOM') && (
@@ -1279,331 +1391,274 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                             type="text"
                             value={currentMonth === 'CUSTOM' ? '' : currentMonth}
                             onChange={e => handleMonthChange(key, e.target.value)}
-                            placeholder="Ex: Octobre - Éval 1"
-                            className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none"
+                            placeholder="Libellé..."
+                            className="w-full py-0.5 px-1.5 bg-white border border-slate-200 rounded text-xs outline-none"
                           />
                         )}
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      <p className="text-[10px] font-medium text-slate-400">
-                        Affiche : <strong className="text-slate-800">{getTermLabel(key, formData.evaluationMonths, formData.evaluationCount || 9)}</strong>
+              {/* Trimestres & Semestres en barres compactes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                {/* Trimestres */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Trimestres (2ème Cycle & Lycée) :
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { key: 'TRIMESTRE_1', label: '1er Trim.', defaultVal: 'Octobre - Décembre' },
+                      { key: 'TRIMESTRE_2', label: '2ème Trim.', defaultVal: 'Janvier - Mars' },
+                      { key: 'TRIMESTRE_3', label: '3ème Trim.', defaultVal: 'Avril - Juin' },
+                    ].map(t => (
+                      <div key={t.key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-700 block mb-0.5">{t.label}</label>
+                        <input
+                          type="text"
+                          value={formData.evaluationMonths?.[t.key] || t.defaultVal}
+                          onChange={e => handleMonthChange(t.key, e.target.value)}
+                          className="w-full py-0.5 px-1 bg-white border border-slate-200 rounded text-[11px] font-medium outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Semestres */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Semestres (Technique & BT) :
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { key: 'SEMESTRE_1', label: '1er Semestre', defaultVal: 'Octobre - Février' },
+                      { key: 'SEMESTRE_2', label: '2ème Semestre', defaultVal: 'Mars - Juin' },
+                    ].map(s => (
+                      <div key={s.key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                        <label className="text-[10px] font-bold text-slate-700 block mb-0.5">{s.label}</label>
+                        <input
+                          type="text"
+                          value={formData.evaluationMonths?.[s.key] || s.defaultVal}
+                          onChange={e => handleMonthChange(s.key, e.target.value)}
+                          className="w-full py-0.5 px-1 bg-white border border-slate-200 rounded text-[11px] font-medium outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* ================= TAB 5: FORMULES DES MOYENNES (SCREENSHOT 4 COMPACTED) ================= */}
+          {activeTab === 'CALCULATION_FORMULA' && (
+            <form onSubmit={handleSubmit} className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                  <Calculator className="w-4 h-4 text-blue-900 shrink-0" />
+                  <span>Formules de Calcul des Moyennes Trimestrielles</span>
+                </div>
+
+                <button
+                  type="submit"
+                  className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Save className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Enregistrer les Formules</span>
+                </button>
+              </div>
+
+              {/* 1ER CYCLE FONDAMENTAL (NOTES / 10) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.2 bg-amber-100 text-amber-900 rounded font-bold text-[10px] uppercase">
+                    1er Cycle Fondamental (/10)
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    Mode de calcul appliqué aux bulletins
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-1.5">
+                  {[
+                    { id: 'MALI_OFFICIAL', label: 'Standard Malien', formula: '(Classe + Comp) / 2', desc: 'Poids égal devoirs et composition.' },
+                    { id: 'EQUAL_WEIGHT', label: 'Égale (50%/50%)', formula: '(Classe + Comp) / 2', desc: 'Poids égal 50% devoirs / 50% comp.' },
+                    { id: 'CLASS_ONLY', label: 'Classe Seule (100%)', formula: 'Note Classe', desc: 'Ignore la composition.' },
+                    { id: 'COMP_ONLY', label: 'Compos Seule (100%)', formula: 'Composition', desc: 'Ignore les devoirs.' },
+                    { id: 'CUSTOM', label: 'Sur-Mesure', formula: 'Pondération libre', desc: 'Poids personnalisés.' },
+                  ].map(item => (
+                    <div
+                      key={item.id}
+                      onClick={() => setFormData(prev => ({ ...prev, calculationFormula1stCycle: item.id as any }))}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer space-y-1 ${
+                        (formData.calculationFormula1stCycle || 'MALI_OFFICIAL') === item.id
+                          ? 'bg-blue-50/90 border-blue-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">{item.label}</span>
+                        <input
+                          type="radio"
+                          name="calc1st"
+                          checked={(formData.calculationFormula1stCycle || 'MALI_OFFICIAL') === item.id}
+                          onChange={() => {}}
+                          className="text-blue-900"
+                        />
+                      </div>
+                      <p className="text-[10px] font-mono font-bold text-blue-900 bg-white px-1.5 py-0.2 rounded border border-blue-100 inline-block">
+                        {item.formula}
                       </p>
+                      <p className="text-[10px] text-slate-500 line-clamp-1">{item.desc}</p>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  ))}
+                </div>
 
-            {/* Trimestres */}
-            <div className="pt-6 border-t border-slate-100 space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-blue-100 text-blue-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                  2ème Cycle & Lycée
+                {formData.calculationFormula1stCycle === 'CUSTOM' && (
+                  <div className="bg-blue-50/60 p-2.5 rounded-lg border border-blue-200 flex flex-wrap items-center gap-4 text-xs">
+                    <span className="font-bold text-blue-950 text-[11px]">Poids personnalisés (1er cycle) :</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-600">Poids Devoirs :</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={formData.classScoreWeight1st ?? 1}
+                        onChange={e => setFormData(prev => ({ ...prev, classScoreWeight1st: parseFloat(e.target.value) || 1 }))}
+                        className="w-16 py-0.5 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-600">Poids Composition :</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={formData.compScoreWeight1st ?? 1}
+                        onChange={e => setFormData(prev => ({ ...prev, compScoreWeight1st: parseFloat(e.target.value) || 1 }))}
+                        className="w-16 py-0.5 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2EME CYCLE & LYCEE (NOTES / 20) */}
+              <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2 py-0.2 bg-emerald-100 text-emerald-900 rounded font-bold text-[10px] uppercase">
+                    2nd Cycle & Lycée (/20)
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    Mode de calcul appliqué aux bulletins
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-1.5">
+                  {[
+                    { id: 'MALI_OFFICIAL', label: 'Officiel Mali', formula: '(Dev /20 + Comp /40) / 3', desc: 'Composition compte double.' },
+                    { id: 'EQUAL_WEIGHT', label: 'Égale (50%/50%)', formula: '(Dev /20 + Comp /20) / 2', desc: 'Même coefficient 1 et 1.' },
+                    { id: 'CLASS_ONLY', label: 'Classe Seule (100%)', formula: 'Note Classe /20', desc: 'Uniquement devoirs.' },
+                    { id: 'COMP_ONLY', label: 'Compos Seule (100%)', formula: 'Composition /20', desc: 'Uniquement composition.' },
+                    { id: 'CUSTOM', label: 'Sur-Mesure', formula: 'Coefficients libres', desc: 'Poids personnalisés.' },
+                  ].map(item => (
+                    <div
+                      key={item.id}
+                      onClick={() => setFormData(prev => ({ ...prev, calculationFormula2ndCycle: item.id as any }))}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer space-y-1 ${
+                        (formData.calculationFormula2ndCycle || 'MALI_OFFICIAL') === item.id
+                          ? 'bg-emerald-50/90 border-emerald-900 shadow-2xs'
+                          : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">{item.label}</span>
+                        <input
+                          type="radio"
+                          name="calc2nd"
+                          checked={(formData.calculationFormula2ndCycle || 'MALI_OFFICIAL') === item.id}
+                          onChange={() => {}}
+                          className="text-emerald-900"
+                        />
+                      </div>
+                      <p className="text-[10px] font-mono font-bold text-emerald-900 bg-white px-1.5 py-0.2 rounded border border-emerald-100 inline-block">
+                        {item.formula}
+                      </p>
+                      <p className="text-[10px] text-slate-500 line-clamp-1">{item.desc}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {formData.calculationFormula2ndCycle === 'CUSTOM' && (
+                  <div className="bg-emerald-50/60 p-2.5 rounded-lg border border-emerald-200 flex flex-wrap items-center gap-4 text-xs">
+                    <span className="font-bold text-emerald-950 text-[11px]">Coefficients personnalisés (2nd cycle/lycée) :</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-600">Poids Devoirs :</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={formData.classScoreWeight2nd ?? 1}
+                        onChange={e => setFormData(prev => ({ ...prev, classScoreWeight2nd: parseFloat(e.target.value) || 1 }))}
+                        className="w-16 py-0.5 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-600">Poids Composition :</span>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        value={formData.compScoreWeight2nd ?? 2}
+                        onChange={e => setFormData(prev => ({ ...prev, compScoreWeight2nd: parseFloat(e.target.value) || 2 }))}
+                        className="w-16 py-0.5 px-1.5 bg-white border border-slate-200 rounded text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ABSENCES DE NOTES (2 COMPACT DROPDOWNS) */}
+              <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Gestion des Absences de Notes dans la Période :
                 </span>
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  Trimestres Scolaires
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {[
-                  { key: 'TRIMESTRE_1', label: '1er Trimestre', defaultVal: 'Octobre - Décembre' },
-                  { key: 'TRIMESTRE_2', label: '2ème Trimestre', defaultVal: 'Janvier - Mars' },
-                  { key: 'TRIMESTRE_3', label: '3ème Trimestre', defaultVal: 'Avril - Juin' },
-                ].map(t => (
-                  <div key={t.key} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2">
-                    <label className="text-xs font-black text-slate-900 uppercase">
-                      {t.label}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                      Si l'élève n'a pas de note de devoirs :
                     </label>
-                    <input
-                      type="text"
-                      value={formData.evaluationMonths?.[t.key] || t.defaultVal}
-                      onChange={e => handleMonthChange(t.key, e.target.value)}
-                      placeholder={t.defaultVal}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
-                    />
-                    <p className="text-[10px] font-medium text-slate-400">
-                      Affiche : <strong className="text-slate-800">{getTermLabel(t.key, formData.evaluationMonths)}</strong>
-                    </p>
+                    <select
+                      value={formData.missingClassScoreBehavior || 'USE_COMP_ONLY'}
+                      onChange={e => setFormData(prev => ({ ...prev, missingClassScoreBehavior: e.target.value as any }))}
+                      className="w-full py-1 px-2 bg-white border border-slate-200 rounded text-xs font-medium text-slate-800 outline-none cursor-pointer"
+                    >
+                      <option value="USE_COMP_ONLY">Prendre la note de Composition comme moyenne</option>
+                      <option value="ZERO">Compter la note de devoirs comme 0</option>
+                    </select>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Semestres */}
-            <div className="pt-6 border-t border-slate-100 space-y-4">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-purple-100 text-purple-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                  BT & Technique
-                </span>
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                  Semestres
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {[
-                  { key: 'SEMESTRE_1', label: '1er Semestre', defaultVal: 'Octobre - Février' },
-                  { key: 'SEMESTRE_2', label: '2ème Semestre', defaultVal: 'Mars - Juin' },
-                ].map(s => (
-                  <div key={s.key} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2">
-                    <label className="text-xs font-black text-slate-900 uppercase">
-                      {s.label}
+                  <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                    <label className="text-[10px] font-bold text-slate-700 block mb-1">
+                      Si l'élève n'a pas de note de composition :
                     </label>
-                    <input
-                      type="text"
-                      value={formData.evaluationMonths?.[s.key] || s.defaultVal}
-                      onChange={e => handleMonthChange(s.key, e.target.value)}
-                      placeholder={s.defaultVal}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900"
-                    />
-                    <p className="text-[10px] font-medium text-slate-400">
-                      Affiche : <strong className="text-slate-800">{getTermLabel(s.key, formData.evaluationMonths)}</strong>
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-4 border-t border-slate-100">
-              <button
-                type="submit"
-                className="flex items-center gap-2 px-8 py-4 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Enregistrer le Calendrier d'Évaluations</span>
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* TAB: CALCULATION_FORMULA */}
-      {activeTab === 'CALCULATION_FORMULA' && (
-        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-            <div>
-              <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-blue-900" />
-                <span>Formules de Calcul des Moyennes</span>
-              </h2>
-              <p className="text-xs font-bold text-slate-400 mt-1">
-                Choisissez le mode de calcul des moyennes pour le premier cycle fondamental et le cycle secondaire.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-6 py-3 bg-blue-900 hover:bg-blue-950 text-white font-black text-xs uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer shrink-0"
-            >
-              <Save className="w-4 h-4" />
-              <span>Enregistrer la Configuration</span>
-            </button>
-          </div>
-
-          {/* Section 1er Cycle */}
-          <div className="space-y-4 pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-amber-100 text-amber-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                Premier Cycle Fondamental (Notes / 10)
-              </span>
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                Mode de Calcul de la Moyenne Trimestrielle
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { id: 'MALI_OFFICIAL', label: 'Modèle Standard Malien', formula: '(Note Classe + Composition) / 2', desc: 'Moyenne égale entre devoirs et composition.' },
-                { id: 'EQUAL_WEIGHT', label: 'Moyenne Égale (50% / 50%)', formula: '(Note Classe + Composition) / 2', desc: 'Devoirs et composition ont le même poids.' },
-                { id: 'CLASS_ONLY', label: 'Notes de Classe Seules (100%)', formula: 'Note de Classe', desc: 'Ignore la composition, uniquement les devoirs.' },
-                { id: 'COMP_ONLY', label: 'Composition Seule (100%)', formula: 'Composition', desc: 'Ignore les devoirs, uniquement la composition.' },
-                { id: 'CUSTOM', label: 'Pondération Sur-Mesure', formula: '(Classe × Poids1 + Comp × Poids2) / Total', desc: 'Définissez vos propres coefficients pour devoirs et composition.' },
-              ].map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => setFormData(prev => ({ ...prev, calculationFormula1stCycle: item.id as any }))}
-                  className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                    (formData.calculationFormula1stCycle || 'MALI_OFFICIAL') === item.id
-                      ? 'bg-blue-50/80 border-blue-900 shadow-sm'
-                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900 uppercase">{item.label}</span>
-                    <input
-                      type="radio"
-                      name="calc1st"
-                      checked={(formData.calculationFormula1stCycle || 'MALI_OFFICIAL') === item.id}
-                      onChange={() => {}}
-                      className="text-blue-900 focus:ring-blue-900"
-                    />
-                  </div>
-                  <p className="text-[11px] font-mono font-bold text-blue-900 bg-white/80 px-2 py-1 rounded border border-blue-100 inline-block">
-                    {item.formula}
-                  </p>
-                  <p className="text-[11px] font-medium text-slate-500">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            {formData.calculationFormula1stCycle === 'CUSTOM' && (
-              <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-200/80 space-y-3">
-                <h4 className="text-xs font-black text-blue-950 uppercase">Coefficients Personnalisés (1er Cycle)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Poids Devoirs / Note de Classe :</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={formData.classScoreWeight1st ?? 1}
-                      onChange={e => setFormData(prev => ({ ...prev, classScoreWeight1st: parseFloat(e.target.value) || 1 }))}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Poids Composition :</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={formData.compScoreWeight1st ?? 1}
-                      onChange={e => setFormData(prev => ({ ...prev, compScoreWeight1st: parseFloat(e.target.value) || 1 }))}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900"
-                    />
+                    <select
+                      value={formData.missingCompScoreBehavior || 'USE_CLASS_ONLY'}
+                      onChange={e => setFormData(prev => ({ ...prev, missingCompScoreBehavior: e.target.value as any }))}
+                      className="w-full py-1 px-2 bg-white border border-slate-200 rounded text-xs font-medium text-slate-800 outline-none cursor-pointer"
+                    >
+                      <option value="USE_CLASS_ONLY">Prendre la moyenne des devoirs comme moyenne</option>
+                      <option value="ZERO">Compter la composition comme 0</option>
+                    </select>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Section 2ème Cycle / Lycée */}
-          <div className="space-y-4 pt-6 border-t border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 bg-emerald-100 text-emerald-900 rounded-full font-black text-[10px] uppercase tracking-wider">
-                Second Cycle & Lycée (Notes / 20)
-              </span>
-              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                Mode de Calcul de la Moyenne Trimestrielle
-              </h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { id: 'MALI_OFFICIAL', label: 'Officiel Mali (Coef 1 Devoir, Coef 2 Comp)', formula: '(Note Classe /20 + Comp /40) / 3', desc: 'Composition compte double par rapport aux devoirs.' },
-                { id: 'EQUAL_WEIGHT', label: 'Moyenne Égale (50% / 50%)', formula: '(Note Classe /20 + Comp /20) / 2', desc: 'Devoirs et composition ont le même coefficient (1 et 1).' },
-                { id: 'CLASS_ONLY', label: 'Notes de Classe Seules (100%)', formula: 'Note de Classe /20', desc: 'Seuls les devoirs comptent dans la moyenne trimestrielle.' },
-                { id: 'COMP_ONLY', label: 'Composition Seule (100%)', formula: 'Composition /20', desc: 'Seule la composition compte dans la moyenne trimestrielle.' },
-                { id: 'CUSTOM', label: 'Coefficients Sur-Mesure', formula: '(Classe × Poids1 + Comp × Poids2) / Total', desc: 'Choisissez les poids exacts pour devoirs et composition.' },
-              ].map(item => (
-                <div
-                  key={item.id}
-                  onClick={() => setFormData(prev => ({ ...prev, calculationFormula2ndCycle: item.id as any }))}
-                  className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                    (formData.calculationFormula2ndCycle || 'MALI_OFFICIAL') === item.id
-                      ? 'bg-emerald-50/80 border-emerald-900 shadow-sm'
-                      : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-900 uppercase">{item.label}</span>
-                    <input
-                      type="radio"
-                      name="calc2nd"
-                      checked={(formData.calculationFormula2ndCycle || 'MALI_OFFICIAL') === item.id}
-                      onChange={() => {}}
-                      className="text-emerald-900 focus:ring-emerald-900"
-                    />
-                  </div>
-                  <p className="text-[11px] font-mono font-bold text-emerald-900 bg-white/80 px-2 py-1 rounded border border-emerald-100 inline-block">
-                    {item.formula}
-                  </p>
-                  <p className="text-[11px] font-medium text-slate-500">{item.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            {formData.calculationFormula2ndCycle === 'CUSTOM' && (
-              <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200/80 space-y-3">
-                <h4 className="text-xs font-black text-emerald-950 uppercase">Coefficients Personnalisés (2ème Cycle & Lycée)</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Coefficient Devoirs / Note de Classe :</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={formData.classScoreWeight2nd ?? 1}
-                      onChange={e => setFormData(prev => ({ ...prev, classScoreWeight2nd: parseFloat(e.target.value) || 1 }))}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Coefficient Composition :</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.1"
-                      value={formData.compScoreWeight2nd ?? 2}
-                      onChange={e => setFormData(prev => ({ ...prev, compScoreWeight2nd: parseFloat(e.target.value) || 2 }))}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section Absences de Notes */}
-          <div className="space-y-4 pt-6 border-t border-slate-100">
-            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-              Gestion des Absences de Notes dans la Période
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-2">
-                <label className="text-xs font-black text-slate-900 uppercase block">
-                  Si un élève n'a PAS de note de Devoirs :
-                </label>
-                <select
-                  value={formData.missingClassScoreBehavior || 'USE_COMP_ONLY'}
-                  onChange={e => setFormData(prev => ({ ...prev, missingClassScoreBehavior: e.target.value as any }))}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
-                >
-                  <option value="USE_COMP_ONLY">Prendre la note de Composition seule comme moyenne</option>
-                  <option value="ZERO">Compter la note de devoirs comme 0/20 (ou 0/10)</option>
-                </select>
-              </div>
-
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-2">
-                <label className="text-xs font-black text-slate-900 uppercase block">
-                  Si un élève n'a PAS de note de Composition :
-                </label>
-                <select
-                  value={formData.missingCompScoreBehavior || 'USE_CLASS_ONLY'}
-                  onChange={e => setFormData(prev => ({ ...prev, missingCompScoreBehavior: e.target.value as any }))}
-                  className="w-full p-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-900 cursor-pointer"
-                >
-                  <option value="USE_CLASS_ONLY">Prendre la moyenne des Devoirs comme moyenne trimestrielle</option>
-                  <option value="ZERO">Compter la composition comme 0/20 (ou 0/10)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button
-              type="submit"
-              className="flex items-center gap-2 px-8 py-4 bg-blue-900 hover:bg-blue-950 text-white font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg shadow-blue-900/20 transition-all cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              <span>Enregistrer les Formules & Config.</span>
-            </button>
-          </div>
-        </form>
-      )}
-      </>
+            </form>
+          )}
+        </>
       )}
 
       {/* PWA Installation Modal */}

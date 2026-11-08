@@ -333,9 +333,12 @@ export interface DailyCashClosure {
   verifiedBy?: string;
 }
 
+export type SchoolCategory = 'ECOLE_FONDAMENTALE' | 'LYCEE' | 'PROFESSIONNEL' | 'COMPLEXE';
+
 export interface SchoolSettings {
   schoolName: string; // Nom officiel de l'établissement
   schoolType: 'PRIVE' | 'PUBLIC' | 'CONFESSIONNEL';
+  schoolCategory?: SchoolCategory; // 'ECOLE_FONDAMENTALE' (Primaire/Fondamental), 'LYCEE' (Lycée Général), 'PROFESSIONNEL' (CAP/BT), 'COMPLEXE' (Tous cycles)
   academyName: string; // Académie d'Enseignement de rattachement
   capName: string; // Centre d'Animation Pédagogique (CAP)
   registrationNumber: string; // N° Autorisation / Agrément MEN

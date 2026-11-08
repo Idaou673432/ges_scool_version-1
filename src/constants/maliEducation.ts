@@ -32,19 +32,44 @@ export const MALI_SCHOOL_LEVEL_CATEGORIES = [
 ];
 
 export const MALI_DEFAULT_CLASSES = [
+  // 1er Cycle Fondamental (Primaire)
   { name: '1ère Année A', category: 'FONDAMENTAL_1', level: '1ère', fee: 15000, insFee: 10000 },
+  { name: '2ème Année A', category: 'FONDAMENTAL_1', level: '2ème', fee: 15000, insFee: 10000 },
+  { name: '3ème Année A', category: 'FONDAMENTAL_1', level: '3ème', fee: 16000, insFee: 10000 },
+  { name: '4ème Année A', category: 'FONDAMENTAL_1', level: '4ème', fee: 16000, insFee: 10000 },
+  { name: '5ème Année A', category: 'FONDAMENTAL_1', level: '5ème', fee: 17000, insFee: 10000 },
   { name: '6ème Année A', category: 'FONDAMENTAL_1', level: '6ème', fee: 18000, insFee: 10000 },
+
+  // 2ème Cycle Fondamental (Collège)
   { name: '7ème Année A', category: 'FONDAMENTAL_2', level: '7ème', fee: 20000, insFee: 15000 },
   { name: '8ème Année B', category: 'FONDAMENTAL_2', level: '8ème', fee: 22000, insFee: 15000 },
   { name: '9ème Année A (DEF)', category: 'FONDAMENTAL_2', level: '9ème', fee: 25000, insFee: 20000 },
-  { name: '10ème CG 1', category: 'LYCEE', level: '10ème', fee: 30000, insFee: 25000 },
+
+  // Lycée Général
+  { name: '10ème Commune (10ème CG)', category: 'LYCEE', level: '10ème', fee: 30000, insFee: 25000 },
   { name: '11ème Sciences (11ème S)', category: 'LYCEE', level: '11ème', fee: 32000, insFee: 25000 },
-  { name: '12ème TSS (Terminales Sciences Sociales)', category: 'LYCEE', level: '12ème', fee: 35000, insFee: 30000 },
-  { name: '12ème TSE (Terminales Sciences Exactes)', category: 'LYCEE', level: '12ème', fee: 35000, insFee: 30000 },
+  { name: '11ème Lettres (11ème L)', category: 'LYCEE', level: '11ème', fee: 32000, insFee: 25000 },
+  { name: '12ème Terminales Sciences Exactes (TSE)', category: 'LYCEE', level: '12ème', fee: 35000, insFee: 30000 },
+  { name: '12ème Terminales Sciences Sociales (TSS)', category: 'LYCEE', level: '12ème', fee: 35000, insFee: 30000 },
+  { name: '12ème Terminales Arts & Lettres (TAL)', category: 'LYCEE', level: '12ème', fee: 35000, insFee: 30000 },
+
+  // Enseignement Technique & Professionnel
   { name: 'BT1 Comptabilité & Gestion', category: 'TECHNIQUE_BT', level: 'BT1', fee: 35000, insFee: 30000 },
+  { name: 'BT2 Comptabilité & Gestion', category: 'TECHNIQUE_BT', level: 'BT2', fee: 38000, insFee: 30000 },
+  { name: 'BT1 Secrétariat Bureautique', category: 'TECHNIQUE_BT', level: 'BT1', fee: 35000, insFee: 30000 },
+  { name: 'CAP 1 Mécanique & Électricité', category: 'PROFESSIONNEL_CAP', level: 'CAP 1', fee: 30000, insFee: 25000 },
+  { name: 'CAP 2 Mécanique & Électricité', category: 'PROFESSIONNEL_CAP', level: 'CAP 2', fee: 32000, insFee: 25000 },
 ];
 
 export const MALI_DEFAULT_SUBJECTS = [
+  // 1er Cycle Fondamental
+  { code: 'FRAN_1', name: 'Français & Lecture', coefficient: 3, classCategory: 'FONDAMENTAL_1', order: 1 },
+  { code: 'CALC_1', name: 'Calcul & Mathématiques', coefficient: 3, classCategory: 'FONDAMENTAL_1', order: 2 },
+  { code: 'EVEIL_1', name: 'Éveil / Sciences Usuelles', coefficient: 2, classCategory: 'FONDAMENTAL_1', order: 3 },
+  { code: 'ECM_1', name: 'Morale & Éducation Civique', coefficient: 1, classCategory: 'FONDAMENTAL_1', order: 4 },
+  { code: 'EPS_1', name: 'Éducation Physique (EPS)', coefficient: 1, classCategory: 'FONDAMENTAL_1', order: 5 },
+
+  // 2ème Cycle Fondamental
   { code: 'FRAN', name: 'Français / Rédaction', coefficient: 3, classCategory: 'FONDAMENTAL_2', order: 1 },
   { code: 'MATH', name: 'Mathématiques', coefficient: 3, classCategory: 'FONDAMENTAL_2', order: 2 },
   { code: 'PHYS', name: 'Physique - Chimie', coefficient: 2, classCategory: 'FONDAMENTAL_2', order: 3 },
@@ -54,12 +79,24 @@ export const MALI_DEFAULT_SUBJECTS = [
   { code: 'ANGL', name: 'Anglais', coefficient: 2, classCategory: 'FONDAMENTAL_2', order: 7 },
   { code: 'EPS', name: 'Éducation Physique & Sportive', coefficient: 1, classCategory: 'FONDAMENTAL_2', order: 8 },
   
-  // Lycée TSE
-  { code: 'MATH_SE', name: 'Mathématiques Supérieures', coefficient: 5, classCategory: 'LYCEE', order: 1 },
-  { code: 'PHYS_SE', name: 'Physique - Chimie Avancée', coefficient: 4, classCategory: 'LYCEE', order: 2 },
-  { code: 'PHIL', name: 'Philosophie', coefficient: 2, classCategory: 'LYCEE', order: 3 },
+  // Lycée Général
+  { code: 'MATH_LYC', name: 'Mathématiques Supérieures', coefficient: 5, classCategory: 'LYCEE', order: 1 },
+  { code: 'PHYS_LYC', name: 'Physique - Chimie Avancée', coefficient: 4, classCategory: 'LYCEE', order: 2 },
+  { code: 'PHIL_LYC', name: 'Philosophie', coefficient: 3, classCategory: 'LYCEE', order: 3 },
   { code: 'FRAN_LYC', name: 'Français / Littérature', coefficient: 3, classCategory: 'LYCEE', order: 4 },
-  { code: 'ANGL_LYC', name: 'Anglais Général', coefficient: 2, classCategory: 'LYCEE', order: 5 },
+  { code: 'SVT_LYC', name: 'Sciences Biologiques & Géologie', coefficient: 3, classCategory: 'LYCEE', order: 5 },
+  { code: 'HIST_LYC', name: 'Histoire - Géographie', coefficient: 2, classCategory: 'LYCEE', order: 6 },
+  { code: 'ANGL_LYC', name: 'Anglais Général', coefficient: 2, classCategory: 'LYCEE', order: 7 },
+  { code: 'EPS_LYC', name: 'Éducation Physique & Sportive', coefficient: 1, classCategory: 'LYCEE', order: 8 },
+
+  // Enseignement Technique & Professionnel
+  { code: 'PRAT_PRO', name: 'Pratique & Atelier Professionnel', coefficient: 5, classCategory: 'TECHNIQUE_BT', order: 1 },
+  { code: 'COMPTA', name: 'Comptabilité Générale & Analytique', coefficient: 4, classCategory: 'TECHNIQUE_BT', order: 2 },
+  { code: 'MATH_APP', name: 'Mathématiques Appliquées / Statistiques', coefficient: 3, classCategory: 'TECHNIQUE_BT', order: 3 },
+  { code: 'DROIT_LEG', name: 'Droit Commercial & Législation du Travail', coefficient: 2, classCategory: 'TECHNIQUE_BT', order: 4 },
+  { code: 'INFO_BUR', name: 'Informatique & Bureautique', coefficient: 2, classCategory: 'TECHNIQUE_BT', order: 5 },
+  { code: 'FRAN_APP', name: 'Français Professionnel & Correspondance', coefficient: 2, classCategory: 'TECHNIQUE_BT', order: 6 },
+  { code: 'ANGL_COM', name: 'Anglais Commercial', coefficient: 2, classCategory: 'TECHNIQUE_BT', order: 7 },
 ];
 
 export function getMaliScoreAppreciation(score: number, maxScore: number = 20): { appreciation: string; badgeColor: string } {

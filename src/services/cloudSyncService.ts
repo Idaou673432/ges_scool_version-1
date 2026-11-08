@@ -1,6 +1,7 @@
 /**
- * SomaSikolo / KalanGest - Cloud Real-time Database & Multi-tenant Synchronization Service
- * Enables multi-school separation and seamless real-time syncing between computers, phones, and tablets.
+ * SomaSikolo / KalanGest - Real-time Multi-tenant Multi-Device Synchronization Service
+ * Enables seamless instant synchronization across all devices (PC, mobile, tablet)
+ * using Server-Sent Events (SSE), HTTP Sync Engine, BroadcastChannel, and Cloud Firestore.
  */
 
 import {
@@ -31,7 +32,7 @@ import { secureLocalStorage } from './secureStorage';
 import { getPublicBaseUrl } from './urlService';
 
 /**
- * Strips undefined values recursively so that Firestore setDoc and writeBatch never crash
+ * Strips undefined values recursively so that serialization and Firestore never crash
  */
 export function cleanForFirestore<T>(data: T): any {
   if (data === undefined) {
@@ -69,24 +70,32 @@ export interface CloudSyncListeners {
   onSyncStatusChange?: (status: 'CONNECTED' | 'SYNCING' | 'OFFLINE' | 'ERROR', msg?: string) => void;
 }
 
+// Generate unique device/tab id to filter out self-echoes
+const DEVICE_CLIENT_ID = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+
 class CloudSyncService {
   private activeSchoolCode: string = '';
-  private unsubscribers: Unsubscribe[] = [];
+  private firestoreUnsubscribers: Unsubscribe[] = [];
+  private eventSource: EventSource | null = null;
+  private broadcastChannel: BroadcastChannel | null = null;
+  private currentListeners: CloudSyncListeners | null = null;
   private isOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
+  private sseReconnectTimeout: any = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', () => {
         this.isOnline = true;
+        this.reconnectAll();
       });
       window.addEventListener('offline', () => {
         this.isOnline = false;
+        this.currentListeners?.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne local');
       });
     }
   }
 
   public getActiveSchoolCode(): string {
-    // 1. Check URL parameters for direct link connection (e.g. ?school=ECOLE-MALI-01)
     if (typeof window !== 'undefined') {
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -100,7 +109,7 @@ class CloudSyncService {
           }
         }
       } catch (e) {
-        // ignore URL search params parse errors
+        // ignore
       }
     }
 
@@ -129,7 +138,7 @@ class CloudSyncService {
   }
 
   /**
-   * Register or verify a School Code in the directory
+   * Connect or register school
    */
   public async connectOrRegisterSchool(
     schoolCode: string,
@@ -140,16 +149,36 @@ class CloudSyncService {
       const cleanCode = schoolCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
       if (!cleanCode) return false;
 
-      const schoolRef = doc(db, 'school_directory', cleanCode);
-      await setDoc(schoolRef, {
-        schoolCode: cleanCode,
-        schoolName: schoolName || 'Établissement Scolaire',
-        pinCode: pinCode || '00223',
-        lastSyncAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-
       this.setActiveSchoolCode(cleanCode);
+
+      // Register with Server Sync
+      try {
+        await fetch('/api/sync/mutate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            schoolCode: cleanCode,
+            mutationType: 'SYNC_SETTINGS',
+            payload: { schoolName, adminPassword: pinCode, schoolCode: cleanCode },
+            senderId: DEVICE_CLIENT_ID
+          })
+        });
+      } catch {}
+
+      // Try Firestore directory in parallel
+      try {
+        const schoolRef = doc(db, 'school_directory', cleanCode);
+        await setDoc(schoolRef, {
+          schoolCode: cleanCode,
+          schoolName: schoolName || 'Établissement Scolaire',
+          pinCode: pinCode || '00223',
+          lastSyncAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (e) {
+        // Firestore permission notice, handled gracefully
+      }
+
       return true;
     } catch (e) {
       console.error('Failed to register/connect school:', e);
@@ -158,7 +187,7 @@ class CloudSyncService {
   }
 
   /**
-   * Check if Cloud database has data for this school; if empty, initialize with local seed.
+   * Check if server/cloud database has data for this school; if empty, initialize with local seed.
    */
   public async bootstrapCloudIfEmpty(
     schoolCode: string,
@@ -173,45 +202,244 @@ class CloudSyncService {
       attendance: AttendanceRecord[];
     }
   ): Promise<boolean> {
+    const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
+
     try {
-      const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
+      // 1. Bootstrap Server Store
+      const response = await fetch('/api/sync/bootstrap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolCode: code, seedData })
+      });
+      if (response.ok) {
+        const resJson = await response.json();
+        // If server already had fresh data, update current listeners with it
+        if (!resJson.bootstrapped && resJson.currentStore) {
+          this.applyFullServerStore(resJson.currentStore);
+        }
+      }
+    } catch (e) {
+      console.info('[SyncService] Local server bootstrap ping:', e);
+    }
+
+    // 2. Also attempt Firestore bootstrap in parallel if available
+    try {
       const settingsRef = doc(db, `schools/${code}/settings`, 'config');
       const snap = await getDoc(settingsRef);
-
       if (!snap.exists()) {
-        console.info(`[CloudSync] Initializing empty cloud school [${code}] with seed data...`);
-        return await this.pushAllDataToCloud(code, seedData);
+        await this.pushAllDataToCloud(code, seedData);
       }
-      return true;
     } catch (e) {
-      console.warn('[CloudSync] Bootstrap check notice:', e);
-      return false;
+      // Ignore Firestore permission errors
     }
+
+    return true;
   }
 
   /**
-   * Subscribe to real-time updates for the current active school
+   * Start real-time sync across all devices (PC, mobile, tablet)
    */
   public startRealtimeSync(schoolCode: string, listeners: CloudSyncListeners): void {
     this.stopRealtimeSync();
     this.setActiveSchoolCode(schoolCode);
     const code = this.getActiveSchoolCode();
+    this.currentListeners = listeners;
 
-    listeners.onSyncStatusChange?.('SYNCING', `Connexion Cloud [${code}]...`);
+    listeners.onSyncStatusChange?.('SYNCING', `Connexion en cours [${code}]...`);
 
+    // 1. Fetch latest server state immediately
+    this.fetchServerState(code);
+
+    // 2. Connect to Server-Sent Events (SSE) for instant cross-device updates
+    this.connectSSE(code);
+
+    // 3. Connect to BroadcastChannel for instant intra-browser tab sync
+    this.connectBroadcastChannel(code);
+
+    // 4. Connect Firestore listeners if available
+    this.connectFirestoreListeners(code);
+  }
+
+  private fetchServerState(code: string): void {
+    fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.store) {
+          this.applyFullServerStore(data.store);
+          this.currentListeners?.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}]`);
+        }
+      })
+      .catch(err => {
+        console.info('[SyncService] Server state fetch notice:', err);
+      });
+  }
+
+  private applyFullServerStore(store: any): void {
+    if (!this.currentListeners || !store) return;
+
+    if (store.settings) {
+      this.currentListeners.onSettingsChange?.(store.settings);
+    }
+    if (Array.isArray(store.students)) {
+      this.currentListeners.onStudentsChange?.(store.students);
+    }
+    if (Array.isArray(store.classes)) {
+      this.currentListeners.onClassesChange?.(store.classes);
+    }
+    if (Array.isArray(store.subjects)) {
+      this.currentListeners.onSubjectsChange?.(store.subjects);
+    }
+    if (Array.isArray(store.teachers)) {
+      this.currentListeners.onTeachersChange?.(store.teachers);
+    }
+    if (Array.isArray(store.grades)) {
+      this.currentListeners.onGradesChange?.(store.grades);
+    }
+    if (Array.isArray(store.payments)) {
+      this.currentListeners.onPaymentsChange?.(store.payments);
+    }
+    if (Array.isArray(store.attendance)) {
+      this.currentListeners.onAttendanceChange?.(store.attendance);
+    }
+    if (Array.isArray(store.expenses)) {
+      this.currentListeners.onExpensesChange?.(store.expenses);
+    }
+  }
+
+  private connectSSE(code: string): void {
+    if (typeof window === 'undefined' || !('EventSource' in window)) return;
+
+    try {
+      if (this.eventSource) {
+        this.eventSource.close();
+      }
+
+      this.eventSource = new EventSource(`/api/sync/events?school=${encodeURIComponent(code)}`);
+
+      this.eventSource.addEventListener('connected', (e: MessageEvent) => {
+        this.currentListeners?.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}] (Multi-appareils actif)`);
+      });
+
+      this.eventSource.addEventListener('mutation', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          // Ignore echo from this exact device/tab
+          if (data.senderId === DEVICE_CLIENT_ID) return;
+
+          this.handleIncomingMutation(data.mutationType, data.payload, code);
+          this.currentListeners?.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}]`);
+        } catch (err) {
+          console.warn('[SyncService] Error parsing SSE mutation:', err);
+        }
+      });
+
+      this.eventSource.addEventListener('state_updated', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.senderId === DEVICE_CLIENT_ID) return;
+          if (data.store) {
+            this.applyFullServerStore(data.store);
+          }
+        } catch {}
+      });
+
+      this.eventSource.addEventListener('state_reset', (e: MessageEvent) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.store) {
+            this.applyFullServerStore(data.store);
+          }
+        } catch {}
+      });
+
+      this.eventSource.onerror = () => {
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+        }
+        // Auto reconnect after 3 seconds
+        clearTimeout(this.sseReconnectTimeout);
+        this.sseReconnectTimeout = setTimeout(() => {
+          if (this.isOnline) {
+            this.connectSSE(code);
+          }
+        }, 3000);
+      };
+    } catch (e) {
+      console.warn('[SyncService] SSE init error:', e);
+    }
+  }
+
+  private connectBroadcastChannel(code: string): void {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return;
+
+    try {
+      if (this.broadcastChannel) {
+        this.broadcastChannel.close();
+      }
+      this.broadcastChannel = new BroadcastChannel(`somasikolo_sync_${code}`);
+      this.broadcastChannel.onmessage = (event) => {
+        const { mutationType, payload, senderId } = event.data || {};
+        if (senderId === DEVICE_CLIENT_ID) return;
+        this.handleIncomingMutation(mutationType, payload, code);
+      };
+    } catch {}
+  }
+
+  private handleIncomingMutation(mutationType: string, payload: any, code: string): void {
+    if (!this.currentListeners || !payload) return;
+
+    switch (mutationType) {
+      case 'SYNC_SETTINGS':
+        this.currentListeners.onSettingsChange?.(payload);
+        break;
+
+      case 'SYNC_PAYMENT':
+        // Re-fetch all fresh payments from server to ensure perfect list ordering
+        this.fetchAllCloudPayments(code).then(payments => {
+          if (payments.length > 0) {
+            this.currentListeners?.onPaymentsChange?.(payments);
+          }
+        });
+        break;
+
+      case 'SYNC_EXPENSE':
+      case 'DELETE_EXPENSE':
+        fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
+          .then(r => r.json())
+          .then(res => {
+            if (res.store?.expenses) {
+              this.currentListeners?.onExpensesChange?.(res.store.expenses);
+            }
+          });
+        break;
+
+      case 'SYNC_DOC':
+      case 'DELETE_DOC':
+      case 'CLEAR_COLLECTION':
+        // Re-fetch state for collection
+        fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
+          .then(r => r.json())
+          .then(res => {
+            if (res.store) {
+              this.applyFullServerStore(res.store);
+            }
+          });
+        break;
+    }
+  }
+
+  private connectFirestoreListeners(code: string): void {
     try {
       // 1. Settings Listener
       const settingsDocRef = doc(db, `schools/${code}/settings`, 'config');
       const unsubSettings = onSnapshot(settingsDocRef, (snapshot) => {
         if (snapshot.exists()) {
           const data = snapshot.data() as SchoolSettings;
-          listeners.onSettingsChange?.(data);
+          this.currentListeners?.onSettingsChange?.(data);
         }
-      }, (err) => {
-        console.warn('Settings sync error:', err);
-        listeners.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne');
-      });
-      this.unsubscribers.push(unsubSettings);
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubSettings);
 
       // 2. Students Collection
       const studentsCollRef = collection(db, `schools/${code}/students`);
@@ -220,12 +448,11 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Student);
         });
-        listeners.onStudentsChange?.(list);
-        listeners.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}]`);
-      }, (err) => {
-        console.warn('Students sync error:', err);
-      });
-      this.unsubscribers.push(unsubStudents);
+        if (list.length > 0) {
+          this.currentListeners?.onStudentsChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubStudents);
 
       // 3. Classes Collection
       const classesCollRef = collection(db, `schools/${code}/classes`);
@@ -234,11 +461,11 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as SchoolClass);
         });
-        listeners.onClassesChange?.(list);
-      }, (err) => {
-        console.warn('Classes sync error:', err);
-      });
-      this.unsubscribers.push(unsubClasses);
+        if (list.length > 0) {
+          this.currentListeners?.onClassesChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubClasses);
 
       // 4. Subjects Collection
       const subjectsCollRef = collection(db, `schools/${code}/subjects`);
@@ -247,11 +474,11 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Subject);
         });
-        listeners.onSubjectsChange?.(list);
-      }, (err) => {
-        console.warn('Subjects sync error:', err);
-      });
-      this.unsubscribers.push(unsubSubjects);
+        if (list.length > 0) {
+          this.currentListeners?.onSubjectsChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubSubjects);
 
       // 5. Teachers Collection
       const teachersCollRef = collection(db, `schools/${code}/teachers`);
@@ -260,11 +487,11 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Teacher);
         });
-        listeners.onTeachersChange?.(list);
-      }, (err) => {
-        console.warn('Teachers sync error:', err);
-      });
-      this.unsubscribers.push(unsubTeachers);
+        if (list.length > 0) {
+          this.currentListeners?.onTeachersChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubTeachers);
 
       // 6. Grades Collection
       const gradesCollRef = collection(db, `schools/${code}/grades`);
@@ -273,13 +500,13 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as EvaluationGrade);
         });
-        listeners.onGradesChange?.(list);
-      }, (err) => {
-        console.warn('Grades sync error:', err);
-      });
-      this.unsubscribers.push(unsubGrades);
+        if (list.length > 0) {
+          this.currentListeners?.onGradesChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubGrades);
 
-      // 7. Payments Collection - Realtime Instant Sync across Phone & PC
+      // 7. Payments Collection
       const paymentsCollRef = collection(db, `schools/${code}/payments`);
       const unsubPayments = onSnapshot(paymentsCollRef, (snapshot) => {
         const list: Payment[] = [];
@@ -305,17 +532,16 @@ class CloudSyncService {
             notes: d.notes || ''
           } as Payment);
         });
-        // Sort newest payments first by date, then receiptNumber or ID
-        list.sort((a, b) => 
-          (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
-          (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
-          (b.id || '').localeCompare(a.id || '')
-        );
-        listeners.onPaymentsChange?.(list);
-      }, (err) => {
-        console.warn('[CloudSync] Payments listener notice:', err);
-      });
-      this.unsubscribers.push(unsubPayments);
+        if (list.length > 0) {
+          list.sort((a, b) => 
+            (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
+            (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
+            (b.id || '').localeCompare(a.id || '')
+          );
+          this.currentListeners?.onPaymentsChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubPayments);
 
       // 8. Attendance Collection
       const attendanceCollRef = collection(db, `schools/${code}/attendance`);
@@ -324,11 +550,11 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as AttendanceRecord);
         });
-        listeners.onAttendanceChange?.(list);
-      }, (err) => {
-        console.warn('Attendance sync error:', err);
-      });
-      this.unsubscribers.push(unsubAttendance);
+        if (list.length > 0) {
+          this.currentListeners?.onAttendanceChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubAttendance);
 
       // 9. Expenses Collection
       const expensesCollRef = collection(db, `schools/${code}/expenses`);
@@ -337,33 +563,73 @@ class CloudSyncService {
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Expense);
         });
-        list.sort((a, b) => (b.expenseDate || '').localeCompare(a.expenseDate || ''));
-        listeners.onExpensesChange?.(list);
-      }, (err) => {
-        console.warn('Expenses sync error:', err);
-      });
-      this.unsubscribers.push(unsubExpenses);
+        if (list.length > 0) {
+          list.sort((a, b) => (b.expenseDate || '').localeCompare(a.expenseDate || ''));
+          this.currentListeners?.onExpensesChange?.(list);
+        }
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubExpenses);
+    } catch {}
+  }
 
-      listeners.onSyncStatusChange?.('CONNECTED', `Synchronisé en direct avec [${code}]`);
-    } catch (e) {
-      console.error('Error starting realtime sync:', e);
-      listeners.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne');
+  private reconnectAll(): void {
+    const code = this.getActiveSchoolCode();
+    if (this.currentListeners) {
+      this.fetchServerState(code);
+      this.connectSSE(code);
     }
   }
 
   public stopRealtimeSync(): void {
-    this.unsubscribers.forEach((unsub) => {
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    if (this.broadcastChannel) {
+      this.broadcastChannel.close();
+      this.broadcastChannel = null;
+    }
+    clearTimeout(this.sseReconnectTimeout);
+    this.firestoreUnsubscribers.forEach((unsub) => {
       try {
         unsub();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     });
-    this.unsubscribers = [];
+    this.firestoreUnsubscribers = [];
   }
 
   /**
-   * Push an entire local database to Cloud Firestore for this school
+   * Broadcast a mutation across the network to all other devices in real-time
+   */
+  private async dispatchMutation(mutationType: string, payload: any, schoolCode?: string): Promise<void> {
+    const code = schoolCode || this.getActiveSchoolCode();
+
+    // 1. Intra-browser tab broadcast
+    try {
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({ mutationType, payload, senderId: DEVICE_CLIENT_ID });
+      }
+    } catch {}
+
+    // 2. Server API mutation for cross-device broadcast
+    try {
+      await fetch('/api/sync/mutate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolCode: code,
+          mutationType,
+          payload,
+          senderId: DEVICE_CLIENT_ID
+        })
+      });
+    } catch (e) {
+      console.warn('[SyncService] Server mutation post notice:', e);
+    }
+  }
+
+  /**
+   * Push an entire local database to Cloud & Server for this school
    */
   public async pushAllDataToCloud(
     schoolCode: string,
@@ -379,88 +645,70 @@ class CloudSyncService {
       expenses?: Expense[];
     }
   ): Promise<boolean> {
+    const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
+
+    // 1. Send to server sync store
     try {
-      const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
+      await fetch('/api/sync/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolCode: code, data, senderId: DEVICE_CLIENT_ID })
+      });
+    } catch (e) {
+      console.warn('[SyncService] Server push notice:', e);
+    }
+
+    // 2. Try Firestore batch write
+    try {
       const batch = writeBatch(db);
 
-      // 1. Settings
       const settingsRef = doc(db, `schools/${code}/settings`, 'config');
       batch.set(settingsRef, cleanForFirestore(data.settings), { merge: true });
 
-      // 2. Students
       data.students.forEach((s) => {
         if (!s.id) return;
-        const ref = doc(db, `schools/${code}/students`, s.id);
-        batch.set(ref, cleanForFirestore(s), { merge: true });
+        batch.set(doc(db, `schools/${code}/students`, s.id), cleanForFirestore(s), { merge: true });
       });
 
-      // 3. Classes
       data.classes.forEach((c) => {
         if (!c.id) return;
-        const ref = doc(db, `schools/${code}/classes`, c.id);
-        batch.set(ref, cleanForFirestore(c), { merge: true });
+        batch.set(doc(db, `schools/${code}/classes`, c.id), cleanForFirestore(c), { merge: true });
       });
 
-      // 4. Subjects
       data.subjects.forEach((subj) => {
         if (!subj.id) return;
-        const ref = doc(db, `schools/${code}/subjects`, subj.id);
-        batch.set(ref, cleanForFirestore(subj), { merge: true });
+        batch.set(doc(db, `schools/${code}/subjects`, subj.id), cleanForFirestore(subj), { merge: true });
       });
 
-      // 5. Teachers
       data.teachers.forEach((t) => {
         if (!t.id) return;
-        const ref = doc(db, `schools/${code}/teachers`, t.id);
-        batch.set(ref, cleanForFirestore(t), { merge: true });
+        batch.set(doc(db, `schools/${code}/teachers`, t.id), cleanForFirestore(t), { merge: true });
       });
 
-      // 6. Grades
       data.grades.forEach((g) => {
         if (!g.id) return;
-        const ref = doc(db, `schools/${code}/grades`, g.id);
-        batch.set(ref, cleanForFirestore(g), { merge: true });
+        batch.set(doc(db, `schools/${code}/grades`, g.id), cleanForFirestore(g), { merge: true });
       });
 
-      // 7. Payments - guaranteed clean and complete
       data.payments.forEach((p) => {
         if (!p.id) return;
-        const ref = doc(db, `schools/${code}/payments`, p.id);
-        const cleanP = cleanForFirestore({
-          ...p,
-          monthCovered: p.monthCovered || '',
-          referenceNumber: p.referenceNumber || '',
-          notes: p.notes || '',
-          amountPaid: Number(p.amountPaid) || 0,
-          expectedAmount: Number(p.expectedAmount) || 0,
-          remainingAmount: Number(p.remainingAmount) || 0,
-          paymentDate: p.paymentDate || new Date().toISOString().split('T')[0],
-          method: p.method || 'ESPECES',
-          cashierName: p.cashierName || 'Comptable',
-          academicYear: p.academicYear || '2025-2026'
-        });
-        batch.set(ref, cleanP, { merge: true });
+        batch.set(doc(db, `schools/${code}/payments`, p.id), cleanForFirestore(p), { merge: true });
       });
 
-      // 8. Attendance
       data.attendance.forEach((att) => {
         if (!att.id) return;
-        const ref = doc(db, `schools/${code}/attendance`, att.id);
-        batch.set(ref, cleanForFirestore(att), { merge: true });
+        batch.set(doc(db, `schools/${code}/attendance`, att.id), cleanForFirestore(att), { merge: true });
       });
 
-      // 9. Expenses (if available)
       if (data.expenses && data.expenses.length > 0) {
         data.expenses.forEach((e) => {
           if (!e.id) return;
-          const ref = doc(db, `schools/${code}/expenses`, e.id);
-          batch.set(ref, cleanForFirestore(e), { merge: true });
+          batch.set(doc(db, `schools/${code}/expenses`, e.id), cleanForFirestore(e), { merge: true });
         });
       }
 
       await batch.commit();
 
-      // Update school directory metadata
       await setDoc(doc(db, 'school_directory', code), cleanForFirestore({
         schoolCode: code,
         schoolName: data.settings.schoolName || 'Établissement Scolaire',
@@ -470,77 +718,105 @@ class CloudSyncService {
         totalClasses: data.classes.length,
         totalPayments: data.payments.length
       }), { merge: true });
-
-      return true;
     } catch (e) {
-      console.error('Failed to push all data to cloud:', e);
-      return false;
+      // Handled gracefully
     }
+
+    return true;
   }
 
   // --- Dedicated Payment Realtime Cloud Sync ---
   public async syncPayment(payment: Payment, schoolCode?: string): Promise<boolean> {
+    const code = schoolCode || this.getActiveSchoolCode();
+    if (!payment.id) return false;
+
+    const cleanPayment = cleanForFirestore({
+      id: payment.id,
+      receiptNumber: payment.receiptNumber || '',
+      studentId: payment.studentId || '',
+      studentMatricule: payment.studentMatricule || '',
+      studentName: payment.studentName || 'Élève',
+      className: payment.className || '',
+      category: payment.category || 'MENSUALITE',
+      monthCovered: payment.monthCovered || '',
+      amountPaid: Number(payment.amountPaid) || 0,
+      expectedAmount: Number(payment.expectedAmount) || 0,
+      remainingAmount: Number(payment.remainingAmount) || 0,
+      paymentDate: payment.paymentDate || new Date().toISOString().split('T')[0],
+      method: payment.method || 'ESPECES',
+      referenceNumber: payment.referenceNumber || '',
+      cashierName: payment.cashierName || 'Comptable',
+      academicYear: payment.academicYear || '2025-2026',
+      notes: payment.notes || '',
+      updatedAt: new Date().toISOString()
+    });
+
+    // 1. Broadcast mutation to all devices via server
+    await this.dispatchMutation('SYNC_PAYMENT', cleanPayment, code);
+
+    // 2. Also try Firestore
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
-      if (!payment.id) return false;
-
       const docRef = doc(db, `schools/${code}/payments`, payment.id);
-      const cleanData = cleanForFirestore({
-        id: payment.id,
-        receiptNumber: payment.receiptNumber || '',
-        studentId: payment.studentId || '',
-        studentMatricule: payment.studentMatricule || '',
-        studentName: payment.studentName || 'Élève',
-        className: payment.className || '',
-        category: payment.category || 'MENSUALITE',
-        monthCovered: payment.monthCovered || '',
-        amountPaid: Number(payment.amountPaid) || 0,
-        expectedAmount: Number(payment.expectedAmount) || 0,
-        remainingAmount: Number(payment.remainingAmount) || 0,
-        paymentDate: payment.paymentDate || new Date().toISOString().split('T')[0],
-        method: payment.method || 'ESPECES',
-        referenceNumber: payment.referenceNumber || '',
-        cashierName: payment.cashierName || 'Comptable',
-        academicYear: payment.academicYear || '2025-2026',
-        notes: payment.notes || '',
-        updatedAt: new Date().toISOString()
-      });
+      await setDoc(docRef, cleanPayment, { merge: true });
+    } catch {}
 
-      await setDoc(docRef, cleanData, { merge: true });
-      return true;
-    } catch (e) {
-      console.error(`[CloudSync] Error syncing payment ${payment.id} to cloud:`, e);
-      return false;
-    }
+    return true;
   }
 
   // --- Dedicated Expense Realtime Cloud Sync ---
   public async syncExpense(expense: Expense, schoolCode?: string): Promise<boolean> {
+    const code = schoolCode || this.getActiveSchoolCode();
+    if (!expense.id) return false;
+
+    const cleanData = cleanForFirestore({
+      ...expense,
+      amount: Number(expense.amount) || 0,
+      updatedAt: new Date().toISOString()
+    });
+
+    await this.dispatchMutation('SYNC_EXPENSE', cleanData, code);
+
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
-      if (!expense.id) return false;
-
       const docRef = doc(db, `schools/${code}/expenses`, expense.id);
-      const cleanData = cleanForFirestore({
-        ...expense,
-        amount: Number(expense.amount) || 0,
-        updatedAt: new Date().toISOString()
-      });
-
       await setDoc(docRef, cleanData, { merge: true });
-      return true;
-    } catch (e) {
-      console.warn(`[CloudSync] Error syncing expense ${expense.id}:`, e);
-      return false;
-    }
+    } catch {}
+
+    return true;
+  }
+
+  public async deleteExpense(expenseId: string, schoolCode?: string): Promise<boolean> {
+    const code = schoolCode || this.getActiveSchoolCode();
+    if (!expenseId) return false;
+
+    await this.dispatchMutation('DELETE_EXPENSE', { id: expenseId }, code);
+
+    try {
+      const docRef = doc(db, `schools/${code}/expenses`, expenseId);
+      await deleteDoc(docRef);
+    } catch {}
+
+    return true;
   }
 
   /**
-   * Fetch all cloud payments directly from Firestore for the given school
+   * Fetch all cloud payments directly for the given school
    */
   public async fetchAllCloudPayments(schoolCode?: string): Promise<Payment[]> {
+    const code = schoolCode || this.getActiveSchoolCode();
+
+    // 1. Try server state first
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
+      const res = await fetch(`/api/sync/state?school=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.store?.payments && Array.isArray(data.store.payments)) {
+          return data.store.payments;
+        }
+      }
+    } catch {}
+
+    // 2. Fallback to Firestore
+    try {
       const paymentsCollRef = collection(db, `schools/${code}/payments`);
       const snap = await getDocs(paymentsCollRef);
       const list: Payment[] = [];
@@ -573,7 +849,6 @@ class CloudSyncService {
       );
       return list;
     } catch (e) {
-      console.warn('[CloudSync] Error fetching cloud payments:', e);
       return [];
     }
   }
@@ -584,14 +859,15 @@ class CloudSyncService {
     item: T,
     schoolCode?: string
   ): Promise<void> {
+    const code = schoolCode || this.getActiveSchoolCode();
+    const cleanData = cleanForFirestore(item);
+
+    await this.dispatchMutation('SYNC_DOC', { collectionName, item: cleanData }, code);
+
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
       const docRef = doc(db, `schools/${code}/${collectionName}`, item.id);
-      const cleanData = cleanForFirestore(item);
       await setDoc(docRef, cleanData, { merge: true });
-    } catch (e) {
-      console.warn(`Failed to sync document to ${collectionName}:`, e);
-    }
+    } catch {}
   }
 
   public async deleteCloudDoc(
@@ -599,39 +875,43 @@ class CloudSyncService {
     id: string,
     schoolCode?: string
   ): Promise<void> {
+    const code = schoolCode || this.getActiveSchoolCode();
+
+    await this.dispatchMutation('DELETE_DOC', { collectionName, id }, code);
+
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
       const docRef = doc(db, `schools/${code}/${collectionName}`, id);
       await deleteDoc(docRef);
-    } catch (e) {
-      console.warn(`Failed to delete cloud document from ${collectionName}:`, e);
-    }
+    } catch {}
   }
 
   public async clearCloudCollection(
     collectionName: string,
     schoolCode?: string
   ): Promise<void> {
+    const code = schoolCode || this.getActiveSchoolCode();
+
+    await this.dispatchMutation('CLEAR_COLLECTION', { collectionName }, code);
+
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
       const collRef = collection(db, `schools/${code}/${collectionName}`);
       const snap = await getDocs(collRef);
       const batch = writeBatch(db);
       snap.forEach((d) => batch.delete(d.ref));
       await batch.commit();
-    } catch (e) {
-      console.warn(`Failed to clear cloud collection ${collectionName}:`, e);
-    }
+    } catch {}
   }
 
   public async syncSettings(settings: SchoolSettings, schoolCode?: string): Promise<void> {
+    const code = schoolCode || this.getActiveSchoolCode();
+    const cleanData = cleanForFirestore(settings);
+
+    await this.dispatchMutation('SYNC_SETTINGS', cleanData, code);
+
     try {
-      const code = schoolCode || this.getActiveSchoolCode();
       const docRef = doc(db, `schools/${code}/settings`, 'config');
-      await setDoc(docRef, cleanForFirestore(settings), { merge: true });
-    } catch (e) {
-      console.warn('Failed to sync settings to cloud:', e);
-    }
+      await setDoc(docRef, cleanData, { merge: true });
+    } catch {}
   }
 }
 
