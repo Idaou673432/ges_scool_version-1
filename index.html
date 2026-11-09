@@ -2,6 +2,72 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // AI Studio Environment Constraint: HMR is disabled. Provide MockWebSocket to prevent Vite HMR connection failures.
+      (function() {
+        try {
+          class MockWebSocket extends EventTarget {
+            static CONNECTING = 0;
+            static OPEN = 1;
+            static CLOSING = 2;
+            static CLOSED = 3;
+            CONNECTING = 0;
+            OPEN = 1;
+            CLOSING = 2;
+            CLOSED = 3;
+
+            constructor(url, protocols) {
+              super();
+              this.url = String(url || '');
+              this.protocol = Array.isArray(protocols) ? (protocols[0] || 'vite-hmr') : (protocols || 'vite-hmr');
+              this.readyState = 1; // OPEN
+              this.binaryType = 'blob';
+              this.bufferedAmount = 0;
+              this.extensions = '';
+              this.onopen = null;
+              this.onclose = null;
+              this.onerror = null;
+              this.onmessage = null;
+
+              setTimeout(() => {
+                const openEvent = new Event('open');
+                this.dispatchEvent(openEvent);
+                if (typeof this.onopen === 'function') {
+                  this.onopen(openEvent);
+                }
+              }, 0);
+            }
+
+            send() {}
+            close() {
+              this.readyState = 3;
+            }
+          }
+
+          window.WebSocket = MockWebSocket;
+
+          const origError = console.error;
+          console.error = function(...args) {
+            const hasWsError = args.some(arg => {
+              if (!arg) return false;
+              const str = typeof arg === 'string' ? arg : (arg.message || arg.stack || String(arg));
+              return str.includes('WebSocket') || str.includes('vite-hmr') || str.includes('[vite]');
+            });
+            if (hasWsError) return;
+            origError.apply(console, args);
+          };
+
+          window.addEventListener('error', function(event) {
+            const msg = (event && (event.message || (event.error && event.error.message))) || '';
+            if (msg.includes('WebSocket') || msg.includes('vite')) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return true;
+            }
+          }, true);
+        } catch (_) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>KalanGest - Gestion Établissement Scolaire</title>
     <meta name="description" content="Application professionnelle de gestion scolaire adaptée aux établissements d'enseignement au Mali (Fondamental, Lycées, CAP/BT)." />

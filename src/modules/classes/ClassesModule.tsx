@@ -118,15 +118,42 @@ export const ClassesModule: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const filteredClasses = classes.filter(c => {
-    const q = search.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      c.name.toLowerCase().includes(q) ||
-      c.category.toLowerCase().includes(q) ||
-      (c.classroom && c.classroom.toLowerCase().includes(q))
-    );
-  });
+  // Catégories de cycle disponibles selon le type d'établissement sélectionné
+  const availableLevelCategories = useMemo(() => {
+    if (settings.schoolCategory === 'ECOLE_FONDAMENTALE') {
+      return MALI_SCHOOL_LEVEL_CATEGORIES.filter(c => c.id === 'FONDAMENTAL_1' || c.id === 'FONDAMENTAL_2');
+    }
+    if (settings.schoolCategory === 'LYCEE') {
+      return MALI_SCHOOL_LEVEL_CATEGORIES.filter(c => c.id === 'LYCEE');
+    }
+    if (settings.schoolCategory === 'PROFESSIONNEL') {
+      return MALI_SCHOOL_LEVEL_CATEGORIES.filter(c => c.id === 'TECHNIQUE_BT' || c.id === 'PROFESSIONNEL_CAP');
+    }
+    return MALI_SCHOOL_LEVEL_CATEGORIES;
+  }, [settings.schoolCategory]);
+
+  const filteredClasses = useMemo(() => {
+    return classes.filter(c => {
+      // Filtrage strict par type d'établissement (ex: Fondamental ne voit pas Lycée / BT)
+      if (settings.schoolCategory === 'ECOLE_FONDAMENTALE' && c.category !== 'FONDAMENTAL_1' && c.category !== 'FONDAMENTAL_2') {
+        return false;
+      }
+      if (settings.schoolCategory === 'LYCEE' && c.category !== 'LYCEE') {
+        return false;
+      }
+      if (settings.schoolCategory === 'PROFESSIONNEL' && c.category !== 'TECHNIQUE_BT' && c.category !== 'PROFESSIONNEL_CAP') {
+        return false;
+      }
+
+      const q = search.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.category.toLowerCase().includes(q) ||
+        (c.classroom && c.classroom.toLowerCase().includes(q))
+      );
+    });
+  }, [classes, settings.schoolCategory, search]);
 
   return (
     <div className="space-y-2 max-w-7xl mx-auto pb-4">
@@ -344,7 +371,7 @@ export const ClassesModule: React.FC = () => {
                   }}
                   className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-medium"
                 >
-                  {MALI_SCHOOL_LEVEL_CATEGORIES.map(cat => (
+                  {availableLevelCategories.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.label}</option>
                   ))}
                 </select>

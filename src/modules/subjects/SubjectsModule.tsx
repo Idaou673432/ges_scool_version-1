@@ -2,7 +2,7 @@
  * SomaSikolo - Matières & Coefficients Module
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { BookOpen, Plus, Edit3, Trash2, Search, X } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { Subject, SchoolLevelCategory } from '../../types';
@@ -32,11 +32,38 @@ export const SubjectsModule: React.FC = () => {
     order: 1
   });
 
-  const filteredSubjects = subjects.filter(sub => {
-    const matchesCat = selectedCategory === 'ALL' || sub.classCategory === selectedCategory;
-    const matchesSearch = sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || sub.code.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCat && matchesSearch;
-  });
+  // Catégories disponibles selon le niveau de l'établissement
+  const availableCategories = useMemo(() => {
+    if (settings.schoolCategory === 'ECOLE_FONDAMENTALE') {
+      return MALI_SCHOOL_LEVEL_CATEGORIES.filter(c => c.id === 'FONDAMENTAL_1' || c.id === 'FONDAMENTAL_2');
+    }
+    if (settings.schoolCategory === 'LYCEE') {
+      return MALI_SCHOOL_LEVEL_CATEGORIES.filter(c => c.id === 'LYCEE');
+    }
+    if (settings.schoolCategory === 'PROFESSIONNEL') {
+      return MALI_SCHOOL_LEVEL_CATEGORIES.filter(c => c.id === 'TECHNIQUE_BT' || c.id === 'PROFESSIONNEL_CAP');
+    }
+    return MALI_SCHOOL_LEVEL_CATEGORIES;
+  }, [settings.schoolCategory]);
+
+  const filteredSubjects = useMemo(() => {
+    return subjects.filter(sub => {
+      // Filtrage strict par type d'établissement
+      if (settings.schoolCategory === 'ECOLE_FONDAMENTALE' && sub.classCategory !== 'FONDAMENTAL_1' && sub.classCategory !== 'FONDAMENTAL_2') {
+        return false;
+      }
+      if (settings.schoolCategory === 'LYCEE' && sub.classCategory !== 'LYCEE') {
+        return false;
+      }
+      if (settings.schoolCategory === 'PROFESSIONNEL' && sub.classCategory !== 'TECHNIQUE_BT' && sub.classCategory !== 'PROFESSIONNEL_CAP') {
+        return false;
+      }
+
+      const matchesCat = selectedCategory === 'ALL' || sub.classCategory === selectedCategory;
+      const matchesSearch = sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || sub.code.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCat && matchesSearch;
+    });
+  }, [subjects, settings.schoolCategory, selectedCategory, searchQuery]);
 
   const handleOpenAdd = () => {
     setSelectedSubj(null);
@@ -81,8 +108,14 @@ export const SubjectsModule: React.FC = () => {
               onChange={e => setSelectedCategory(e.target.value)}
               className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[150px] sm:max-w-[200px] truncate"
             >
-              <option value="ALL">Tous les cycles ({subjects.length})</option>
-              {MALI_SCHOOL_LEVEL_CATEGORIES.map(cat => (
+              <option value="ALL">
+                {settings.schoolCategory === 'ECOLE_FONDAMENTALE' 
+                  ? 'Fondamental (Toutes matières)' 
+                  : settings.schoolCategory === 'LYCEE'
+                  ? 'Lycée (Toutes matières)'
+                  : 'Tous les cycles'} ({filteredSubjects.length})
+              </option>
+              {availableCategories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.label}</option>
               ))}
             </select>
@@ -243,7 +276,7 @@ export const SubjectsModule: React.FC = () => {
                     onChange={e => setFormData({ ...formData, classCategory: e.target.value as SchoolLevelCategory })}
                     className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400"
                   >
-                    {MALI_SCHOOL_LEVEL_CATEGORIES.map(cat => (
+                    {availableCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.label}</option>
                     ))}
                   </select>

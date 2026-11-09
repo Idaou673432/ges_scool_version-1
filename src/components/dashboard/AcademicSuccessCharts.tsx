@@ -20,7 +20,7 @@ import {
 } from 'recharts';
 import { useSchool } from '../../contexts/SchoolContext';
 import { EvaluationTerm } from '../../types';
-import { getMaliEvaluationTerms } from '../../constants/maliEducation';
+import { getMaliEvaluationTerms, getFilteredEvaluationTerms } from '../../constants/maliEducation';
 
 interface AcademicSuccessChartsProps {
   onNavigateToGrades?: () => void;
@@ -144,12 +144,25 @@ export const AcademicSuccessCharts: React.FC<AcademicSuccessChartsProps> = ({ on
           </p>
         </div>
 
-        {/* Sélecteur de période épuré */}
+        {/* Sélecteur de période épuré selon le cycle */}
         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg shrink-0 flex-wrap">
           <span className="text-xs font-semibold text-slate-600 px-2">Période :</span>
-          {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-            .filter(t => t.category === 'TRIMESTRE' || ['EVALUATION_1', 'EVALUATION_2', 'EVALUATION_3'].includes(t.id))
-            .map(t => (
+          {(() => {
+            const filtered = getFilteredEvaluationTerms(
+              undefined,
+              settings.schoolCategory,
+              settings.evaluationMonths,
+              settings.evaluationCount
+            );
+            const termsToShow = settings.schoolCategory === 'ECOLE_FONDAMENTALE'
+              ? filtered.monthlyTerms.slice(0, 4)
+              : (settings.schoolCategory === 'LYCEE'
+                ? filtered.trimesterTerms
+                : (settings.schoolCategory === 'PROFESSIONNEL'
+                  ? filtered.semesterTerms
+                  : [...filtered.monthlyTerms.slice(0, 3), ...filtered.trimesterTerms]));
+
+            return termsToShow.map(t => (
               <button
                 key={t.id}
                 onClick={() => setSelectedTerm(t.id as EvaluationTerm)}
@@ -161,7 +174,8 @@ export const AcademicSuccessCharts: React.FC<AcademicSuccessChartsProps> = ({ on
               >
                 {t.shortLabel}
               </button>
-            ))}
+            ));
+          })()}
         </div>
       </div>
 

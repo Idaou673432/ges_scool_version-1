@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.APP_PORT) || 3000;
 const DATA_DIR = path.join(__dirname, 'data', 'schools');
 
 // Ensure persistent storage directory exists
@@ -20,7 +20,73 @@ try {
   console.warn('[Server] Could not create data directory, using in-memory store:', e);
 }
 
-app.use(express.json({ limit: '50mb' }));
+// 1. Security Headers Middleware (Anti-XSS, Anti-Sniffing, Anti-Clickjacking)
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
+// 2. IP Rate Limiter to prevent DoS / Brute-force attacks on API endpoints
+interface RateLimitBucket {
+  count: number;
+  resetAt: number;
+}
+const rateLimits = new Map<string, RateLimitBucket>();
+
+function apiRateLimiter(limit: number = 240, windowMs: number = 60000) {
+  return (req: Request, res: Response, next: () => void) => {
+    if (!req.path.startsWith('/api/')) return next();
+    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    let bucket = rateLimits.get(ip);
+    if (!bucket || now > bucket.resetAt) {
+      bucket = { count: 1, resetAt: now + windowMs };
+      rateLimits.set(ip, bucket);
+    } else {
+      bucket.count++;
+    }
+
+    if (bucket.count > limit) {
+      res.setHeader('Retry-After', Math.ceil((bucket.resetAt - now) / 1000));
+      return res.status(429).json({ error: 'Trop de requêtes, veuillez patienter quelques secondes.' });
+    }
+    next();
+  };
+}
+
+// Nettoyage régulier des compteurs de rate limit
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, bucket] of rateLimits.entries()) {
+    if (now > bucket.resetAt) rateLimits.delete(ip);
+  }
+}, 300000);
+
+app.use(apiRateLimiter(300, 60000));
+app.use(express.json({ limit: '10mb' }));
+
+// Protection contre la pollution de prototype
+function sanitizePayload<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') {
+    if (typeof obj === 'string') return obj.replace(/\0/g, '') as unknown as T;
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizePayload) as unknown as T;
+  }
+  const clean: any = {};
+  for (const key of Object.keys(obj)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+      continue;
+    }
+    clean[key] = sanitizePayload((obj as any)[key]);
+  }
+  return clean;
+}
 
 // In-memory cache + active SSE clients per school code
 interface SchoolStore {
@@ -40,11 +106,22 @@ const memoryStores = new Map<string, SchoolStore>();
 const sseClients = new Map<string, Set<Response>>();
 
 function sanitizeCode(code: string): string {
-  return (code || 'ECOLE-PRINCIPALE').trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'ECOLE-PRINCIPALE';
+  return (code || 'ECOLE-PRINCIPALE')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '')
+    .slice(0, 64) || 'ECOLE-PRINCIPALE';
 }
 
 function getFilePath(code: string): string {
-  return path.join(DATA_DIR, `${sanitizeCode(code)}.json`);
+  const cleanCode = sanitizeCode(code);
+  const targetFile = `${cleanCode}.json`;
+  const resolved = path.resolve(DATA_DIR, targetFile);
+  const root = path.resolve(DATA_DIR);
+  if (!resolved.startsWith(root)) {
+    throw new Error('Access denied: Invalid path traversal attempt');
+  }
+  return resolved;
 }
 
 function loadSchoolData(code: string): SchoolStore {
@@ -153,151 +230,212 @@ app.get('/api/sync/state', (req: Request, res: Response) => {
   res.json({ success: true, schoolCode, store });
 });
 
+const ALLOWED_MUTATIONS = new Set<string>([
+  'SYNC_SETTINGS',
+  'SYNC_DOC',
+  'DELETE_DOC',
+  'CLEAR_COLLECTION',
+  'SYNC_PAYMENT',
+  'SYNC_EXPENSE',
+  'DELETE_EXPENSE'
+]);
+
+const ALLOWED_COLLECTIONS = new Set<string>([
+  'students',
+  'classes',
+  'subjects',
+  'teachers',
+  'grades',
+  'payments',
+  'attendance',
+  'expenses'
+]);
+
 // 3. Bootstrap cloud/server store if empty with initial client data
 app.post('/api/sync/bootstrap', (req: Request, res: Response) => {
-  const { schoolCode, seedData } = req.body;
-  const cleanCode = sanitizeCode(schoolCode);
-  const current = loadSchoolData(cleanCode);
+  try {
+    const { schoolCode, seedData: rawSeed } = req.body;
+    const cleanCode = sanitizeCode(schoolCode);
+    const current = loadSchoolData(cleanCode);
 
-  const hasData = (current.students && current.students.length > 0) ||
-                  (current.payments && current.payments.length > 0) ||
-                  (current.classes && current.classes.length > 0);
+    const hasData = (current.students && current.students.length > 0) ||
+                    (current.payments && current.payments.length > 0) ||
+                    (current.classes && current.classes.length > 0);
 
-  if (!hasData && seedData) {
-    saveSchoolData(cleanCode, {
-      settings: seedData.settings || null,
-      students: seedData.students || [],
-      classes: seedData.classes || [],
-      subjects: seedData.subjects || [],
-      teachers: seedData.teachers || [],
-      grades: seedData.grades || [],
-      payments: seedData.payments || [],
-      attendance: seedData.attendance || [],
-      expenses: seedData.expenses || [],
-      updatedAt: new Date().toISOString()
-    });
-    broadcastToSchool(cleanCode, 'state_reset', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) });
-    return res.json({ success: true, bootstrapped: true });
+    if (!hasData && rawSeed && typeof rawSeed === 'object') {
+      const seedData = sanitizePayload(rawSeed);
+      saveSchoolData(cleanCode, {
+        settings: seedData.settings || null,
+        students: Array.isArray(seedData.students) ? seedData.students : [],
+        classes: Array.isArray(seedData.classes) ? seedData.classes : [],
+        subjects: Array.isArray(seedData.subjects) ? seedData.subjects : [],
+        teachers: Array.isArray(seedData.teachers) ? seedData.teachers : [],
+        grades: Array.isArray(seedData.grades) ? seedData.grades : [],
+        payments: Array.isArray(seedData.payments) ? seedData.payments : [],
+        attendance: Array.isArray(seedData.attendance) ? seedData.attendance : [],
+        expenses: Array.isArray(seedData.expenses) ? seedData.expenses : [],
+        updatedAt: new Date().toISOString()
+      });
+      broadcastToSchool(cleanCode, 'state_reset', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) });
+      return res.json({ success: true, bootstrapped: true });
+    }
+
+    return res.json({ success: true, bootstrapped: false, currentStore: current });
+  } catch (err: any) {
+    console.error('[Server Error /api/sync/bootstrap]:', err?.message || err);
+    return res.status(500).json({ error: 'Erreur interne lors du bootstrap' });
   }
-
-  res.json({ success: true, bootstrapped: false, currentStore: current });
 });
 
 // 4. Push complete school data (or manual cloud push)
 app.post('/api/sync/push', (req: Request, res: Response) => {
-  const { schoolCode, data, senderId } = req.body;
-  const cleanCode = sanitizeCode(schoolCode);
+  try {
+    const { schoolCode, data: rawData, senderId } = req.body;
+    const cleanCode = sanitizeCode(schoolCode);
 
-  if (!data) {
-    return res.status(400).json({ error: 'Missing data payload' });
+    if (!rawData || typeof rawData !== 'object') {
+      return res.status(400).json({ error: 'Missing data payload' });
+    }
+
+    const data = sanitizePayload(rawData);
+
+    saveSchoolData(cleanCode, {
+      settings: data.settings || null,
+      students: Array.isArray(data.students) ? data.students : [],
+      classes: Array.isArray(data.classes) ? data.classes : [],
+      subjects: Array.isArray(data.subjects) ? data.subjects : [],
+      teachers: Array.isArray(data.teachers) ? data.teachers : [],
+      grades: Array.isArray(data.grades) ? data.grades : [],
+      payments: Array.isArray(data.payments) ? data.payments : [],
+      attendance: Array.isArray(data.attendance) ? data.attendance : [],
+      expenses: Array.isArray(data.expenses) ? data.expenses : [],
+      updatedAt: new Date().toISOString()
+    });
+
+    broadcastToSchool(cleanCode, 'state_updated', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) }, senderId);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[Server Error /api/sync/push]:', err?.message || err);
+    return res.status(500).json({ error: 'Erreur interne lors de la sauvegarde' });
   }
-
-  saveSchoolData(cleanCode, {
-    settings: data.settings,
-    students: data.students || [],
-    classes: data.classes || [],
-    subjects: data.subjects || [],
-    teachers: data.teachers || [],
-    grades: data.grades || [],
-    payments: data.payments || [],
-    attendance: data.attendance || [],
-    expenses: data.expenses || [],
-    updatedAt: new Date().toISOString()
-  });
-
-  broadcastToSchool(cleanCode, 'state_updated', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) }, senderId);
-  res.json({ success: true });
 });
 
 // 5. Atomic mutations (adding a payment, editing student, adding note, updating attendance, etc.)
 app.post('/api/sync/mutate', (req: Request, res: Response) => {
-  const { schoolCode, mutationType, payload, senderId } = req.body;
-  const cleanCode = sanitizeCode(schoolCode);
-  const store = loadSchoolData(cleanCode);
+  try {
+    const { schoolCode, mutationType, payload: rawPayload, senderId } = req.body;
+    if (!mutationType || !ALLOWED_MUTATIONS.has(mutationType)) {
+      return res.status(400).json({ error: 'Type de mutation non autorisé' });
+    }
 
-  switch (mutationType) {
-    case 'SYNC_SETTINGS':
-      store.settings = payload;
-      break;
+    const payload = sanitizePayload(rawPayload);
+    const cleanCode = sanitizeCode(schoolCode);
+    const store = loadSchoolData(cleanCode);
 
-    case 'SYNC_DOC': {
-      const { collectionName, item } = payload;
-      const coll = (store as any)[collectionName] as any[] | undefined;
-      if (Array.isArray(coll)) {
-        const idx = coll.findIndex(i => i.id === item.id);
-        if (idx >= 0) {
-          coll[idx] = { ...coll[idx], ...item };
-        } else {
-          coll.push(item);
+    switch (mutationType) {
+      case 'SYNC_SETTINGS':
+        if (payload && typeof payload === 'object') {
+          store.settings = payload;
         }
+        break;
+
+      case 'SYNC_DOC': {
+        const { collectionName, item } = payload || {};
+        if (!collectionName || !ALLOWED_COLLECTIONS.has(collectionName) || !item || !item.id) {
+          return res.status(400).json({ error: 'Collection ou élément manquant' });
+        }
+        const coll = (store as any)[collectionName] as any[] | undefined;
+        if (Array.isArray(coll)) {
+          const idx = coll.findIndex(i => i.id === item.id);
+          if (idx >= 0) {
+            coll[idx] = { ...coll[idx], ...item };
+          } else {
+            coll.push(item);
+          }
+        }
+        break;
       }
-      break;
+
+      case 'DELETE_DOC': {
+        const { collectionName, id } = payload || {};
+        if (!collectionName || !ALLOWED_COLLECTIONS.has(collectionName) || !id) {
+          return res.status(400).json({ error: 'Collection ou identifiant invalide' });
+        }
+        const coll = (store as any)[collectionName] as any[] | undefined;
+        if (Array.isArray(coll)) {
+          (store as any)[collectionName] = coll.filter(i => i.id !== id);
+        }
+        break;
+      }
+
+      case 'CLEAR_COLLECTION': {
+        const { collectionName } = payload || {};
+        if (!collectionName || !ALLOWED_COLLECTIONS.has(collectionName)) {
+          return res.status(400).json({ error: 'Collection invalide' });
+        }
+        if (Array.isArray((store as any)[collectionName])) {
+          (store as any)[collectionName] = [];
+        }
+        break;
+      }
+
+      case 'SYNC_PAYMENT': {
+        if (!Array.isArray(store.payments)) store.payments = [];
+        const payment = payload;
+        if (!payment || !payment.id) {
+          return res.status(400).json({ error: 'Paiement invalide' });
+        }
+        const idx = store.payments.findIndex(p => p.id === payment.id);
+        if (idx >= 0) {
+          store.payments[idx] = { ...store.payments[idx], ...payment };
+        } else {
+          store.payments.push(payment);
+        }
+        // Sort newest payments first
+        store.payments.sort((a, b) => 
+          (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
+          (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
+          (b.id || '').localeCompare(a.id || '')
+        );
+        break;
+      }
+
+      case 'SYNC_EXPENSE': {
+        if (!Array.isArray(store.expenses)) store.expenses = [];
+        const expense = payload;
+        if (!expense || !expense.id) {
+          return res.status(400).json({ error: 'Dépense invalide' });
+        }
+        const idx = store.expenses.findIndex(e => e.id === expense.id);
+        if (idx >= 0) {
+          store.expenses[idx] = { ...store.expenses[idx], ...expense };
+        } else {
+          store.expenses.push(expense);
+        }
+        break;
+      }
+
+      case 'DELETE_EXPENSE': {
+        if (Array.isArray(store.expenses) && payload?.id) {
+          store.expenses = store.expenses.filter(e => e.id !== payload.id);
+        }
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: 'Action non supportée' });
     }
 
-    case 'DELETE_DOC': {
-      const { collectionName, id } = payload;
-      const coll = (store as any)[collectionName] as any[] | undefined;
-      if (Array.isArray(coll)) {
-        (store as any)[collectionName] = coll.filter(i => i.id !== id);
-      }
-      break;
-    }
+    saveSchoolData(cleanCode, store);
 
-    case 'CLEAR_COLLECTION': {
-      const { collectionName } = payload;
-      if (Array.isArray((store as any)[collectionName])) {
-        (store as any)[collectionName] = [];
-      }
-      break;
-    }
+    // Broadcast mutation to all other devices in real-time
+    broadcastToSchool(cleanCode, 'mutation', { mutationType, payload }, senderId);
 
-    case 'SYNC_PAYMENT': {
-      if (!Array.isArray(store.payments)) store.payments = [];
-      const payment = payload;
-      const idx = store.payments.findIndex(p => p.id === payment.id);
-      if (idx >= 0) {
-        store.payments[idx] = { ...store.payments[idx], ...payment };
-      } else {
-        store.payments.push(payment);
-      }
-      // Sort newest payments first
-      store.payments.sort((a, b) => 
-        (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
-        (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
-        (b.id || '').localeCompare(a.id || '')
-      );
-      break;
-    }
-
-    case 'SYNC_EXPENSE': {
-      if (!Array.isArray(store.expenses)) store.expenses = [];
-      const expense = payload;
-      const idx = store.expenses.findIndex(e => e.id === expense.id);
-      if (idx >= 0) {
-        store.expenses[idx] = { ...store.expenses[idx], ...expense };
-      } else {
-        store.expenses.push(expense);
-      }
-      break;
-    }
-
-    case 'DELETE_EXPENSE': {
-      if (Array.isArray(store.expenses) && payload?.id) {
-        store.expenses = store.expenses.filter(e => e.id !== payload.id);
-      }
-      break;
-    }
-
-    default:
-      console.warn(`[Server] Unknown mutationType: ${mutationType}`);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[Server Error /api/sync/mutate]:', err?.message || err);
+    return res.status(500).json({ error: 'Erreur interne lors de la mutation' });
   }
-
-  saveSchoolData(cleanCode, store);
-
-  // Broadcast mutation to all other devices in real-time
-  broadcastToSchool(cleanCode, 'mutation', { mutationType, payload }, senderId);
-
-  res.json({ success: true });
 });
 
 // 6. Server Health & Stats
@@ -319,7 +457,7 @@ async function startServer() {
 
   if (!isProduction) {
     const vite = await createViteServer({
-      server: { middlewareMode: true, host: '0.0.0.0', port: PORT },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa'
     });
     app.use(vite.middlewares);

@@ -3,7 +3,7 @@
  * Saisie directe des notes dans le bulletin & Impression directe A4 / PDF
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   FileText,
   Printer, 
@@ -20,13 +20,27 @@ import {
 import { useSchool } from '../../contexts/SchoolContext';
 import { ReportCard, StudentSubjectAverage, EvaluationGrade, EvaluationTerm } from '../../types';
 import { PdfService } from '../../services/pdfService';
-import { getMaliScoreAppreciation, getTermLabel, getMaliEvaluationTerms } from '../../constants/maliEducation';
+import { getMaliScoreAppreciation, getTermLabel, getMaliEvaluationTerms, getFilteredEvaluationTerms } from '../../constants/maliEducation';
 
 export const BulletinsModule: React.FC = () => {
   const { students, classes, subjects, grades, saveGrade, generateReportCard, settings } = useSchool();
 
-  const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
-  const [selectedTerm, setSelectedTerm] = useState<EvaluationTerm>('TRIMESTRE_1');
+  // Classes filtrées selon le type d'établissement configuré
+  const availableClasses = useMemo(() => {
+    if (settings.schoolCategory === 'ECOLE_FONDAMENTALE') {
+      return classes.filter(c => c.category === 'FONDAMENTAL_1' || c.category === 'FONDAMENTAL_2');
+    }
+    if (settings.schoolCategory === 'LYCEE') {
+      return classes.filter(c => c.category === 'LYCEE');
+    }
+    if (settings.schoolCategory === 'PROFESSIONNEL') {
+      return classes.filter(c => c.category === 'TECHNIQUE_BT' || c.category === 'PROFESSIONNEL_CAP');
+    }
+    return classes;
+  }, [classes, settings.schoolCategory]);
+
+  const [selectedClassId, setSelectedClassId] = useState<string>(() => availableClasses[0]?.id || classes[0]?.id || '');
+  const [selectedTerm, setSelectedTerm] = useState<EvaluationTerm>('EVALUATION_1');
   const [activeStudentId, setActiveStudentId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [studentSortMode, setStudentSortMode] = useState<'RANK' | 'ALPHA'>('RANK');
@@ -36,8 +50,47 @@ export const BulletinsModule: React.FC = () => {
   const [showBatchModal, setShowBatchModal] = useState<boolean>(false);
   const [batchSubjectId, setBatchSubjectId] = useState<string>('');
 
+  // Synchronisation de la classe sélectionnée si la liste disponible change
+  useEffect(() => {
+    if (availableClasses.length > 0 && !availableClasses.some(c => c.id === selectedClassId)) {
+      setSelectedClassId(availableClasses[0].id);
+    }
+  }, [availableClasses, selectedClassId]);
+
   // Active class & active student list
-  const currentClass = classes.find(c => c.id === selectedClassId);
+  const currentClass = availableClasses.find(c => c.id === selectedClassId) || classes.find(c => c.id === selectedClassId);
+
+  // Périodes strictement adaptées : au Fondamental, masque les Trimestres et Semestres des autres cycles
+  const filteredTerms = useMemo(() => {
+    return getFilteredEvaluationTerms(
+      currentClass?.category,
+      settings.schoolCategory,
+      settings.evaluationMonths,
+      settings.evaluationCount
+    );
+  }, [currentClass?.category, settings.schoolCategory, settings.evaluationMonths, settings.evaluationCount]);
+
+  // Bascule automatique vers une période valide selon le cycle
+  useEffect(() => {
+    const isFondamental = 
+      currentClass?.category === 'FONDAMENTAL_1' || 
+      currentClass?.category === 'FONDAMENTAL_2' || 
+      settings.schoolCategory === 'ECOLE_FONDAMENTALE';
+
+    if (isFondamental) {
+      if (selectedTerm.startsWith('TRIMESTRE_') || selectedTerm.startsWith('SEMESTRE_')) {
+        setSelectedTerm('EVALUATION_1');
+      }
+    } else if (currentClass?.category === 'LYCEE' || settings.schoolCategory === 'LYCEE') {
+      if (!selectedTerm.startsWith('TRIMESTRE_')) {
+        setSelectedTerm('TRIMESTRE_1');
+      }
+    } else if (currentClass?.category === 'TECHNIQUE_BT' || currentClass?.category === 'PROFESSIONNEL_CAP' || settings.schoolCategory === 'PROFESSIONNEL') {
+      if (!selectedTerm.startsWith('SEMESTRE_')) {
+        setSelectedTerm('SEMESTRE_1');
+      }
+    }
+  }, [currentClass?.category, settings.schoolCategory, selectedTerm]);
 
   const totalClassStudents = useMemo(() => {
     return students.filter(s => s.classId === selectedClassId && s.status === 'ACTIF');
@@ -238,51 +291,13 @@ export const BulletinsModule: React.FC = () => {
   };
 
   const triggerPrint = (isAll: boolean) => {
-    const container = document.getElementById('printable-bulletins-container');
-    
-    // Try opening clean print window first to bypass iframe clipping
-    if (container && container.innerHTML.trim().length > 0) {
-      try {
-        const printWin = window.open('', '_blank', 'width=950,height=1100');
-        if (printWin) {
-          printWin.document.write(`
-            <!DOCTYPE html>
-            <html lang="fr">
-              <head>
-                <meta charset="utf-8">
-                <title>${isAll ? 'Bulletins_de_Classe' : 'Bulletin_de_Notes'}</title>
-                <script src="https://cdn.tailwindcss.com"></script>
-                <style>
-                  @page { size: A4 portrait; margin: 6mm; }
-                  body { background: #ffffff !important; color: #0f172a !important; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 0; }
-                  .page-break { page-break-after: always !important; break-after: page !important; }
-                </style>
-              </head>
-              <body>
-                <div>${container.innerHTML}</div>
-                <script>
-                  window.onload = function() {
-                    setTimeout(function() {
-                      window.focus();
-                      window.print();
-                    }, 400);
-                  };
-                </script>
-              </body>
-            </html>
-          `);
-          printWin.document.close();
-          setTimeout(() => setIsPrintAllMode(false), 1200);
-          return;
-        }
-      } catch (e) {
-        console.warn('Popup print window blocked, falling back to direct window.print()', e);
-      }
+    try {
+      window.print();
+    } catch (e) {
+      console.warn('Impression directe :', e);
+    } finally {
+      setTimeout(() => setIsPrintAllMode(false), 2000);
     }
-
-    // Direct window.print() fallback
-    window.print();
-    setTimeout(() => setIsPrintAllMode(false), 2000);
   };
 
   const handleDownloadPdf = () => {
@@ -407,7 +422,7 @@ export const BulletinsModule: React.FC = () => {
                 }}
                 className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[130px] sm:max-w-[180px] truncate"
               >
-                {classes.map(c => (
+                {availableClasses.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.name} ({c.studentCount || 0})
                   </option>
@@ -415,7 +430,7 @@ export const BulletinsModule: React.FC = () => {
               </select>
             </div>
 
-            {/* Période selector */}
+            {/* Période selector (Strictement filtrée : masque les Trimestres et Semestres pour le Fondamental) */}
             <div className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 rounded-lg px-2 py-1 transition-colors shrink-0">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Période</span>
               <select
@@ -423,27 +438,27 @@ export const BulletinsModule: React.FC = () => {
                 onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
                 className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate"
               >
-                <optgroup label="Évaluations Mensuelles">
-                  {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                    .filter(t => t.category === 'EVALUATION_MENSUELLE')
-                    .map(t => (
+                {filteredTerms.monthlyTerms.length > 0 && (
+                  <optgroup label="Évaluations Mensuelles (Fondamental)">
+                    {filteredTerms.monthlyTerms.map(t => (
                       <option key={t.id} value={t.id}>{t.label}</option>
                     ))}
-                </optgroup>
-                <optgroup label="Trimestres">
-                  {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                    .filter(t => t.category === 'TRIMESTRE')
-                    .map(t => (
+                  </optgroup>
+                )}
+                {filteredTerms.trimesterTerms.length > 0 && (
+                  <optgroup label="Trimestres (Lycée)">
+                    {filteredTerms.trimesterTerms.map(t => (
                       <option key={t.id} value={t.id}>{t.label}</option>
                     ))}
-                </optgroup>
-                <optgroup label="Semestres">
-                  {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                    .filter(t => t.category === 'SEMESTRE')
-                    .map(t => (
+                  </optgroup>
+                )}
+                {filteredTerms.semesterTerms.length > 0 && (
+                  <optgroup label="Semestres (Technique / Professionnel)">
+                    {filteredTerms.semesterTerms.map(t => (
                       <option key={t.id} value={t.id}>{t.label}</option>
                     ))}
-                </optgroup>
+                  </optgroup>
+                )}
               </select>
             </div>
 

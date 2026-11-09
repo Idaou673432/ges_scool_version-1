@@ -341,12 +341,38 @@ export class PdfService {
         doc.autoPrint();
         const blob = doc.output('blob');
         const blobUrl = URL.createObjectURL(blob);
-        const printWin = window.open(blobUrl, '_blank');
-        if (!printWin) {
-          doc.save(filename);
-        }
+        
+        // Impression sans popup via iframe invisible pour respecter les restrictions iframe/sandbox
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = '0';
+        iframe.style.visibility = 'hidden';
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+
+        iframe.onload = () => {
+          setTimeout(() => {
+            try {
+              iframe.focus();
+              iframe.contentWindow?.print();
+            } catch {
+              doc.save(filename);
+            } finally {
+              setTimeout(() => {
+                if (document.body.contains(iframe)) {
+                  document.body.removeChild(iframe);
+                }
+                URL.revokeObjectURL(blobUrl);
+              }, 2000);
+            }
+          }, 200);
+        };
       } catch (err) {
-        console.warn('Impression directe impossible via popup (restriction iframe), téléchargement du PDF :', err);
+        console.warn('Impression directe via iframe impossible, téléchargement direct du PDF :', err);
         doc.save(filename);
       }
     } else {

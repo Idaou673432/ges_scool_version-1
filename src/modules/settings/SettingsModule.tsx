@@ -1861,55 +1861,68 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                 </div>
               </div>
 
-              {/* Trimestres & Semestres en barres compactes */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
-                {/* Trimestres */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Trimestres (2ème Cycle & Lycée) :
+              {/* Trimestres & Semestres : masqués si École Fondamentale */}
+              {formData.schoolCategory === 'ECOLE_FONDAMENTALE' ? (
+                <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl flex items-center gap-2 text-xs text-blue-950 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-blue-900 shrink-0" />
+                  <span>
+                    <strong>Structure exclusive École Fondamentale :</strong> Votre établissement utilise exclusivement les <strong>Évaluations Mensuelles N°1 à N°{formData.evaluationCount || 9}</strong> officielles du Ministère de l'Éducation Nationale du Mali. Les trimestres de lycée et semestres techniques sont automatiquement masqués de toutes les interfaces.
                   </span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {[
-                      { key: 'TRIMESTRE_1', label: '1er Trim.', defaultVal: 'Octobre - Décembre' },
-                      { key: 'TRIMESTRE_2', label: '2ème Trim.', defaultVal: 'Janvier - Mars' },
-                      { key: 'TRIMESTRE_3', label: '3ème Trim.', defaultVal: 'Avril - Juin' },
-                    ].map(t => (
-                      <div key={t.key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                        <label className="text-[10px] font-bold text-slate-700 block mb-0.5">{t.label}</label>
-                        <input
-                          type="text"
-                          value={formData.evaluationMonths?.[t.key] || t.defaultVal}
-                          onChange={e => handleMonthChange(t.key, e.target.value)}
-                          className="w-full py-0.5 px-1 bg-white border border-slate-200 rounded text-[11px] font-medium outline-none"
-                        />
-                      </div>
-                    ))}
-                  </div>
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                  {/* Trimestres (Lycée) */}
+                  {formData.schoolCategory !== 'PROFESSIONNEL' && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Trimestres (Lycée) :
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { key: 'TRIMESTRE_1', label: '1er Trim.', defaultVal: 'Octobre - Décembre' },
+                          { key: 'TRIMESTRE_2', label: '2ème Trim.', defaultVal: 'Janvier - Mars' },
+                          { key: 'TRIMESTRE_3', label: '3ème Trim.', defaultVal: 'Avril - Juin' },
+                        ].map(t => (
+                          <div key={t.key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                            <label className="text-[10px] font-bold text-slate-700 block mb-0.5">{t.label}</label>
+                            <input
+                              type="text"
+                              value={formData.evaluationMonths?.[t.key] || t.defaultVal}
+                              onChange={e => handleMonthChange(t.key, e.target.value)}
+                              className="w-full py-0.5 px-1 bg-white border border-slate-200 rounded text-[11px] font-medium outline-none"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                {/* Semestres */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Semestres (Technique & BT) :
-                  </span>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { key: 'SEMESTRE_1', label: '1er Semestre', defaultVal: 'Octobre - Février' },
-                      { key: 'SEMESTRE_2', label: '2ème Semestre', defaultVal: 'Mars - Juin' },
-                    ].map(s => (
-                      <div key={s.key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-                        <label className="text-[10px] font-bold text-slate-700 block mb-0.5">{s.label}</label>
-                        <input
-                          type="text"
-                          value={formData.evaluationMonths?.[s.key] || s.defaultVal}
-                          onChange={e => handleMonthChange(s.key, e.target.value)}
-                          className="w-full py-0.5 px-1 bg-white border border-slate-200 rounded text-[11px] font-medium outline-none"
-                        />
+                  {/* Semestres (Technique / Professionnel) */}
+                  {formData.schoolCategory !== 'LYCEE' && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Semestres (Technique & BT) :
+                      </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {[
+                          { key: 'SEMESTRE_1', label: '1er Semestre', defaultVal: 'Octobre - Février' },
+                          { key: 'SEMESTRE_2', label: '2ème Semestre', defaultVal: 'Mars - Juin' },
+                        ].map(s => (
+                          <div key={s.key} className="bg-slate-50 p-1.5 rounded-lg border border-slate-200">
+                            <label className="text-[10px] font-bold text-slate-700 block mb-0.5">{s.label}</label>
+                            <input
+                              type="text"
+                              value={formData.evaluationMonths?.[s.key] || s.defaultVal}
+                              onChange={e => handleMonthChange(s.key, e.target.value)}
+                              className="w-full py-0.5 px-1 bg-white border border-slate-200 rounded text-[11px] font-medium outline-none"
+                            />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </form>
           )}
 

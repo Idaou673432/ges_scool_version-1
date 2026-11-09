@@ -266,6 +266,81 @@ export function getMaliEvaluationTerms(customMonths?: Record<string, string>, ev
 
 export const MALI_EVALUATION_TERMS: TermOption[] = getMaliEvaluationTerms();
 
+/**
+ * Filtre strictement les périodes d'évaluation selon le cycle (Fondamental, Lycée, Technique).
+ * Au Fondamental (1er et 2nd cycle), masque strictement les trimestres et semestres des autres cycles,
+ * et ne présente que les Évaluations Mensuelles officielles du Fondamental.
+ */
+export function getFilteredEvaluationTerms(
+  classCategory?: string,
+  schoolCategory?: string,
+  customMonths?: Record<string, string>,
+  evaluationCount: number = 9
+): {
+  monthlyTerms: TermOption[];
+  trimesterTerms: TermOption[];
+  semesterTerms: TermOption[];
+} {
+  const allTerms = getMaliEvaluationTerms(customMonths, evaluationCount);
+  const isFondamental = 
+    schoolCategory === 'ECOLE_FONDAMENTALE' ||
+    classCategory === 'FONDAMENTAL_1' || 
+    classCategory === 'FONDAMENTAL_2' ||
+    classCategory === 'PREMIER_CYCLE' ||
+    classCategory === 'SECOND_CYCLE' ||
+    classCategory === 'PRIMAIRE';
+
+  const isLycee = 
+    !isFondamental && (
+      classCategory === 'LYCEE' || 
+      schoolCategory === 'LYCEE'
+    );
+
+  const isTechPro = 
+    !isFondamental && (
+      classCategory === 'TECHNIQUE_BT' || 
+      classCategory === 'PROFESSIONNEL_CAP' || 
+      schoolCategory === 'PROFESSIONNEL'
+    );
+
+  const monthlyTerms = allTerms.filter(t => t.category === 'EVALUATION_MENSUELLE');
+  const trimesterTerms = allTerms.filter(t => t.category === 'TRIMESTRE');
+  const semesterTerms = allTerms.filter(t => t.category === 'SEMESTRE');
+
+  if (isFondamental) {
+    // Si niveau Fondamental : masquer les Trimestres et Semestres des autres niveaux
+    return {
+      monthlyTerms,
+      trimesterTerms: [],
+      semesterTerms: []
+    };
+  }
+
+  if (isLycee) {
+    // Au Lycée : Trimestres uniquement
+    return {
+      monthlyTerms: [],
+      trimesterTerms,
+      semesterTerms: []
+    };
+  }
+
+  if (isTechPro) {
+    // En Technique / BT / CAP : Semestres uniquement
+    return {
+      monthlyTerms: [],
+      trimesterTerms: [],
+      semesterTerms
+    };
+  }
+
+  return {
+    monthlyTerms,
+    trimesterTerms,
+    semesterTerms
+  };
+}
+
 export function getRelatedTermsForPeriod(term: string, evaluationCount: number = 9): string[] {
   if (!term.startsWith('TRIMESTRE_') && !term.startsWith('SEMESTRE_')) {
     return [term];

@@ -46,7 +46,7 @@ import {
 import { Student, SchoolClass, Payment, AttendanceRecord, EvaluationTerm, PaymentCategory, PaymentMethod, ReportCard } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
 import { PdfService } from '../../services/pdfService';
-import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation } from '../../constants/maliEducation';
+import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation, getFilteredEvaluationTerms } from '../../constants/maliEducation';
 import { HorizontalReceiptModal } from '../receipts/HorizontalReceiptModal';
 
 interface StudentProfileViewProps {
@@ -75,8 +75,54 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   // Onglet actif
   const [activeTab, setActiveTab] = useState<'PAYMENTS' | 'CARDS' | 'GRADES' | 'ATTENDANCE' | 'INFO'>(initialTab);
 
+  // Classe de l'élève
+  const studentClass = useMemo(() => {
+    return classes.find(c => c.id === student.classId);
+  }, [classes, student.classId]);
+
+  // Périodes strictement filtrées selon le cycle de la classe
+  const filteredTerms = useMemo(() => {
+    return getFilteredEvaluationTerms(
+      studentClass?.category,
+      settings.schoolCategory,
+      settings.evaluationMonths,
+      settings.evaluationCount
+    );
+  }, [studentClass?.category, settings.schoolCategory, settings.evaluationMonths, settings.evaluationCount]);
+
   // Terme sélectionné pour les notes / bulletins
-  const [selectedTerm, setSelectedTerm] = useState<EvaluationTerm>('TRIMESTRE_1');
+  const [selectedTerm, setSelectedTerm] = useState<EvaluationTerm>(() => {
+    const isFondamental = 
+      studentClass?.category === 'FONDAMENTAL_1' || 
+      studentClass?.category === 'FONDAMENTAL_2' || 
+      settings.schoolCategory === 'ECOLE_FONDAMENTALE';
+    if (isFondamental) return 'EVALUATION_1';
+    if (studentClass?.category === 'LYCEE' || settings.schoolCategory === 'LYCEE') return 'TRIMESTRE_1';
+    if (studentClass?.category === 'TECHNIQUE_BT' || studentClass?.category === 'PROFESSIONNEL_CAP' || settings.schoolCategory === 'PROFESSIONNEL') return 'SEMESTRE_1';
+    return 'EVALUATION_1';
+  });
+
+  // Basculer automatiquement le terme si le cycle ne correspond pas
+  useEffect(() => {
+    const isFondamental = 
+      studentClass?.category === 'FONDAMENTAL_1' || 
+      studentClass?.category === 'FONDAMENTAL_2' || 
+      settings.schoolCategory === 'ECOLE_FONDAMENTALE';
+
+    if (isFondamental) {
+      if (selectedTerm.startsWith('TRIMESTRE_') || selectedTerm.startsWith('SEMESTRE_')) {
+        setSelectedTerm('EVALUATION_1');
+      }
+    } else if (studentClass?.category === 'LYCEE' || settings.schoolCategory === 'LYCEE') {
+      if (!selectedTerm.startsWith('TRIMESTRE_')) {
+        setSelectedTerm('TRIMESTRE_1');
+      }
+    } else if (studentClass?.category === 'TECHNIQUE_BT' || studentClass?.category === 'PROFESSIONNEL_CAP' || settings.schoolCategory === 'PROFESSIONNEL') {
+      if (!selectedTerm.startsWith('SEMESTRE_')) {
+        setSelectedTerm('SEMESTRE_1');
+      }
+    }
+  }, [studentClass?.category, settings.schoolCategory, selectedTerm]);
 
   // Messages de retour / notifications
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -91,11 +137,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const [paymentNotes, setPaymentNotes] = useState<string>('');
   const [isCashFormOpen, setIsCashFormOpen] = useState(false);
   const [previewPayment, setPreviewPayment] = useState<Payment | null>(null);
-
-  // Classe de l'élève
-  const studentClass = useMemo(() => {
-    return classes.find(c => c.id === student.classId);
-  }, [classes, student.classId]);
 
   // Situation financière de l'élève
   const studentFinance = useMemo(() => {
@@ -806,15 +847,35 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
           <div className="bg-white px-3 py-2 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2.5 text-xs">
             <div className="flex items-center gap-2.5 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 font-bold uppercase text-[10px]">Trimestre :</span>
+                <span className="text-slate-400 font-bold uppercase text-[10px]">
+                  {filteredTerms.trimesterTerms.length > 0 ? 'Trimestre :' : (filteredTerms.semesterTerms.length > 0 ? 'Semestre :' : 'Période :')}
+                </span>
                 <select
                   value={selectedTerm}
                   onChange={e => setSelectedTerm(e.target.value as EvaluationTerm)}
-                  className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none cursor-pointer"
+                  className="px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none cursor-pointer max-w-[220px]"
                 >
-                  <option value="TRIMESTRE_1">1er Trimestre</option>
-                  <option value="TRIMESTRE_2">2ème Trimestre</option>
-                  <option value="TRIMESTRE_3">3ème Trimestre</option>
+                  {filteredTerms.monthlyTerms.length > 0 && (
+                    <optgroup label="Évaluations Mensuelles (Fondamental)">
+                      {filteredTerms.monthlyTerms.map(t => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {filteredTerms.trimesterTerms.length > 0 && (
+                    <optgroup label="Trimestres (Lycée)">
+                      {filteredTerms.trimesterTerms.map(t => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {filteredTerms.semesterTerms.length > 0 && (
+                    <optgroup label="Semestres (Technique / Professionnel)">
+                      {filteredTerms.semesterTerms.map(t => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
 

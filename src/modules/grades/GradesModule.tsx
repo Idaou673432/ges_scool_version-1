@@ -24,20 +24,41 @@ import {
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { EvaluationType, EvaluationGrade, EvaluationTerm, Student } from '../../types';
-import { getMaliScoreAppreciation, getMaliEvaluationTerms, getTermLabel } from '../../constants/maliEducation';
+import { getMaliScoreAppreciation, getMaliEvaluationTerms, getFilteredEvaluationTerms, getTermLabel } from '../../constants/maliEducation';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 import { PromotionManager } from '../../components/grades/PromotionManager';
 
 export const GradesModule: React.FC = () => {
   const { classes, subjects, students, grades, saveGrade, deleteGrade, deleteAllGrades, settings } = useSchool();
   
-  const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
+  // Classes filtrées selon le type d'établissement configuré
+  const availableClasses = useMemo(() => {
+    if (settings.schoolCategory === 'ECOLE_FONDAMENTALE') {
+      return classes.filter(c => c.category === 'FONDAMENTAL_1' || c.category === 'FONDAMENTAL_2');
+    }
+    if (settings.schoolCategory === 'LYCEE') {
+      return classes.filter(c => c.category === 'LYCEE');
+    }
+    if (settings.schoolCategory === 'PROFESSIONNEL') {
+      return classes.filter(c => c.category === 'TECHNIQUE_BT' || c.category === 'PROFESSIONNEL_CAP');
+    }
+    return classes;
+  }, [classes, settings.schoolCategory]);
+
+  const [selectedClassId, setSelectedClassId] = useState<string>(() => availableClasses[0]?.id || classes[0]?.id || '');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
   const [studentSearch, setStudentSearch] = useState<string>('');
   const [evaluationType, setEvaluationType] = useState<EvaluationType>('COMPOSITION');
   const [term, setTerm] = useState<EvaluationTerm>('EVALUATION_1');
   const [activeTab, setActiveTab] = useState<'BATCH' | 'HISTORY' | 'PROMOTION'>('BATCH');
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+
+  // Synchronisation de la classe sélectionnée si la liste disponible change
+  useEffect(() => {
+    if (availableClasses.length > 0 && !availableClasses.some(c => c.id === selectedClassId)) {
+      setSelectedClassId(availableClasses[0].id);
+    }
+  }, [availableClasses, selectedClassId]);
 
   // Map des notes de l'élève par matière: { [subjectId]: scoreNumber }
   const [scoresMap, setScoresMap] = useState<Record<string, number>>({});
@@ -47,7 +68,39 @@ export const GradesModule: React.FC = () => {
   const [editingGrade, setEditingGrade] = useState<EvaluationGrade | null>(null);
   const [deletingGradeId, setDeletingGradeId] = useState<string | null>(null);
 
-  const selectedClassObj = classes.find(c => c.id === selectedClassId);
+  const selectedClassObj = availableClasses.find(c => c.id === selectedClassId) || classes.find(c => c.id === selectedClassId);
+
+  // Périodes strictement filtrées : si Fondamental, masquer Trimestres et Semestres des autres niveaux
+  const filteredTerms = useMemo(() => {
+    return getFilteredEvaluationTerms(
+      selectedClassObj?.category,
+      settings.schoolCategory,
+      settings.evaluationMonths,
+      settings.evaluationCount
+    );
+  }, [selectedClassObj?.category, settings.schoolCategory, settings.evaluationMonths, settings.evaluationCount]);
+
+  // Si le niveau est Fondamental, basculer automatiquement hors de Trimestre/Semestre
+  useEffect(() => {
+    const isFondamental = 
+      selectedClassObj?.category === 'FONDAMENTAL_1' || 
+      selectedClassObj?.category === 'FONDAMENTAL_2' || 
+      settings.schoolCategory === 'ECOLE_FONDAMENTALE';
+
+    if (isFondamental) {
+      if (term.startsWith('TRIMESTRE_') || term.startsWith('SEMESTRE_')) {
+        setTerm('EVALUATION_1');
+      }
+    } else if (selectedClassObj?.category === 'LYCEE' || settings.schoolCategory === 'LYCEE') {
+      if (!term.startsWith('TRIMESTRE_')) {
+        setTerm('TRIMESTRE_1');
+      }
+    } else if (selectedClassObj?.category === 'TECHNIQUE_BT' || selectedClassObj?.category === 'PROFESSIONNEL_CAP' || settings.schoolCategory === 'PROFESSIONNEL') {
+      if (!term.startsWith('SEMESTRE_')) {
+        setTerm('SEMESTRE_1');
+      }
+    }
+  }, [selectedClassObj?.category, settings.schoolCategory, term]);
   const isFirstCycle = selectedClassObj?.category === 'FONDAMENTAL_1';
   const currentMaxScore = isFirstCycle ? 10 : 20;
 
@@ -292,7 +345,7 @@ export const GradesModule: React.FC = () => {
                   }}
                   className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[130px] sm:max-w-[160px] truncate"
                 >
-                  {classes.map(c => (
+                  {availableClasses.map(c => (
                     <option key={c.id} value={c.id}>{c.name} ({c.studentCount || 0})</option>
                   ))}
                 </select>
@@ -313,7 +366,7 @@ export const GradesModule: React.FC = () => {
                 </select>
               </div>
 
-              {/* Période */}
+              {/* Période (Strictement filtrée : masque les Trimestres et Semestres pour le Fondamental) */}
               <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 shrink-0">
                 <span className="text-[10px] font-bold uppercase text-slate-400">Période</span>
                 <select
@@ -321,27 +374,27 @@ export const GradesModule: React.FC = () => {
                   onChange={e => setTerm(e.target.value as EvaluationTerm)}
                   className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer max-w-[150px] sm:max-w-[200px] truncate"
                 >
-                  <optgroup label="Trimestres">
-                    {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                      .filter(t => t.category === 'TRIMESTRE')
-                      .map(t => (
+                  {filteredTerms.monthlyTerms.length > 0 && (
+                    <optgroup label="Évaluations Mensuelles (Fondamental)">
+                      {filteredTerms.monthlyTerms.map(t => (
                         <option key={t.id} value={t.id}>{t.label}</option>
                       ))}
-                  </optgroup>
-                  <optgroup label="Évaluations Mensuelles">
-                    {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                      .filter(t => t.category === 'EVALUATION_MENSUELLE')
-                      .map(t => (
+                    </optgroup>
+                  )}
+                  {filteredTerms.trimesterTerms.length > 0 && (
+                    <optgroup label="Trimestres (Lycée)">
+                      {filteredTerms.trimesterTerms.map(t => (
                         <option key={t.id} value={t.id}>{t.label}</option>
                       ))}
-                  </optgroup>
-                  <optgroup label="Semestres">
-                    {getMaliEvaluationTerms(settings.evaluationMonths, settings.evaluationCount)
-                      .filter(t => t.category === 'SEMESTRE')
-                      .map(t => (
+                    </optgroup>
+                  )}
+                  {filteredTerms.semesterTerms.length > 0 && (
+                    <optgroup label="Semestres (Technique / Professionnel)">
+                      {filteredTerms.semesterTerms.map(t => (
                         <option key={t.id} value={t.id}>{t.label}</option>
                       ))}
-                  </optgroup>
+                    </optgroup>
+                  )}
                 </select>
               </div>
 

@@ -44,10 +44,15 @@ export function getPublicBaseUrl(customSchoolUrl?: string): string {
 }
 
 /**
- * Nettoie une URL publique
+ * Nettoie une URL publique et bloque tout schéma malveillant (javascript:, data:, vbscript:)
  */
 export function sanitizePublicUrl(url: string): string {
-  if (!url) return getPublicBaseUrl();
-  return url;
+  if (!url || typeof url !== 'string') return getPublicBaseUrl();
+  const trimmed = url.trim();
+  // Protection contre les injections XSS via URI
+  if (/^(javascript|data|vbscript|file):/i.test(trimmed)) {
+    return getPublicBaseUrl();
+  }
+  return trimmed;
 }
 

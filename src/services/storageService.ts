@@ -1109,19 +1109,30 @@ class StorageService {
 
   public restoreFullBackupJSON(jsonContent: string): boolean {
     try {
-      const data = JSON.parse(jsonContent);
-      if (data.settings) this.setItem(STORAGE_KEYS.SETTINGS, data.settings);
-      if (data.users) this.setItem(STORAGE_KEYS.USERS, data.users);
-      if (data.students) this.setItem(STORAGE_KEYS.STUDENTS, data.students);
-      if (data.classes) this.setItem(STORAGE_KEYS.CLASSES, data.classes);
-      if (data.subjects) this.setItem(STORAGE_KEYS.SUBJECTS, data.subjects);
-      if (data.teachers) this.setItem(STORAGE_KEYS.TEACHERS, data.teachers);
-      if (data.grades) this.setItem(STORAGE_KEYS.GRADES, data.grades);
-      if (data.payments) this.setItem(STORAGE_KEYS.PAYMENTS, data.payments);
-      if (data.attendance) this.setItem(STORAGE_KEYS.ATTENDANCE, data.attendance);
-      if (data.logs) this.setItem(STORAGE_KEYS.LOGS, data.logs);
+      if (!jsonContent || typeof jsonContent !== 'string') return false;
+
+      // Protection stricte contre les attaques par pollution de prototype
+      const data = JSON.parse(jsonContent, (key, value) => {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          return undefined;
+        }
+        return value;
+      });
+
+      if (!data || typeof data !== 'object') return false;
+
+      if (data.settings && typeof data.settings === 'object') this.setItem(STORAGE_KEYS.SETTINGS, data.settings);
+      if (Array.isArray(data.users)) this.setItem(STORAGE_KEYS.USERS, data.users);
+      if (Array.isArray(data.students)) this.setItem(STORAGE_KEYS.STUDENTS, data.students);
+      if (Array.isArray(data.classes)) this.setItem(STORAGE_KEYS.CLASSES, data.classes);
+      if (Array.isArray(data.subjects)) this.setItem(STORAGE_KEYS.SUBJECTS, data.subjects);
+      if (Array.isArray(data.teachers)) this.setItem(STORAGE_KEYS.TEACHERS, data.teachers);
+      if (Array.isArray(data.grades)) this.setItem(STORAGE_KEYS.GRADES, data.grades);
+      if (Array.isArray(data.payments)) this.setItem(STORAGE_KEYS.PAYMENTS, data.payments);
+      if (Array.isArray(data.attendance)) this.setItem(STORAGE_KEYS.ATTENDANCE, data.attendance);
+      if (Array.isArray(data.logs)) this.setItem(STORAGE_KEYS.LOGS, data.logs);
       
-      this.addAuditLog('RESTAURATION_DATABASE', 'SYSTEME', 'Restauration complète de la base de données SQLite/JSON');
+      this.addAuditLog('RESTAURATION_DATABASE', 'SYSTEME', 'Restauration complète et vérifiée de la base de données');
       return true;
     } catch (e) {
       console.error("Backup restore failed:", e);
