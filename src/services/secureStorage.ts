@@ -243,7 +243,9 @@ export const PROTECTED_STORAGE_KEYS = new Set<string>([
   'soma_expenses',
   'soma_pending_offline_payments',
   'kalangest_offline_queue_v1',
-  'somasikolo_scan_history_v1'
+  'somasikolo_scan_history_v1',
+  'soma_exam_sessions',
+  'soma_exam_slots'
 ]);
 
 /**

@@ -18,6 +18,7 @@ import { SubjectsModule } from './modules/subjects/SubjectsModule';
 import { TeachersModule } from './modules/teachers/TeachersModule';
 import { GradesModule } from './modules/grades/GradesModule';
 import { AttendanceModule } from './modules/attendance/AttendanceModule';
+import { ExamScheduleModule } from './modules/examSchedule/ExamScheduleModule';
 import { BulletinsModule } from './modules/bulletins/BulletinsModule';
 import { CardsModule } from './modules/cards/CardsModule';
 import { PaymentsModule } from './modules/payments/PaymentsModule';
@@ -46,6 +47,7 @@ export function AppContent() {
       teachers: 'teachers',
       grades: 'grades',
       attendance: 'attendance',
+      examSchedule: 'examSchedule',
       bulletins: 'bulletins',
       cards: 'cards',
       payments: 'payments',
@@ -241,6 +243,7 @@ export function AppContent() {
           {activeTab === 'teachers' && <TeachersModule />}
           {activeTab === 'grades' && <GradesModule />}
           {activeTab === 'attendance' && <AttendanceModule />}
+          {activeTab === 'examSchedule' && <ExamScheduleModule />}
           {activeTab === 'bulletins' && <BulletinsModule />}
           {activeTab === 'cards' && <CardsModule />}
           {activeTab === 'payments' && <PaymentsModule />}

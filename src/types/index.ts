@@ -384,6 +384,42 @@ export interface SchoolEnabledFeatures {
   cards?: boolean;       // Cartes Scolaires & Badges
   payments?: boolean;    // Comptabilité & Caisse FCFA
   qrScanner?: boolean;   // Scanner QR Code & Historique
+  examSchedule?: boolean;// Plannings des Examens & Compositions
+}
+
+export type ExamTermType = 'TRIMESTRE_1' | 'TRIMESTRE_2' | 'TRIMESTRE_3' | 'DEF_BLANC' | 'BAC_BLANC' | 'BT_BLANC' | 'DEVOIR_SURVEILLE' | 'AUTRE';
+
+export interface ExamSession {
+  id: string;
+  title: string; // Ex: Compositions du 1er Trimestre 2026-2027
+  term: ExamTermType;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  academicYear: string;
+  status: 'BROUILLON' | 'PUBLIE' | 'TERMINE';
+  generalInstructions?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ExamSlot {
+  id: string;
+  sessionId: string;
+  classId: string;
+  className: string;
+  subjectId: string;
+  subjectName: string;
+  coefficient: number;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm (ex: '08:00')
+  endTime: string; // HH:mm (ex: '10:00')
+  durationMinutes: number;
+  classroom?: string;
+  supervisorTeacherId?: string;
+  supervisorName?: string;
+  supervisorTeacherId2?: string;
+  supervisorName2?: string;
+  notes?: string;
 }
 
 export interface AuditLog {

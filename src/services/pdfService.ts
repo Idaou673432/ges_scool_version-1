@@ -5,7 +5,7 @@
 
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
-import { ReportCard, Payment, Student, SchoolSettings, SchoolClass, TuitionInvoice, AttendanceRecord, DailyCashClosure } from '../types';
+import { ReportCard, Payment, Student, SchoolSettings, SchoolClass, TuitionInvoice, AttendanceRecord, DailyCashClosure, ExamSession, ExamSlot } from '../types';
 import { formatFCFA, getTermLabel } from '../constants/maliEducation';
 import { getPublicBaseUrl } from './urlService';
 
@@ -2567,6 +2567,290 @@ export class PdfService {
     }
 
     doc.save(`Fiche_Statistique_MEN_CAP_${settings.currentAcademicYear || '2025-2026'}.pdf`);
+  }
+
+  /**
+   * Génération officielle du calendrier/planning d'examens et compositions scolaires (Mali)
+   * Format A4 Paysage haute lisibilité pour affichage mural, distribution aux candidats et surveillance.
+   */
+  public static generateExamSchedulePdf(
+    session: ExamSession,
+    cls: SchoolClass,
+    slots: ExamSlot[],
+    settings: SchoolSettings
+  ): void {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = 297;
+    const pageHeight = 210;
+    const margin = 14;
+    const contentWidth = pageWidth - (margin * 2);
+
+    // 1. EN-TÊTE OFFICIEL RÉPUBLIQUE DU MALI
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+
+    // Gauche
+    doc.text('RÉPUBLIQUE DU MALI', margin, 12);
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Un Peuple - Un But - Une Foi', margin, 16);
+
+    // Droite : MEN, Académie, CAP
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    const acadText = (settings.academyName || 'ACADÉMIE D\'ENSEIGNEMENT DE BAMAKO').toUpperCase();
+    const capText = settings.capName ? `CAP DE ${settings.capName.toUpperCase()}` : 'CENTRE D\'ANIMATION PÉDAGOGIQUE';
+    doc.text('MINISTÈRE DE L\'ÉDUCATION NATIONALE', pageWidth - margin, 12, { align: 'right' });
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text(acadText, pageWidth - margin, 16, { align: 'right' });
+    doc.text(capText, pageWidth - margin, 20, { align: 'right' });
+
+    // Centre : Logo si présent
+    if (settings.logoUrl) {
+      try {
+        doc.addImage(settings.logoUrl, 'PNG', pageWidth / 2 - 10, 8, 20, 16);
+      } catch (e) {
+        console.warn('Erreur affichage logo dans planning examens', e);
+      }
+    }
+
+    // Ligne de séparation
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.4);
+    doc.line(margin, 24, pageWidth - margin, 24);
+
+    // 2. BANNIÈRE TITRE DU PLANNING
+    let y = 31;
+    doc.setFillColor(15, 23, 42); // Dark slate
+    doc.roundedRect(margin, y - 5, contentWidth, 14, 2, 2, 'F');
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(255, 255, 255);
+    const titleText = `CALENDRIER OFFICIEL DES ÉPREUVES — ${session.title.toUpperCase()}`;
+    doc.text(titleText, pageWidth / 2, y + 1.5, { align: 'center' });
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(226, 232, 240);
+    doc.text(
+      `ÉTABLISSEMENT : ${(settings.schoolName || 'ÉCOLE').toUpperCase()}   |   CLASSE : ${cls.name.toUpperCase()} (${cls.category.replace('_', ' ')})   |   ANNÉE SCOLAIRE : ${session.academicYear || settings.currentAcademicYear || '2026-2027'}`,
+      pageWidth / 2,
+      y + 6.5,
+      { align: 'center' }
+    );
+
+    // 3. TABLEAU DES ÉPREUVES
+    y += 16;
+    const colWidths = {
+      date: 40,
+      hours: 32,
+      duration: 20,
+      subject: 65,
+      coeff: 16,
+      classroom: 30,
+      supervisor: 66
+    };
+
+    // Entête du tableau
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, contentWidth, 8, 'F');
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineWidth(0.3);
+    doc.rect(margin, y, contentWidth, 8, 'S');
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+
+    let curX = margin;
+    doc.text('DATE DU JOUR', curX + 3, y + 5.5);
+    curX += colWidths.date;
+    doc.text('HORAIRES', curX + 3, y + 5.5);
+    curX += colWidths.hours;
+    doc.text('DURÉE', curX + 3, y + 5.5);
+    curX += colWidths.duration;
+    doc.text('ÉPREUVE / MATIÈRE', curX + 3, y + 5.5);
+    curX += colWidths.subject;
+    doc.text('COEFF.', curX + 3, y + 5.5);
+    curX += colWidths.coeff;
+    doc.text('SALLE', curX + 3, y + 5.5);
+    curX += colWidths.classroom;
+    doc.text('SURVEILLANCE & ÉMARGEMENT', curX + 3, y + 5.5);
+
+    y += 8;
+
+    if (slots.length === 0) {
+      doc.setFont('Helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(148, 163, 184);
+      doc.text('Aucune épreuve planifiée pour cette classe dans cette session.', pageWidth / 2, y + 10, { align: 'center' });
+      y += 20;
+    } else {
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+
+      slots.forEach((slot, idx) => {
+        const rowHeight = 7.5;
+
+        // Alternance fond
+        if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252);
+          doc.rect(margin, y, contentWidth, rowHeight, 'F');
+        }
+
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(margin, y, contentWidth, rowHeight, 'S');
+
+        // Date formatée
+        const dateObj = new Date(slot.date);
+        const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+        const dayName = isNaN(dateObj.getTime()) ? '' : dayNames[dateObj.getDay()];
+        const formattedDate = `${dayName} ${slot.date.split('-').reverse().join('/')}`;
+
+        doc.setTextColor(15, 23, 42);
+        let cellX = margin;
+        
+        // Date
+        doc.setFont('Helvetica', 'bold');
+        doc.text(formattedDate, cellX + 3, y + 5);
+        cellX += colWidths.date;
+
+        // Horaires
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(30, 58, 138); // Blue 900
+        doc.text(`${slot.startTime} — ${slot.endTime}`, cellX + 3, y + 5);
+        cellX += colWidths.hours;
+
+        // Durée
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(71, 85, 105);
+        const durHours = Math.floor(slot.durationMinutes / 60);
+        const durMins = slot.durationMinutes % 60;
+        const durText = durMins > 0 ? `${durHours}h${durMins}` : `${durHours}h00`;
+        doc.text(durText, cellX + 3, y + 5);
+        cellX += colWidths.duration;
+
+        // Matière
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(slot.subjectName.toUpperCase(), cellX + 3, y + 5, { maxWidth: colWidths.subject - 6 });
+        cellX += colWidths.subject;
+
+        // Coeff
+        doc.setFont('Helvetica', 'bold');
+        doc.setTextColor(180, 83, 9); // Amber 700
+        doc.text(`× ${slot.coefficient}`, cellX + 4, y + 5);
+        cellX += colWidths.coeff;
+
+        // Salle
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(51, 65, 85);
+        doc.text(slot.classroom || cls.classroom || 'Salle 01', cellX + 3, y + 5, { maxWidth: colWidths.classroom - 5 });
+        cellX += colWidths.classroom;
+
+        // Surveillant & zone visa
+        doc.setFont('Helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        const supervisorLabel = slot.supervisorName || 'Surveillant Titulaire';
+        doc.text(supervisorLabel, cellX + 3, y + 5, { maxWidth: colWidths.supervisor - 30 });
+        
+        // Petit cadre d'émargement
+        doc.setDrawColor(203, 213, 225);
+        doc.rect(cellX + colWidths.supervisor - 26, y + 1.2, 24, rowHeight - 2.4);
+        doc.setFontSize(6);
+        doc.setTextColor(148, 163, 184);
+        doc.text('Signature', cellX + colWidths.supervisor - 24, y + 4.5);
+        doc.setFontSize(8);
+
+        y += rowHeight;
+
+        // Gestion du saut de page si beaucoup d'épreuves
+        if (y > pageHeight - 45) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+    }
+
+    // 4. CADRE DES CONSIGNES OFFICIELLES & SIGNATURES
+    y += 5;
+    if (y > pageHeight - 42) {
+      doc.addPage();
+      y = 20;
+    }
+
+    const footerBoxWidth = (contentWidth - 6) / 2;
+
+    // Bloc gauche : Consignes officielles
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(margin, y, footerBoxWidth, 32, 2, 2, 'FD');
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(185, 28, 28); // Dark red
+    doc.text('CONSIGNES STRICTES AUX CANDIDATS :', margin + 4, y + 5);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(51, 65, 85);
+    const instructions = [
+      '1. Présentation obligatoire de la carte scolaire sur la table d\'examen.',
+      '2. Appel des candidats effectué 15 minutes avant le début de l\'épreuve.',
+      '3. Téléphones portables, montres connectées et documents strictement interdits.',
+      '4. Tout retardataire après ouverture des enveloppes d\'épreuves se verra refuser l\'accès.',
+      '5. Toute tentative de fraude entraîne l\'exclusion immédiate et la note zéro (00/20).'
+    ];
+    instructions.forEach((inst, i) => {
+      doc.text(inst, margin + 4, y + 9.5 + (i * 4));
+    });
+
+    // Bloc droit : Signatures officielles et Cachet
+    const signX = margin + footerBoxWidth + 6;
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(203, 213, 225);
+    doc.roundedRect(signX, y, footerBoxWidth, 32, 2, 2, 'FD');
+
+    doc.setFont('Helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Fait à ${settings.city || 'Bamako'}, le ` + new Date().toLocaleDateString('fr-FR'), signX + 4, y + 5);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text('LE DIRECTEUR DES ÉTUDES / SURVEILLANT', signX + 6, y + 11);
+    doc.text('LE DIRECTEUR DE L\'ÉTABLISSEMENT', signX + footerBoxWidth - 6, y + 11, { align: 'right' });
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Visa de vérification :', signX + 6, y + 16);
+    doc.text('Signature et cachet officiel :', signX + footerBoxWidth - 6, y + 16, { align: 'right' });
+
+    // Cachet si existant
+    if (settings.stampUrl) {
+      try {
+        doc.addImage(settings.stampUrl, 'PNG', signX + footerBoxWidth - 36, y + 15, 30, 15);
+      } catch (e) {
+        console.warn('Erreur cachet dans planning examens', e);
+      }
+    }
+
+    // Nom du fichier PDF de sortie
+    const cleanClassName = cls.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const cleanSessionName = session.title.replace(/[^a-zA-Z0-9]/g, '_');
+    doc.save(`Planning_Examens_${cleanClassName}_${cleanSessionName}.pdf`);
   }
 }
 

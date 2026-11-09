@@ -23,7 +23,8 @@ import {
   ChevronRight,
   Shield,
   Sliders,
-  Wallet
+  Wallet,
+  CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSchool } from '../../contexts/SchoolContext';
@@ -38,6 +39,7 @@ export type NavTab =
   | 'teachers'
   | 'grades'
   | 'attendance'
+  | 'examSchedule'
   | 'bulletins'
   | 'cards'
   | 'payments'
@@ -75,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     teachers: 'teachers',
     grades: 'grades',
     attendance: 'attendance',
+    examSchedule: 'examSchedule',
     bulletins: 'bulletins',
     cards: 'cards',
     payments: 'payments',
@@ -105,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       items: [
         { id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList, perm: 'grades:view' },
         { id: 'attendance' as NavTab, label: 'Présences', icon: CalendarCheck, perm: 'students:view' },
+        { id: 'examSchedule' as NavTab, label: 'Plannings Examens', icon: CalendarDays, perm: 'bulletins:generate' },
         { id: 'bulletins' as NavTab, label: 'Bulletins', icon: FileText, perm: 'bulletins:generate' },
         { id: 'cards' as NavTab, label: 'Cartes & Badges', icon: QrCode, perm: 'cards:generate' },
       ]

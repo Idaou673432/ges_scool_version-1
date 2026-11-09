@@ -647,6 +647,12 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
       description: 'Feuille d\'appel journalière, décompte des absences justifiées et retards.'
     },
     {
+      key: 'examSchedule',
+      name: 'Planning des Examens & Compositions',
+      category: 'Évaluations',
+      description: 'Génération automatique, aménagement des salles et impression des emplois du temps de composition.'
+    },
+    {
       key: 'bulletins',
       name: 'Bulletins Scolaires Officiels',
       category: 'Évaluations',
