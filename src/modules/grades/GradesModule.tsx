@@ -104,9 +104,12 @@ export const GradesModule: React.FC = () => {
   const isFirstCycle = selectedClassObj?.category === 'FONDAMENTAL_1';
   const currentMaxScore = isFirstCycle ? 10 : 20;
 
-  // Matières assignées au cycle de la classe sélectionnée (affichées verticalement)
+  // Matières assignées à la classe sélectionnée (affichées verticalement)
   const classSubjects = useMemo(() => {
     if (!selectedClassObj) return subjects;
+    if (selectedClassObj.subjectIds && selectedClassObj.subjectIds.length > 0) {
+      return subjects.filter(s => selectedClassObj.subjectIds!.includes(s.id));
+    }
     const filtered = subjects.filter(s => s.classCategory === selectedClassObj.category);
     return filtered.length > 0 ? filtered : subjects;
   }, [subjects, selectedClassObj]);
@@ -207,7 +210,9 @@ export const GradesModule: React.FC = () => {
           type: evaluationType,
           score,
           maxScore: currentMaxScore,
-          coefficient: sub.coefficient || (evaluationType === 'COMPOSITION' ? 2 : 1),
+          coefficient: (selectedClassObj?.customCoefficients && selectedClassObj.customCoefficients[sub.id] !== undefined)
+            ? selectedClassObj.customCoefficients[sub.id]
+            : (sub.coefficient || (evaluationType === 'COMPOSITION' ? 2 : 1)),
           date: new Date().toISOString().split('T')[0]
         });
         savedCount++;
@@ -243,7 +248,9 @@ export const GradesModule: React.FC = () => {
 
     classSubjects.forEach(sub => {
       const score = scoresMap[sub.id];
-      const coef = sub.coefficient || 1;
+      const coef = (selectedClassObj?.customCoefficients && selectedClassObj.customCoefficients[sub.id] !== undefined)
+        ? selectedClassObj.customCoefficients[sub.id]
+        : (sub.coefficient || 1);
       if (score !== undefined) {
         enteredCount++;
         totalPoints += score * coef;
@@ -615,7 +622,9 @@ export const GradesModule: React.FC = () => {
                       classSubjects.map((sub, index) => {
                         const score = scoresMap[sub.id];
                         const hasScore = score !== undefined && !isNaN(score);
-                        const coef = sub.coefficient || 1;
+                        const coef = (selectedClassObj?.customCoefficients && selectedClassObj.customCoefficients[sub.id] !== undefined)
+                          ? selectedClassObj.customCoefficients[sub.id]
+                          : (sub.coefficient || 1);
                         const points = hasScore ? (score * coef) : 0;
                         const { appreciation, badgeColor } = hasScore 
                           ? getMaliScoreAppreciation(score, currentMaxScore)

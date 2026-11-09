@@ -92,6 +92,8 @@ export interface SchoolClass {
   studentCount?: number;
   capacity?: number; // Optionnel (retiré des contraintes obligatoires)
   passingGrade?: number; // Note de passage / moyenne d'admission (ex: 10/20 ou 5/10)
+  subjectIds?: string[]; // IDs des matières spécifiques enseignées dans cette classe
+  customCoefficients?: Record<string, number>; // Coefficients personnalisés par matière pour cette classe { [subjectId]: coeff }
 }
 
 export interface Subject {

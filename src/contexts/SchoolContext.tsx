@@ -537,9 +537,13 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const isFirstCycle = studentClass?.category === 'FONDAMENTAL_1';
     const maxScore = isFirstCycle ? 10 : 20;
 
-    const relevantSubjects = subjects.filter(
-      subj => !studentClass || subj.classCategory === studentClass.category
-    );
+    const relevantSubjects = subjects.filter(subj => {
+      if (!studentClass) return true;
+      if (studentClass.subjectIds && studentClass.subjectIds.length > 0) {
+        return studentClass.subjectIds.includes(subj.id);
+      }
+      return subj.classCategory === studentClass.category;
+    });
 
     const targetTerms = getRelatedTermsForPeriod(term, settings.evaluationCount || 9);
 
@@ -642,10 +646,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }
 
+      const effectiveCoeff = (studentClass?.customCoefficients && studentClass.customCoefficients[subj.id] !== undefined)
+        ? studentClass.customCoefficients[subj.id]
+        : subj.coefficient;
+
       finalScore = Math.round(finalScore * 100) / 100;
-      const weightedScore = Math.round(finalScore * subj.coefficient * 100) / 100;
+      const weightedScore = Math.round(finalScore * effectiveCoeff * 100) / 100;
       totalPoints += weightedScore;
-      totalCoefficients += subj.coefficient;
+      totalCoefficients += effectiveCoeff;
 
       const { appreciation } = getMaliScoreAppreciation(finalScore, maxScore);
 
@@ -653,7 +661,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         subjectId: subj.id,
         subjectName: subj.name,
         subjectCode: subj.code,
-        coefficient: subj.coefficient,
+        coefficient: effectiveCoeff,
         classAverage: isFirstCycle ? 6.4 : 12.8,
         classScore: Math.round(classScore * 100) / 100,
         compositionScore: Math.round(compositionScore * 100) / 100,

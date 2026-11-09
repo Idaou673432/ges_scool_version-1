@@ -794,7 +794,9 @@ class StorageService {
         monthlyFee: cls.monthlyFee || 20000,
         inscriptionFee: cls.inscriptionFee || 15000,
         classroom: cls.classroom || 'Salle 01',
-        passingGrade: cls.passingGrade ?? (cls.category === 'FONDAMENTAL_1' ? 5 : 10)
+        passingGrade: cls.passingGrade ?? (cls.category === 'FONDAMENTAL_1' ? 5 : 10),
+        subjectIds: cls.subjectIds,
+        customCoefficients: cls.customCoefficients
       };
       classes.push(saved);
     }

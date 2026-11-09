@@ -250,6 +250,9 @@ export class ExamScheduleService {
 
     // Filtrer les matières appropriées pour cette classe
     const classSubjects = subjects.filter(s => {
+      if (cls.subjectIds && cls.subjectIds.length > 0) {
+        return cls.subjectIds.includes(s.id);
+      }
       if (!s.classCategory) return true;
       return s.classCategory === cls.category;
     });
@@ -258,7 +261,11 @@ export class ExamScheduleService {
     if (subjectsToSchedule.length === 0) return [];
 
     // Trier les matières en mettant les gros coefficients le matin
-    const sorted = [...subjectsToSchedule].sort((a, b) => (b.coefficient || 1) - (a.coefficient || 1));
+    const sorted = [...subjectsToSchedule].sort((a, b) => {
+      const coeffA = (cls.customCoefficients && cls.customCoefficients[a.id] !== undefined) ? cls.customCoefficients[a.id] : (a.coefficient || 1);
+      const coeffB = (cls.customCoefficients && cls.customCoefficients[b.id] !== undefined) ? cls.customCoefficients[b.id] : (b.coefficient || 1);
+      return coeffB - coeffA;
+    });
 
     // Supprimer les anciens créneaux pour cette classe dans cette session
     this.clearSlotsForClass(sessionId, cls.id);
@@ -305,7 +312,7 @@ export class ExamScheduleService {
           className: cls.name,
           subjectId: sub.id,
           subjectName: sub.name,
-          coefficient: sub.coefficient || 1,
+          coefficient: (cls.customCoefficients && cls.customCoefficients[sub.id] !== undefined) ? cls.customCoefficients[sub.id] : (sub.coefficient || 1),
           date: dateStr,
           startTime: slotTime.start,
           endTime: slotTime.end,

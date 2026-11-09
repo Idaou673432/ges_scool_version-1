@@ -13,7 +13,7 @@ import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel, MALI_DEFAULT_CLASSES, MALI_DEFAULT_SUBJECTS } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
-import { SchoolEnabledFeatures, SchoolCategory, User, UserRole } from '../../types';
+import { SchoolEnabledFeatures, SchoolCategory, User, UserRole, Subject } from '../../types';
 import { secureLocalStorage } from '../../services/secureStorage';
 import { AuthService } from '../../services/authService';
 
@@ -367,8 +367,9 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
     const merged = { ...formData, ...newSettings };
     setFormData(merged);
     updateSettings(merged);
-    setCleanToast(`Configuration appliquée : attributs et barèmes configurés pour "${getCategoryLabel(category)}".`);
-    setTimeout(() => setCleanToast(null), 3500);
+
+    // Génération automatique immédiate des classes et matières officielles pour ce type
+    handleGenerateDefaultClassesAndSubjects(category);
   };
 
   const handleGenerateDefaultClassesAndSubjects = (category: SchoolCategory) => {
@@ -383,31 +384,18 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
       subjectsToCreate = MALI_DEFAULT_SUBJECTS.filter(s => s.classCategory === 'LYCEE');
     } else if (category === 'PROFESSIONNEL') {
       classesToCreate = MALI_DEFAULT_CLASSES.filter(c => c.category === 'TECHNIQUE_BT' || c.category === 'PROFESSIONNEL_CAP');
-      subjectsToCreate = MALI_DEFAULT_SUBJECTS.filter(s => s.classCategory === 'TECHNIQUE_BT');
+      subjectsToCreate = MALI_DEFAULT_SUBJECTS.filter(s => s.classCategory === 'TECHNIQUE_BT' || s.classCategory === 'PROFESSIONNEL_CAP');
     }
 
-    let addedClasses = 0;
-    classesToCreate.forEach(cls => {
-      const exists = classes.some(c => c.name.toLowerCase() === cls.name.toLowerCase());
-      if (!exists) {
-        saveClass({
-          name: cls.name,
-          category: cls.category as any,
-          level: cls.level,
-          monthlyFee: cls.fee,
-          inscriptionFee: cls.insFee,
-          classroom: 'Salle Principale',
-          passingGrade: cls.category === 'FONDAMENTAL_1' ? 5 : 10
-        });
-        addedClasses++;
-      }
-    });
+    // Étape 1 : Créer les matières officielles manquantes et référencer toutes les matières disponibles
+    const activeSubjectsMap = new Map<string, Subject>();
+    subjects.forEach(s => activeSubjectsMap.set(s.code, s));
 
     let addedSubjects = 0;
     subjectsToCreate.forEach(sub => {
-      const exists = subjects.some(s => s.name.toLowerCase() === sub.name.toLowerCase() || s.code.toLowerCase() === sub.code.toLowerCase());
-      if (!exists) {
-        saveSubject({
+      let existing = subjects.find(s => s.code.toLowerCase() === sub.code.toLowerCase() || s.name.toLowerCase() === sub.name.toLowerCase());
+      if (!existing) {
+        existing = saveSubject({
           code: sub.code,
           name: sub.name,
           coefficient: sub.coefficient,
@@ -416,10 +404,49 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
         });
         addedSubjects++;
       }
+      activeSubjectsMap.set(sub.code, existing);
     });
 
-    setCleanToast(`Préréglages importés : ${addedClasses} classe(s) et ${addedSubjects} matière(s) ajoutée(s).`);
-    setTimeout(() => setCleanToast(null), 3500);
+    const allCurrentSubjects = Array.from(activeSubjectsMap.values());
+
+    // Étape 2 : Créer les classes officielles manquantes avec leurs matières pré-associées
+    let addedClasses = 0;
+    classesToCreate.forEach(cls => {
+      const existingClass = classes.find(c => c.name.toLowerCase() === cls.name.toLowerCase());
+      if (!existingClass) {
+        // Pré-associer automatiquement les matières officielles correspondant à cette classe
+        const matchingSubjectIds = allCurrentSubjects
+          .filter(s => s.classCategory === cls.category)
+          .map(s => s.id);
+
+        saveClass({
+          name: cls.name,
+          category: cls.category as any,
+          level: cls.level,
+          monthlyFee: cls.fee,
+          inscriptionFee: cls.insFee,
+          classroom: 'Salle Principale',
+          passingGrade: cls.category === 'FONDAMENTAL_1' ? 5 : 10,
+          subjectIds: matchingSubjectIds
+        });
+        addedClasses++;
+      } else if (!existingClass.subjectIds || existingClass.subjectIds.length === 0) {
+        // Si la classe existe déjà mais n'a pas encore de subjectIds, lui assigner les matières officielles de son cycle
+        const matchingSubjectIds = allCurrentSubjects
+          .filter(s => s.classCategory === existingClass.category)
+          .map(s => s.id);
+        if (matchingSubjectIds.length > 0) {
+          saveClass({
+            ...existingClass,
+            subjectIds: matchingSubjectIds
+          });
+        }
+      }
+    });
+
+    const catLabel = getCategoryLabel(category);
+    setCleanToast(`Configuration "${catLabel}" appliquée : ${addedClasses} classe(s) et ${addedSubjects} matière(s) générées automatiquement ! Rendez-vous dans "Classes" pour choisir les matières spécifiques par classe.`);
+    setTimeout(() => setCleanToast(null), 5000);
   };
 
   const handleMonthChange = (termKey: string, monthValue: string) => {
