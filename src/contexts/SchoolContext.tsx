@@ -87,14 +87,14 @@ const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<SchoolSettings>(() => storageService.getSettings());
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [grades, setGrades] = useState<EvaluationGrade[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [students, setStudents] = useState<Student[]>(() => storageService.getStudents());
+  const [classes, setClasses] = useState<SchoolClass[]>(() => storageService.getClasses());
+  const [subjects, setSubjects] = useState<Subject[]>(() => storageService.getSubjects());
+  const [teachers, setTeachers] = useState<Teacher[]>(() => storageService.getTeachers());
+  const [grades, setGrades] = useState<EvaluationGrade[]>(() => storageService.getGrades());
+  const [payments, setPayments] = useState<Payment[]>(() => storageService.getPayments());
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => storageService.getAttendanceRecords());
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => storageService.getAuditLogs());
 
   // Multi-school & Cloud Sync Status
   const [cloudSchoolCode, setCloudSchoolCode] = useState<string>(() => cloudSyncService.getActiveSchoolCode());
@@ -136,12 +136,30 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // 2. Start Realtime Firestore synchronization for the active school code
     cloudSyncService.startRealtimeSync(cloudSchoolCode, {
       onSettingsChange: (newSettings) => {
+        if (!newSettings || typeof newSettings !== 'object') return;
         isSyncingFromCloud.current = true;
         storageService.updateSettings(newSettings);
         setSettings(newSettings);
         isSyncingFromCloud.current = false;
       },
       onStudentsChange: (cloudStudents) => {
+        if (!Array.isArray(cloudStudents)) return;
+        if (cloudStudents.length === 0) {
+          const localStudents = storageService.getStudents();
+          if (localStudents.length > 0) {
+            cloudSyncService.pushAllDataToCloud(cloudSchoolCode, {
+              settings: storageService.getSettings(),
+              students: localStudents,
+              classes: storageService.getClasses(),
+              subjects: storageService.getSubjects(),
+              teachers: storageService.getTeachers(),
+              grades: storageService.getGrades(),
+              payments: storageService.getPayments(),
+              attendance: storageService.getAttendanceRecords()
+            });
+            return;
+          }
+        }
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_students', cloudStudents);
@@ -150,6 +168,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onClassesChange: (cloudClasses) => {
+        if (!Array.isArray(cloudClasses)) return;
+        if (cloudClasses.length === 0 && storageService.getClasses().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_classes', cloudClasses);
@@ -158,6 +178,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onSubjectsChange: (cloudSubjects) => {
+        if (!Array.isArray(cloudSubjects)) return;
+        if (cloudSubjects.length === 0 && storageService.getSubjects().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_subjects', cloudSubjects);
@@ -166,6 +188,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onTeachersChange: (cloudTeachers) => {
+        if (!Array.isArray(cloudTeachers)) return;
+        if (cloudTeachers.length === 0 && storageService.getTeachers().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_teachers', cloudTeachers);
@@ -174,6 +198,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onGradesChange: (cloudGrades) => {
+        if (!Array.isArray(cloudGrades)) return;
+        if (cloudGrades.length === 0 && storageService.getGrades().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_grades', cloudGrades);
@@ -182,9 +208,10 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onPaymentsChange: (cloudPayments) => {
+        if (!Array.isArray(cloudPayments)) return;
+        if (cloudPayments.length === 0 && storageService.getPayments().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
-          // Check for any offline pending payments that need pushing to cloud
           let pendingToPush: Payment[] = [];
           try {
             pendingToPush = secureLocalStorage.getJSON<Payment[]>('soma_pending_offline_payments', []);
@@ -205,6 +232,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isSyncingFromCloud.current = false;
       },
       onAttendanceChange: (cloudAttendance) => {
+        if (!Array.isArray(cloudAttendance)) return;
+        if (cloudAttendance.length === 0 && storageService.getAttendanceRecords().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_attendance', cloudAttendance);

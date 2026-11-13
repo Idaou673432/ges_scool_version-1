@@ -912,16 +912,25 @@ class StorageService {
 
   public saveGrade(grade: Partial<EvaluationGrade>): EvaluationGrade {
     const grades = this.getGrades();
-    const isEdit = Boolean(grade.id);
     let saved: EvaluationGrade;
 
-    if (isEdit) {
-      const idx = grades.findIndex(g => g.id === grade.id);
-      saved = { ...grades[idx], ...grade } as EvaluationGrade;
-      grades[idx] = saved;
+    // Chercher par identifiant direct ou par clé unique composite (studentId, subjectId, term, type, academicYear)
+    const existingIdx = grades.findIndex(g => 
+      (grade.id && g.id === grade.id) || 
+      (Boolean(grade.studentId && grade.subjectId && grade.term && grade.type) &&
+       g.studentId === grade.studentId && 
+       g.subjectId === grade.subjectId && 
+       g.term === grade.term && 
+       g.type === grade.type && 
+       g.academicYear === (grade.academicYear || '2025-2026'))
+    );
+
+    if (existingIdx >= 0) {
+      saved = { ...grades[existingIdx], ...grade } as EvaluationGrade;
+      grades[existingIdx] = saved;
     } else {
       saved = {
-        id: `grd-${Date.now()}`,
+        id: grade.id || `grd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         studentId: grade.studentId || '',
         classId: grade.classId || '',
         subjectId: grade.subjectId || '',
@@ -929,9 +938,9 @@ class StorageService {
         academicYear: grade.academicYear || '2025-2026',
         type: grade.type || 'COMPOSITION',
         score: grade.score || 0,
-        maxScore: 20,
+        maxScore: grade.maxScore || 20,
         coefficient: grade.coefficient || 1,
-        date: new Date().toISOString().split('T')[0],
+        date: grade.date || new Date().toISOString().split('T')[0],
         comment: grade.comment
       };
       grades.unshift(saved);

@@ -67,7 +67,11 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
     const text = encodeURIComponent(
       `🏫 *Accès Synchronisé KalanGest - ${settings.schoolName || 'Établissement'}*\n\nVoici le lien d'accès direct pour connecter votre téléphone ou ordinateur :\n👉 ${directSchoolUrl}\n\nCode Établissement : *${cloudSchoolCode}*\nTous vos paiements et notes se synchronisent automatiquement en temps réel !`
     );
-    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    const link = document.createElement('a');
+    link.href = `https://api.whatsapp.com/send?text=${text}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.click();
   };
 
   if (!isOpen) return null;

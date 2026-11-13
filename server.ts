@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { createDefaultSchoolStore } from './src/constants/initialSeedData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,6 +100,8 @@ interface SchoolStore {
   payments?: any[];
   attendance?: any[];
   expenses?: any[];
+  exam_sessions?: any[];
+  exam_slots?: any[];
   updatedAt?: string;
 }
 
@@ -124,10 +127,21 @@ function getFilePath(code: string): string {
   return resolved;
 }
 
+function hasMeaningfulData(store: any): boolean {
+  if (!store || typeof store !== 'object') return false;
+  const hasStudents = Array.isArray(store.students) && store.students.length > 0;
+  const hasClasses = Array.isArray(store.classes) && store.classes.length > 0;
+  const hasSettings = store.settings && typeof store.settings === 'object' && Boolean(store.settings.schoolName);
+  return Boolean(hasStudents || hasClasses || hasSettings);
+}
+
 function loadSchoolData(code: string): SchoolStore {
   const cleanCode = sanitizeCode(code);
   if (memoryStores.has(cleanCode)) {
-    return memoryStores.get(cleanCode)!;
+    const cached = memoryStores.get(cleanCode)!;
+    if (hasMeaningfulData(cached)) {
+      return cached;
+    }
   }
 
   const filePath = getFilePath(cleanCode);
@@ -135,27 +149,25 @@ function loadSchoolData(code: string): SchoolStore {
     try {
       const content = fs.readFileSync(filePath, 'utf-8');
       const parsed = JSON.parse(content);
-      memoryStores.set(cleanCode, parsed);
-      return parsed;
+      if (hasMeaningfulData(parsed)) {
+        memoryStores.set(cleanCode, parsed);
+        return parsed;
+      }
     } catch (e) {
       console.warn(`[Server] Error reading file for ${cleanCode}:`, e);
     }
   }
 
-  const emptyStore: SchoolStore = {
-    settings: null,
-    students: [],
-    classes: [],
-    subjects: [],
-    teachers: [],
-    grades: [],
-    payments: [],
-    attendance: [],
-    expenses: [],
-    updatedAt: new Date().toISOString()
-  };
-  memoryStores.set(cleanCode, emptyStore);
-  return emptyStore;
+  // Auto-initialize with official reference school store if empty or not existing
+  const defaultStore = createDefaultSchoolStore() as SchoolStore;
+  if (cleanCode !== 'ECOLE-PRINCIPALE') {
+    defaultStore.settings = {
+      ...defaultStore.settings,
+      schoolName: `Établissement [${cleanCode}]`
+    };
+  }
+  saveSchoolData(cleanCode, defaultStore);
+  return defaultStore;
 }
 
 function saveSchoolData(code: string, data: SchoolStore): void {
@@ -165,9 +177,16 @@ function saveSchoolData(code: string, data: SchoolStore): void {
 
   try {
     const filePath = getFilePath(cleanCode);
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    const tempFile = `${filePath}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempFile, filePath);
   } catch (e) {
-    console.warn(`[Server] Could not persist data for ${cleanCode} to disk:`, e);
+    try {
+      const filePath = getFilePath(cleanCode);
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn(`[Server] Could not persist data for ${cleanCode} to disk:`, err);
+    }
   }
 }
 
@@ -248,7 +267,9 @@ const ALLOWED_COLLECTIONS = new Set<string>([
   'grades',
   'payments',
   'attendance',
-  'expenses'
+  'expenses',
+  'exam_sessions',
+  'exam_slots'
 ]);
 
 // 3. Bootstrap cloud/server store if empty with initial client data
@@ -258,22 +279,22 @@ app.post('/api/sync/bootstrap', (req: Request, res: Response) => {
     const cleanCode = sanitizeCode(schoolCode);
     const current = loadSchoolData(cleanCode);
 
-    const hasData = (current.students && current.students.length > 0) ||
-                    (current.payments && current.payments.length > 0) ||
-                    (current.classes && current.classes.length > 0);
+    const hasData = hasMeaningfulData(current);
 
     if (!hasData && rawSeed && typeof rawSeed === 'object') {
       const seedData = sanitizePayload(rawSeed);
       saveSchoolData(cleanCode, {
-        settings: seedData.settings || null,
-        students: Array.isArray(seedData.students) ? seedData.students : [],
-        classes: Array.isArray(seedData.classes) ? seedData.classes : [],
-        subjects: Array.isArray(seedData.subjects) ? seedData.subjects : [],
-        teachers: Array.isArray(seedData.teachers) ? seedData.teachers : [],
-        grades: Array.isArray(seedData.grades) ? seedData.grades : [],
-        payments: Array.isArray(seedData.payments) ? seedData.payments : [],
-        attendance: Array.isArray(seedData.attendance) ? seedData.attendance : [],
-        expenses: Array.isArray(seedData.expenses) ? seedData.expenses : [],
+        settings: seedData.settings || current.settings || null,
+        students: Array.isArray(seedData.students) && seedData.students.length > 0 ? seedData.students : (current.students || []),
+        classes: Array.isArray(seedData.classes) && seedData.classes.length > 0 ? seedData.classes : (current.classes || []),
+        subjects: Array.isArray(seedData.subjects) && seedData.subjects.length > 0 ? seedData.subjects : (current.subjects || []),
+        teachers: Array.isArray(seedData.teachers) && seedData.teachers.length > 0 ? seedData.teachers : (current.teachers || []),
+        grades: Array.isArray(seedData.grades) && seedData.grades.length > 0 ? seedData.grades : (current.grades || []),
+        payments: Array.isArray(seedData.payments) && seedData.payments.length > 0 ? seedData.payments : (current.payments || []),
+        attendance: Array.isArray(seedData.attendance) && seedData.attendance.length > 0 ? seedData.attendance : (current.attendance || []),
+        expenses: Array.isArray(seedData.expenses) ? seedData.expenses : (current.expenses || []),
+        exam_sessions: Array.isArray(seedData.exam_sessions) ? seedData.exam_sessions : (current.exam_sessions || []),
+        exam_slots: Array.isArray(seedData.exam_slots) ? seedData.exam_slots : (current.exam_slots || []),
         updatedAt: new Date().toISOString()
       });
       broadcastToSchool(cleanCode, 'state_reset', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) });
@@ -298,17 +319,20 @@ app.post('/api/sync/push', (req: Request, res: Response) => {
     }
 
     const data = sanitizePayload(rawData);
+    const current = loadSchoolData(cleanCode);
 
     saveSchoolData(cleanCode, {
-      settings: data.settings || null,
-      students: Array.isArray(data.students) ? data.students : [],
-      classes: Array.isArray(data.classes) ? data.classes : [],
-      subjects: Array.isArray(data.subjects) ? data.subjects : [],
-      teachers: Array.isArray(data.teachers) ? data.teachers : [],
-      grades: Array.isArray(data.grades) ? data.grades : [],
-      payments: Array.isArray(data.payments) ? data.payments : [],
-      attendance: Array.isArray(data.attendance) ? data.attendance : [],
-      expenses: Array.isArray(data.expenses) ? data.expenses : [],
+      settings: data.settings || current.settings || null,
+      students: Array.isArray(data.students) ? data.students : (current.students || []),
+      classes: Array.isArray(data.classes) ? data.classes : (current.classes || []),
+      subjects: Array.isArray(data.subjects) ? data.subjects : (current.subjects || []),
+      teachers: Array.isArray(data.teachers) ? data.teachers : (current.teachers || []),
+      grades: Array.isArray(data.grades) ? data.grades : (current.grades || []),
+      payments: Array.isArray(data.payments) ? data.payments : (current.payments || []),
+      attendance: Array.isArray(data.attendance) ? data.attendance : (current.attendance || []),
+      expenses: Array.isArray(data.expenses) ? data.expenses : (current.expenses || []),
+      exam_sessions: Array.isArray(data.exam_sessions) ? data.exam_sessions : (current.exam_sessions || []),
+      exam_slots: Array.isArray(data.exam_slots) ? data.exam_slots : (current.exam_slots || []),
       updatedAt: new Date().toISOString()
     });
 
@@ -335,7 +359,7 @@ app.post('/api/sync/mutate', (req: Request, res: Response) => {
     switch (mutationType) {
       case 'SYNC_SETTINGS':
         if (payload && typeof payload === 'object') {
-          store.settings = payload;
+          store.settings = { ...(store.settings || {}), ...payload };
         }
         break;
 
@@ -344,8 +368,39 @@ app.post('/api/sync/mutate', (req: Request, res: Response) => {
         if (!collectionName || !ALLOWED_COLLECTIONS.has(collectionName) || !item || !item.id) {
           return res.status(400).json({ error: 'Collection ou élément manquant' });
         }
-        const coll = (store as any)[collectionName] as any[] | undefined;
-        if (Array.isArray(coll)) {
+        let coll = (store as any)[collectionName] as any[] | undefined;
+        if (!Array.isArray(coll)) {
+          coll = [];
+          (store as any)[collectionName] = coll;
+        }
+
+        if (collectionName === 'grades') {
+          // De-duplicate matching grade
+          const matchIdx = coll.findIndex(g =>
+            g.id === item.id ||
+            (g.studentId === item.studentId &&
+             g.subjectId === item.subjectId &&
+             g.term === item.term &&
+             g.type === item.type &&
+             g.academicYear === item.academicYear)
+          );
+          if (matchIdx >= 0) {
+            coll[matchIdx] = { ...coll[matchIdx], ...item };
+          } else {
+            coll.push(item);
+          }
+        } else if (collectionName === 'attendance') {
+          // De-duplicate attendance for student on the same date
+          const matchIdx = coll.findIndex(r =>
+            r.id === item.id ||
+            (r.studentId === item.studentId && r.date === item.date)
+          );
+          if (matchIdx >= 0) {
+            coll[matchIdx] = { ...coll[matchIdx], ...item };
+          } else {
+            coll.push(item);
+          }
+        } else {
           const idx = coll.findIndex(i => i.id === item.id);
           if (idx >= 0) {
             coll[idx] = { ...coll[idx], ...item };

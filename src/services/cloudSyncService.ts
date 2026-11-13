@@ -304,6 +304,16 @@ class CloudSyncService {
     if (Array.isArray(store.expenses)) {
       this.currentListeners.onExpensesChange?.(store.expenses);
     }
+    if (Array.isArray(store.exam_sessions) && store.exam_sessions.length > 0) {
+      try {
+        secureLocalStorage.setJSON('soma_exam_sessions', store.exam_sessions);
+      } catch {}
+    }
+    if (Array.isArray(store.exam_slots) && store.exam_slots.length > 0) {
+      try {
+        secureLocalStorage.setJSON('soma_exam_slots', store.exam_slots);
+      } catch {}
+    }
   }
 
   private connectSSE(code: string): void {
@@ -649,10 +659,20 @@ class CloudSyncService {
 
     // 1. Send to server sync store
     try {
+      const examSessions = secureLocalStorage.getJSON('soma_exam_sessions', []);
+      const examSlots = secureLocalStorage.getJSON('soma_exam_slots', []);
       await fetch('/api/sync/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schoolCode: code, data, senderId: DEVICE_CLIENT_ID })
+        body: JSON.stringify({
+          schoolCode: code,
+          data: {
+            ...data,
+            exam_sessions: examSessions,
+            exam_slots: examSlots
+          },
+          senderId: DEVICE_CLIENT_ID
+        })
       });
     } catch (e) {
       console.warn('[SyncService] Server push notice:', e);

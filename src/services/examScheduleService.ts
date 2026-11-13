@@ -5,6 +5,7 @@
 
 import { ExamSession, ExamSlot, SchoolClass, Subject, Teacher, SchoolSettings, ExamTermType } from '../types';
 import { secureLocalStorage } from './secureStorage';
+import { cloudSyncService } from './cloudSyncService';
 
 const SESSIONS_STORAGE_KEY = 'soma_exam_sessions';
 const SLOTS_STORAGE_KEY = 'soma_exam_slots';
@@ -101,6 +102,9 @@ export class ExamScheduleService {
     }
 
     secureLocalStorage.setJSON(SESSIONS_STORAGE_KEY, sessions);
+    try {
+      cloudSyncService.syncDoc('exam_sessions', saved);
+    } catch {}
     return saved;
   }
 
@@ -116,6 +120,10 @@ export class ExamScheduleService {
     const slots = this.getSlots();
     const remainingSlots = slots.filter(sl => sl.sessionId !== sessionId);
     secureLocalStorage.setJSON(SLOTS_STORAGE_KEY, remainingSlots);
+
+    try {
+      cloudSyncService.deleteCloudDoc('exam_sessions', sessionId);
+    } catch {}
 
     return true;
   }
@@ -211,6 +219,9 @@ export class ExamScheduleService {
     }
 
     secureLocalStorage.setJSON(SLOTS_STORAGE_KEY, slots);
+    try {
+      cloudSyncService.syncDoc('exam_slots', saved);
+    } catch {}
     return saved;
   }
 
@@ -221,6 +232,9 @@ export class ExamScheduleService {
     const slots = this.getSlots();
     const filtered = slots.filter(s => s.id !== slotId);
     secureLocalStorage.setJSON(SLOTS_STORAGE_KEY, filtered);
+    try {
+      cloudSyncService.deleteCloudDoc('exam_slots', slotId);
+    } catch {}
     return true;
   }
 
