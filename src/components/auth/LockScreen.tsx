@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { Lock, Key, Eye, EyeOff, ShieldCheck, AlertCircle, Building2, ArrowRight, QrCode } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import {
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  GraduationCap,
+  ArrowRight
+} from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { secureSessionStorage } from '../../services/secureStorage';
@@ -9,18 +16,25 @@ interface LockScreenProps {
   onOpenQrScanner?: () => void;
 }
 
-export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanner }) => {
+export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
   const { settings } = useSchool();
   const { users, loginAsUser } = useAuth();
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const expectedPassword = settings.adminPassword || '0022390070321';
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanInput = passwordInput.trim();
+    if (!cleanInput) {
+      setError(true);
+      inputRef.current?.focus();
+      return;
+    }
+
     // 1. Vérifier si le mot de passe correspond à un utilisateur configuré (Directeur, Comptable, etc.)
     const matchingUser = users.find(u => u.active && u.password && u.password === cleanInput);
     if (matchingUser) {
@@ -42,144 +56,112 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
     }
 
     setError(true);
-  };
-
-  const handleKeypadPress = (val: string) => {
-    setError(false);
-    if (val === 'CLEAR') {
-      setPasswordInput('');
-    } else if (val === 'BACK') {
-      setPasswordInput(prev => prev.slice(0, -1));
-    } else {
-      setPasswordInput(prev => prev + val);
-    }
+    inputRef.current?.focus();
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 overflow-y-auto flex items-center justify-center p-3 sm:p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-950 via-slate-950 to-black">
-      <div className="w-full max-w-sm sm:max-w-md my-auto bg-white rounded-3xl sm:rounded-[2rem] shadow-2xl p-5 sm:p-6 space-y-4 sm:space-y-5 border border-slate-800 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        
-        {/* Top Decorative Gradient Accent */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-900 via-emerald-600 to-amber-500" />
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-gradient-to-br from-[#F4F7FB] via-[#EEF3FA] to-[#FBF7F0] flex items-center justify-center p-4 sm:p-6">
+      {/* Soft ambient background accents */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -top-32 -left-24 w-96 h-96 rounded-full bg-blue-200/35 blur-3xl" />
+        <div className="absolute -bottom-32 -right-24 w-96 h-96 rounded-full bg-amber-200/30 blur-3xl" />
+      </div>
 
-        {/* Branding & Logo */}
-        <div className="text-center space-y-2 pt-1">
-          <div className="inline-flex items-center justify-center">
-            {settings.logoUrl ? (
+      <div className="relative w-full max-w-[390px] my-auto bg-white/95 backdrop-blur-md rounded-3xl border border-white shadow-[0_20px_50px_-12px_rgba(15,23,42,0.12)] ring-1 ring-slate-200/70 p-7 sm:p-8 space-y-6">
+
+        {/* Clean Branding */}
+        <div className="flex flex-col items-center text-center space-y-3">
+          {settings.logoUrl ? (
+            <div className="w-16 h-16 rounded-2xl bg-white border border-slate-100 shadow-md p-1.5 flex items-center justify-center">
               <img
                 src={settings.logoUrl}
-                alt="Logo Établissement"
-                className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-2xl border-2 border-slate-100 p-1 bg-white shadow-md"
+                alt={settings.schoolName || 'Logo'}
+                className="w-full h-full object-contain rounded-xl"
               />
-            ) : (
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/30">
-                <Building2 className="w-6 h-6 sm:w-7 sm:h-7" />
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-600/25 flex items-center justify-center">
+              <GraduationCap className="w-7 h-7" />
+            </div>
+          )}
 
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-              {settings.academyName || 'Académie d\'Enseignement'}
-            </span>
-            <h1 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
+          <div className="space-y-1">
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-snug">
               {settings.schoolName || 'KalanGest Mali'}
             </h1>
-          </div>
-
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-100 text-blue-900 rounded-full text-[10px] font-black uppercase tracking-widest">
-            <Lock className="w-3 h-3 text-blue-800" />
-            <span>Accès Sécurisé • Entrez le mot de passe</span>
+            <p className="text-xs font-medium text-slate-500">
+              {settings.academyName || "Espace d'administration scolaire"}
+              {settings.currentAcademicYear ? ` · ${settings.currentAcademicYear}` : ''}
+            </p>
           </div>
         </div>
 
         {/* Form */}
         <form onSubmit={handleUnlock} className="space-y-4">
           <div className="space-y-1.5">
-            <div className="relative">
+            <div className="relative flex items-center">
+              <Lock
+                aria-hidden="true"
+                className={`w-4 h-4 absolute left-3.5 pointer-events-none transition-colors ${
+                  error ? 'text-rose-500' : 'text-slate-400'
+                }`}
+              />
               <input
-                type={showPassword ? "text" : "password"}
+                id="lockscreen-pin-input"
+                ref={inputRef}
+                type={showPassword ? 'text' : 'password'}
                 autoFocus
+                autoComplete="current-password"
                 value={passwordInput}
                 onChange={e => {
                   setPasswordInput(e.target.value);
-                  setError(false);
+                  if (error) setError(false);
                 }}
-                placeholder="Saisissez votre Code PIN / Mot de passe"
-                className={`w-full p-3 sm:p-3.5 pr-11 text-center text-base sm:text-lg font-black font-mono text-slate-900 bg-slate-50 border rounded-2xl outline-none transition-all ${
-                  error 
-                    ? 'border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20' 
-                    : 'border-slate-200 focus:border-blue-900 focus:ring-2 focus:ring-blue-900/20'
+                placeholder="Code PIN ou mot de passe"
+                aria-label="Code PIN ou mot de passe"
+                aria-invalid={error}
+                className={`w-full h-12 pl-10 pr-11 text-left text-base text-slate-900 bg-slate-50/80 border rounded-2xl outline-none transition-all placeholder:font-sans placeholder:text-sm placeholder:tracking-normal placeholder:text-slate-400 ${
+                  showPassword ? 'font-mono tracking-normal' : 'font-mono tracking-[0.2em]'
+                } ${
+                  error
+                    ? 'border-rose-400 bg-rose-50/40 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
+                    : 'border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10'
                 }`}
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-1"
+                onClick={() => setShowPassword(prev => !prev)}
+                aria-label={showPassword ? 'Masquer' : 'Afficher'}
+                className="absolute right-1.5 w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 transition-colors cursor-pointer"
               >
-                {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
 
             {error && (
-              <p className="text-xs font-black text-rose-600 text-center flex items-center justify-center gap-1.5 animate-bounce">
-                <AlertCircle className="w-4 h-4" />
-                <span>Code PIN / Mot de passe incorrect ! Veuillez réessayer.</span>
+              <p
+                role="alert"
+                className="text-xs font-medium text-rose-600 flex items-center justify-center gap-1.5 pt-0.5"
+              >
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>Code PIN ou mot de passe incorrect.</span>
               </p>
             )}
           </div>
 
-          {/* Quick Keypad for Touch / PIN entry */}
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => handleKeypadPress(num)}
-                className="py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 active:bg-blue-900 active:text-white rounded-xl text-sm sm:text-base font-black text-slate-800 transition-all cursor-pointer shadow-xs"
-              >
-                {num}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => handleKeypadPress('CLEAR')}
-              className="py-2.5 sm:py-3 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-xl text-xs font-black uppercase transition-all cursor-pointer"
-            >
-              Effacer
-            </button>
-            <button
-              type="button"
-              onClick={() => handleKeypadPress('0')}
-              className="py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 active:bg-blue-900 active:text-white rounded-xl text-sm sm:text-base font-black text-slate-800 transition-all cursor-pointer shadow-xs"
-            >
-              0
-            </button>
-            <button
-              type="button"
-              onClick={() => handleKeypadPress('BACK')}
-              className="py-2.5 sm:py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase transition-all cursor-pointer"
-            >
-              ⌫
-            </button>
-          </div>
-
+          {/* Primary Button */}
           <button
             type="submit"
-            className="w-full py-3 sm:py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+            className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.99] text-white font-semibold text-sm rounded-2xl shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
           >
-            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span>Déverrouiller l'Application</span>
+            <span>Déverrouiller</span>
             <ArrowRight className="w-4 h-4" />
           </button>
-
         </form>
 
-        <div className="text-center pt-2 border-t border-slate-100">
-          <p className="text-[10px] text-slate-400">
-            Modifiable à tout moment dans <strong className="text-slate-600">Paramètres ➔ Logo & Mot de passe</strong>
-          </p>
-        </div>
+        <p className="text-[11px] text-slate-400 text-center">
+          Paramètres &rsaquo; Logo &amp; Mot de passe
+        </p>
       </div>
     </div>
   );

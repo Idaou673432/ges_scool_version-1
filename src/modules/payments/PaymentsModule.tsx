@@ -102,12 +102,18 @@ const INITIAL_EXPENSES: Expense[] = [
 export const PaymentsModule: React.FC = () => {
   const { 
     payments, 
+    expenses,
+    closures,
     students, 
     classes, 
     recordPayment, 
     updatePayment, 
     deletePayment, 
-    deleteAllPayments, 
+    deleteAllPayments,
+    saveExpense,
+    deleteExpense,
+    saveClosure,
+    deleteClosure,
     settings,
     cloudSchoolCode
   } = useSchool();
@@ -138,29 +144,17 @@ export const PaymentsModule: React.FC = () => {
   const [paymentToEditModal, setPaymentToEditModal] = useState<Payment | null>(null);
 
   // Clôture Journalière de Caisse State
-  const [closures, setClosures] = useState<DailyCashClosure[]>(() => {
-    try {
-      return secureLocalStorage.getJSON<DailyCashClosure[]>('kalangest_cash_closures', []);
-    } catch (e) {
-      console.error(e);
-      return [];
-    }
-  });
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
   const [closureToDelete, setClosureToDelete] = useState<DailyCashClosure | null>(null);
 
   const handleSaveClosure = (newClosure: DailyCashClosure) => {
-    const updated = [newClosure, ...closures];
-    setClosures(updated);
-    secureLocalStorage.setJSON('kalangest_cash_closures', updated);
+    saveClosure(newClosure);
     setSyncToast(`Procès-Verbal N° ${newClosure.reference} enregistré avec succès !`);
     setTimeout(() => setSyncToast(null), 4000);
   };
 
   const handleDeleteClosure = (id: string) => {
-    const updated = closures.filter(c => c.id !== id);
-    setClosures(updated);
-    secureLocalStorage.setJSON('kalangest_cash_closures', updated);
+    deleteClosure(id);
     setClosureToDelete(null);
     setSyncToast('Procès-verbal de clôture supprimé.');
     setTimeout(() => setSyncToast(null), 3000);
@@ -173,14 +167,6 @@ export const PaymentsModule: React.FC = () => {
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<'ALL' | 'EN_RETARD' | 'IMPAYE' | 'PARTIEL' | 'PAYE'>('ALL');
   
   // Expenses State
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    try {
-      return secureLocalStorage.getJSON<Expense[]>('soma_expenses', INITIAL_EXPENSES);
-    } catch (e) {
-      console.error(e);
-      return INITIAL_EXPENSES;
-    }
-  });
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseError, setExpenseError] = useState<string | null>(null);
   const [expenseToDeleteModal, setExpenseToDeleteModal] = useState<Expense | null>(null);
@@ -196,10 +182,7 @@ export const PaymentsModule: React.FC = () => {
 
   const handleDeleteExpenseConfirm = () => {
     if (expenseToDeleteModal) {
-      const updated = expenses.filter(e => e.id !== expenseToDeleteModal.id);
-      setExpenses(updated);
-      secureLocalStorage.setJSON('soma_expenses', updated);
-      cloudSyncService.deleteExpense(expenseToDeleteModal.id, cloudSchoolCode);
+      deleteExpense(expenseToDeleteModal.id);
       setExpenseToDeleteModal(null);
       setSyncToast('Dépense supprimée avec succès. Le solde de la caisse a été mis à jour.');
       setTimeout(() => setSyncToast(null), 3000);
@@ -470,10 +453,7 @@ export const PaymentsModule: React.FC = () => {
       paymentMethod: expenseFormData.paymentMethod || 'ESPECES',
       approvedBy: expenseFormData.approvedBy || 'Direction'
     };
-    const updated = [newExpense, ...expenses];
-    setExpenses(updated);
-    secureLocalStorage.setJSON('soma_expenses', updated);
-    cloudSyncService.syncExpense(newExpense, cloudSchoolCode);
+    saveExpense(newExpense);
     setIsExpenseModalOpen(false);
     setExpenseFormData({
       category: 'SALAIRE',

@@ -13,6 +13,8 @@ import {
   EvaluationGrade,
   EvaluationTerm,
   Payment,
+  Expense,
+  DailyCashClosure,
   SchoolSettings,
   SchoolEnabledFeatures,
   AuditLog,
@@ -36,6 +38,8 @@ interface SchoolContextType {
   teachers: Teacher[];
   grades: EvaluationGrade[];
   payments: Payment[];
+  expenses: Expense[];
+  closures: DailyCashClosure[];
   attendanceRecords: AttendanceRecord[];
   auditLogs: AuditLog[];
   stats: SystemStats;
@@ -71,6 +75,11 @@ interface SchoolContextType {
   updatePayment: (payment: Payment) => Payment;
   deletePayment: (paymentId: string) => void;
   deleteAllPayments: () => void;
+  saveExpense: (expense: Expense) => Expense;
+  deleteExpense: (expenseId: string) => void;
+  clearAllExpenses: () => void;
+  saveClosure: (closure: DailyCashClosure) => DailyCashClosure;
+  deleteClosure: (closureId: string) => void;
   saveAttendanceBatch: (records: Partial<AttendanceRecord>[]) => void;
   deleteAttendanceRecord: (id: string) => void;
   deleteAllAttendanceRecords: () => void;
@@ -93,6 +102,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [teachers, setTeachers] = useState<Teacher[]>(() => storageService.getTeachers());
   const [grades, setGrades] = useState<EvaluationGrade[]>(() => storageService.getGrades());
   const [payments, setPayments] = useState<Payment[]>(() => storageService.getPayments());
+  const [expenses, setExpenses] = useState<Expense[]>(() => storageService.getExpenses());
+  const [closures, setClosures] = useState<DailyCashClosure[]>(() => storageService.getClosures());
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => storageService.getAttendanceRecords());
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => storageService.getAuditLogs());
 
@@ -113,6 +124,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTeachers(storageService.getTeachers());
     setGrades(storageService.getGrades());
     setPayments(storageService.getPayments());
+    setExpenses(storageService.getExpenses());
+    setClosures(storageService.getClosures());
     setAttendanceRecords(storageService.getAttendanceRecords());
     setAuditLogs(storageService.getAuditLogs());
   }, []);
@@ -121,45 +134,37 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     refreshData();
 
-    // 1. Auto-bootstrap Cloud if this is a newly connected school with no cloud data yet
-    cloudSyncService.bootstrapCloudIfEmpty(cloudSchoolCode, {
-      settings: storageService.getSettings(),
-      students: storageService.getStudents(),
-      classes: storageService.getClasses(),
-      subjects: storageService.getSubjects(),
-      teachers: storageService.getTeachers(),
-      grades: storageService.getGrades(),
-      payments: storageService.getPayments(),
-      attendance: storageService.getAttendanceRecords()
-    });
-
-    // 2. Start Realtime Firestore synchronization for the active school code
+    // 1. Start Realtime Cloud & Server synchronization for the active school code FIRST so listeners are ready
     cloudSyncService.startRealtimeSync(cloudSchoolCode, {
       onSettingsChange: (newSettings) => {
         if (!newSettings || typeof newSettings !== 'object') return;
         isSyncingFromCloud.current = true;
-        storageService.updateSettings(newSettings);
-        setSettings(newSettings);
+        const currentDefaults = storageService.getSettings();
+        const mergedSettings: SchoolSettings = {
+          ...currentDefaults,
+          ...newSettings,
+          evaluationMonths: {
+            ...currentDefaults.evaluationMonths,
+            ...(newSettings.evaluationMonths || {})
+          },
+          enabledFeatures: {
+            ...currentDefaults.enabledFeatures,
+            ...(newSettings.enabledFeatures || {})
+          }
+        };
+        storageService.updateSettings(mergedSettings);
+        setSettings(mergedSettings);
         isSyncingFromCloud.current = false;
+      },
+      onUsersChange: (cloudUsers) => {
+        if (!Array.isArray(cloudUsers) || cloudUsers.length === 0) return;
+        try {
+          secureLocalStorage.setJSON('somasikolo_users', cloudUsers);
+          window.dispatchEvent(new CustomEvent('somasikolo_users_updated'));
+        } catch {}
       },
       onStudentsChange: (cloudStudents) => {
         if (!Array.isArray(cloudStudents)) return;
-        if (cloudStudents.length === 0) {
-          const localStudents = storageService.getStudents();
-          if (localStudents.length > 0) {
-            cloudSyncService.pushAllDataToCloud(cloudSchoolCode, {
-              settings: storageService.getSettings(),
-              students: localStudents,
-              classes: storageService.getClasses(),
-              subjects: storageService.getSubjects(),
-              teachers: storageService.getTeachers(),
-              grades: storageService.getGrades(),
-              payments: storageService.getPayments(),
-              attendance: storageService.getAttendanceRecords()
-            });
-            return;
-          }
-        }
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_students', cloudStudents);
@@ -169,7 +174,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
       onClassesChange: (cloudClasses) => {
         if (!Array.isArray(cloudClasses)) return;
-        if (cloudClasses.length === 0 && storageService.getClasses().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_classes', cloudClasses);
@@ -179,7 +183,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
       onSubjectsChange: (cloudSubjects) => {
         if (!Array.isArray(cloudSubjects)) return;
-        if (cloudSubjects.length === 0 && storageService.getSubjects().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_subjects', cloudSubjects);
@@ -189,7 +192,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
       onTeachersChange: (cloudTeachers) => {
         if (!Array.isArray(cloudTeachers)) return;
-        if (cloudTeachers.length === 0 && storageService.getTeachers().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_teachers', cloudTeachers);
@@ -199,7 +201,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
       onGradesChange: (cloudGrades) => {
         if (!Array.isArray(cloudGrades)) return;
-        if (cloudGrades.length === 0 && storageService.getGrades().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_grades', cloudGrades);
@@ -209,7 +210,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       },
       onPaymentsChange: (cloudPayments) => {
         if (!Array.isArray(cloudPayments)) return;
-        if (cloudPayments.length === 0 && storageService.getPayments().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           let pendingToPush: Payment[] = [];
@@ -231,9 +231,26 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         isSyncingFromCloud.current = false;
       },
+      onExpensesChange: (cloudExpenses) => {
+        if (!Array.isArray(cloudExpenses)) return;
+        isSyncingFromCloud.current = true;
+        try {
+          secureLocalStorage.setJSON('soma_expenses', cloudExpenses);
+        } catch {}
+        setExpenses(cloudExpenses);
+        isSyncingFromCloud.current = false;
+      },
+      onClosuresChange: (cloudClosures) => {
+        if (!Array.isArray(cloudClosures)) return;
+        isSyncingFromCloud.current = true;
+        try {
+          secureLocalStorage.setJSON('kalangest_cash_closures', cloudClosures);
+        } catch {}
+        setClosures(cloudClosures);
+        isSyncingFromCloud.current = false;
+      },
       onAttendanceChange: (cloudAttendance) => {
         if (!Array.isArray(cloudAttendance)) return;
-        if (cloudAttendance.length === 0 && storageService.getAttendanceRecords().length > 0) return;
         isSyncingFromCloud.current = true;
         try {
           secureLocalStorage.setJSON('somasikolo_attendance', cloudAttendance);
@@ -245,6 +262,21 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setSyncStatus(status);
         if (msg) setSyncStatusMessage(msg);
       }
+    });
+
+    // 2. Hydrate from permanent Cloud Firestore (or bootstrap Cloud if brand new school)
+    cloudSyncService.bootstrapCloudIfEmpty(cloudSchoolCode, {
+      settings: storageService.getSettings(),
+      users: storageService.getUsers(),
+      students: storageService.getStudents(),
+      classes: storageService.getClasses(),
+      subjects: storageService.getSubjects(),
+      teachers: storageService.getTeachers(),
+      grades: storageService.getGrades(),
+      payments: storageService.getPayments(),
+      expenses: storageService.getExpenses(),
+      cash_closures: storageService.getClosures(),
+      attendance: storageService.getAttendanceRecords()
     });
 
     // 3. Mobile device resume & online handler: automatically fetch fresh payments on wake up
@@ -289,15 +321,17 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (success) {
       setCloudSchoolCode(cleanCode);
-      // Auto bootstrap if empty
       cloudSyncService.bootstrapCloudIfEmpty(cleanCode, {
         settings,
+        users: storageService.getUsers(),
         students,
         classes,
         subjects,
         teachers,
         grades,
         payments,
+        expenses,
+        cash_closures: closures,
         attendance: attendanceRecords
       });
       return true;
@@ -311,12 +345,15 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSyncStatusMessage('Téléversement complet des données vers le Cloud...');
     const ok = await cloudSyncService.pushAllDataToCloud(cloudSchoolCode, {
       settings,
+      users: storageService.getUsers(),
       students,
       classes,
       subjects,
       teachers,
       grades,
       payments,
+      expenses,
+      cash_closures: closures,
       attendance: attendanceRecords
     });
     if (ok) {
@@ -504,6 +541,38 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     storageService.clearAllPayments();
     setPayments([]);
     cloudSyncService.clearCloudCollection('payments', cloudSchoolCode);
+  };
+
+  const handleSaveExpense = (expense: Expense): Expense => {
+    const saved = storageService.saveExpense(expense);
+    setExpenses(storageService.getExpenses());
+    cloudSyncService.syncExpense(saved, cloudSchoolCode);
+    return saved;
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    storageService.deleteExpense(expenseId);
+    setExpenses(storageService.getExpenses());
+    cloudSyncService.deleteExpense(expenseId, cloudSchoolCode);
+  };
+
+  const handleClearAllExpenses = () => {
+    storageService.clearAllExpenses();
+    setExpenses([]);
+    cloudSyncService.clearCloudCollection('expenses', cloudSchoolCode);
+  };
+
+  const handleSaveClosure = (closure: DailyCashClosure): DailyCashClosure => {
+    const saved = storageService.saveClosure(closure);
+    setClosures(storageService.getClosures());
+    cloudSyncService.syncClosure(saved, cloudSchoolCode);
+    return saved;
+  };
+
+  const handleDeleteClosure = (closureId: string) => {
+    storageService.deleteClosure(closureId);
+    setClosures(storageService.getClosures());
+    cloudSyncService.deleteClosure(closureId, cloudSchoolCode);
   };
 
   const forceSyncPayments = async (): Promise<boolean> => {
@@ -854,6 +923,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         teachers,
         grades,
         payments,
+        expenses,
+        closures,
         attendanceRecords,
         auditLogs,
         stats,
@@ -885,6 +956,11 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updatePayment: handleUpdatePayment,
         deletePayment: handleDeletePayment,
         deleteAllPayments: handleClearAllPayments,
+        saveExpense: handleSaveExpense,
+        deleteExpense: handleDeleteExpense,
+        clearAllExpenses: handleClearAllExpenses,
+        saveClosure: handleSaveClosure,
+        deleteClosure: handleDeleteClosure,
         saveAttendanceBatch: handleSaveAttendanceBatch,
         deleteAttendanceRecord: handleDeleteAttendanceRecord,
         deleteAllAttendanceRecords: handleClearAllAttendanceRecords,

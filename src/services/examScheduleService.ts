@@ -118,11 +118,13 @@ export class ExamScheduleService {
 
     // Supprimer aussi les créneaux associés
     const slots = this.getSlots();
+    const removedSlots = slots.filter(sl => sl.sessionId === sessionId);
     const remainingSlots = slots.filter(sl => sl.sessionId !== sessionId);
     secureLocalStorage.setJSON(SLOTS_STORAGE_KEY, remainingSlots);
 
     try {
       cloudSyncService.deleteCloudDoc('exam_sessions', sessionId);
+      removedSlots.forEach(sl => cloudSyncService.deleteCloudDoc('exam_slots', sl.id));
     } catch {}
 
     return true;
@@ -243,8 +245,12 @@ export class ExamScheduleService {
    */
   public static clearSlotsForClass(sessionId: string, classId: string): void {
     const slots = this.getSlots();
+    const toRemove = slots.filter(s => s.sessionId === sessionId && s.classId === classId);
     const filtered = slots.filter(s => !(s.sessionId === sessionId && s.classId === classId));
     secureLocalStorage.setJSON(SLOTS_STORAGE_KEY, filtered);
+    try {
+      toRemove.forEach(sl => cloudSyncService.deleteCloudDoc('exam_slots', sl.id));
+    } catch {}
   }
 
   /**

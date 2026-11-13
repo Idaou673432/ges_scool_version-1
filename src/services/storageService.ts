@@ -10,6 +10,8 @@ import {
   Teacher,
   EvaluationGrade,
   Payment,
+  Expense,
+  DailyCashClosure,
   SchoolSettings,
   User,
   AuditLog,
@@ -521,39 +523,31 @@ class StorageService {
 
   // --- SETTINGS ---
   public getSettings(): SchoolSettings {
-    const s = this.getItem(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
+    const raw = this.getItem(STORAGE_KEYS.SETTINGS, INITIAL_SETTINGS);
+    const s: SchoolSettings = {
+      ...INITIAL_SETTINGS,
+      ...raw,
+      evaluationMonths: {
+        ...DEFAULT_EVALUATION_MONTHS,
+        ...(raw?.evaluationMonths || {})
+      },
+      enabledFeatures: {
+        ...INITIAL_SETTINGS.enabledFeatures,
+        ...(raw?.enabledFeatures || {})
+      }
+    };
     let updated = false;
 
-    if (s.schoolName?.includes("Soundiata Keïta")) {
-      s.schoolName = "Établissement Scolaire";
+    if (!s.directorName) {
+      s.directorName = INITIAL_SETTINGS.directorName;
       updated = true;
     }
-    if (s.academyName?.includes("Bamako Rive Gauche")) {
-      s.academyName = "Académie d'Enseignement";
-      updated = true;
-    }
-    if (s.capName?.includes("Lafiabougou")) {
-      s.capName = "CAP";
-      updated = true;
-    }
-    if (s.email?.includes("soundiatakeita.edu.ml")) {
-      s.email = "contact@ecole.edu.ml";
-      updated = true;
-    }
-    if (!s.directorName || s.directorName === "Le Directeur") {
-      s.directorName = "Moh&IB";
-      updated = true;
-    }
-    if (!s.adminPassword || s.adminPassword === "00223") {
-      s.adminPassword = "0022390070321";
-      updated = true;
-    }
-    if (!s.evaluationMonths) {
-      s.evaluationMonths = { ...DEFAULT_EVALUATION_MONTHS };
+    if (!s.adminPassword) {
+      s.adminPassword = INITIAL_SETTINGS.adminPassword;
       updated = true;
     }
     if (!s.modulesSecurityPin) {
-      s.modulesSecurityPin = "0000";
+      s.modulesSecurityPin = INITIAL_SETTINGS.modulesSecurityPin;
       updated = true;
     }
 
@@ -711,6 +705,8 @@ class StorageService {
         nationality: student.nationality || 'Mali',
         address: student.address || 'Bamako',
         phone: student.phone,
+        photoUrl: student.photoUrl || undefined,
+        qrCodeUrl: student.qrCodeUrl,
         classId: student.classId || 'cls-1',
         status: student.status || 'ACTIF',
         academicYear: student.academicYear || '2025-2026',
@@ -721,7 +717,11 @@ class StorageService {
           motherName: '',
           motherPhone: ''
         },
-        observations: student.observations
+        observations: student.observations,
+        reductionPercent: student.reductionPercent,
+        bloodType: student.bloodType,
+        allergies: student.allergies,
+        emergencyContact: student.emergencyContact
       };
       students.unshift(savedStudent);
     }
@@ -856,6 +856,7 @@ class StorageService {
         gender: teacher.gender || 'M',
         phone: teacher.phone || '',
         email: teacher.email,
+        photoUrl: teacher.photoUrl || undefined,
         address: teacher.address || 'Bamako',
         diploma: teacher.diploma || 'Licence',
         specialty: teacher.specialty || 'Général',
@@ -1064,6 +1065,59 @@ class StorageService {
   public clearAllAttendanceRecords(): void {
     this.setItem(STORAGE_KEYS.ATTENDANCE, []);
     this.addAuditLog('SUPPRESSION_TOUTES_PRESENCES', 'ATTENDANCE', 'Suppression de TOUTES les fiches de présence');
+  }
+
+  // --- EXPENSES ---
+  public getExpenses(): Expense[] {
+    return this.getItem<Expense[]>('soma_expenses', []);
+  }
+
+  public saveExpense(expense: Expense): Expense {
+    const existing = this.getExpenses();
+    const idx = existing.findIndex(e => e.id === expense.id);
+    if (idx >= 0) {
+      existing[idx] = expense;
+    } else {
+      existing.unshift(expense);
+    }
+    this.setItem('soma_expenses', existing);
+    this.addAuditLog('DEPENSE_CAISSE', 'CAISSE', `Dépense ${expense.reference} - ${expense.amount} FCFA (${expense.description})`);
+    return expense;
+  }
+
+  public deleteExpense(id: string): void {
+    const updated = this.getExpenses().filter(e => e.id !== id);
+    this.setItem('soma_expenses', updated);
+    this.addAuditLog('SUPPRESSION_DEPENSE', 'CAISSE', `Suppression dépense ID: ${id}`);
+  }
+
+  public clearAllExpenses(): void {
+    this.setItem('soma_expenses', []);
+    this.addAuditLog('SUPPRESSION_TOUTES_DEPENSES', 'CAISSE', 'Suppression de TOUTES les dépenses');
+  }
+
+  // --- CASH CLOSURES ---
+  public getClosures(): DailyCashClosure[] {
+    return this.getItem<DailyCashClosure[]>('kalangest_cash_closures', []);
+  }
+
+  public saveClosure(closure: DailyCashClosure): DailyCashClosure {
+    const existing = this.getClosures();
+    const idx = existing.findIndex(c => c.id === closure.id);
+    if (idx >= 0) {
+      existing[idx] = closure;
+    } else {
+      existing.unshift(closure);
+    }
+    this.setItem('kalangest_cash_closures', existing);
+    this.addAuditLog('CLOTURE_CAISSE', 'CAISSE', `Clôture PV ${closure.reference} (${closure.date})`);
+    return closure;
+  }
+
+  public deleteClosure(id: string): void {
+    const updated = this.getClosures().filter(c => c.id !== id);
+    this.setItem('kalangest_cash_closures', updated);
+    this.addAuditLog('SUPPRESSION_CLOTURE', 'CAISSE', `Suppression clôture ID: ${id}`);
   }
 
   // --- AUDIT LOGS ---

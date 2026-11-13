@@ -10,12 +10,16 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = Number(process.env.APP_PORT) || 3000;
-const DATA_DIR = path.join(__dirname, 'data', 'schools');
+const DATA_DIR = process.env.KALANGEST_DATA_DIR || process.env.DATA_DIR || path.join(__dirname, 'data', 'schools');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 
-// Ensure persistent storage directory exists
+// Ensure persistent storage and backup directories exist
 try {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
   }
 } catch (e) {
   console.warn('[Server] Could not create data directory, using in-memory store:', e);
@@ -91,7 +95,9 @@ function sanitizePayload<T>(obj: T): T {
 
 // In-memory cache + active SSE clients per school code
 interface SchoolStore {
+  isSeed?: boolean;
   settings?: any;
+  users?: any[];
   students?: any[];
   classes?: any[];
   subjects?: any[];
@@ -100,8 +106,10 @@ interface SchoolStore {
   payments?: any[];
   attendance?: any[];
   expenses?: any[];
+  cash_closures?: any[];
   exam_sessions?: any[];
   exam_slots?: any[];
+  audit_logs?: any[];
   updatedAt?: string;
 }
 
@@ -135,6 +143,22 @@ function hasMeaningfulData(store: any): boolean {
   return Boolean(hasStudents || hasClasses || hasSettings);
 }
 
+function writeStoreToDisk(cleanCode: string, data: SchoolStore): void {
+  try {
+    const filePath = getFilePath(cleanCode);
+    const tempFile = `${filePath}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempFile, filePath);
+  } catch (e) {
+    try {
+      const filePath = getFilePath(cleanCode);
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn(`[Server] Could not persist data for ${cleanCode} to disk:`, err);
+    }
+  }
+}
+
 function loadSchoolData(code: string): SchoolStore {
   const cleanCode = sanitizeCode(code);
   if (memoryStores.has(cleanCode)) {
@@ -150,6 +174,10 @@ function loadSchoolData(code: string): SchoolStore {
       const content = fs.readFileSync(filePath, 'utf-8');
       const parsed = JSON.parse(content);
       if (hasMeaningfulData(parsed)) {
+        // If file has no updatedAt (legacy shipped seed template), treat it as seed until real mutation arrives
+        if (parsed.isSeed === undefined) {
+          parsed.isSeed = !parsed.updatedAt;
+        }
         memoryStores.set(cleanCode, parsed);
         return parsed;
       }
@@ -158,36 +186,49 @@ function loadSchoolData(code: string): SchoolStore {
     }
   }
 
-  // Auto-initialize with official reference school store if empty or not existing
+  // Auto-initialize with official reference school store marked strictly as default seed
   const defaultStore = createDefaultSchoolStore() as SchoolStore;
+  defaultStore.isSeed = true;
   if (cleanCode !== 'ECOLE-PRINCIPALE') {
     defaultStore.settings = {
       ...defaultStore.settings,
       schoolName: `Établissement [${cleanCode}]`
     };
   }
-  saveSchoolData(cleanCode, defaultStore);
+  memoryStores.set(cleanCode, defaultStore);
+  writeStoreToDisk(cleanCode, defaultStore);
   return defaultStore;
+}
+
+function backupExistingSchoolFile(cleanCode: string): void {
+  try {
+    const filePath = getFilePath(cleanCode);
+    if (!fs.existsSync(filePath)) return;
+    if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const snapName = `${cleanCode}.${Date.now()}.bak.json`;
+    fs.copyFileSync(filePath, path.join(BACKUP_DIR, snapName));
+    // Keep only the 5 most recent backups per school
+    const prefix = `${cleanCode}.`;
+    const backups = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.startsWith(prefix) && f.endsWith('.bak.json'))
+      .sort()
+      .reverse();
+    backups.slice(5).forEach(oldFile => {
+      try {
+        fs.unlinkSync(path.join(BACKUP_DIR, oldFile));
+      } catch {}
+    });
+  } catch (e) {
+    console.warn(`[Server] Backup notice for ${cleanCode}:`, e);
+  }
 }
 
 function saveSchoolData(code: string, data: SchoolStore): void {
   const cleanCode = sanitizeCode(code);
+  data.isSeed = false;
   data.updatedAt = new Date().toISOString();
   memoryStores.set(cleanCode, data);
-
-  try {
-    const filePath = getFilePath(cleanCode);
-    const tempFile = `${filePath}.tmp.${Date.now()}`;
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
-    fs.renameSync(tempFile, filePath);
-  } catch (e) {
-    try {
-      const filePath = getFilePath(cleanCode);
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-    } catch (err) {
-      console.warn(`[Server] Could not persist data for ${cleanCode} to disk:`, err);
-    }
-  }
+  writeStoreToDisk(cleanCode, data);
 }
 
 function broadcastToSchool(code: string, eventType: string, payload: any, senderId?: string): void {
@@ -260,6 +301,7 @@ const ALLOWED_MUTATIONS = new Set<string>([
 ]);
 
 const ALLOWED_COLLECTIONS = new Set<string>([
+  'users',
   'students',
   'classes',
   'subjects',
@@ -268,37 +310,41 @@ const ALLOWED_COLLECTIONS = new Set<string>([
   'payments',
   'attendance',
   'expenses',
+  'cash_closures',
   'exam_sessions',
-  'exam_slots'
+  'exam_slots',
+  'audit_logs'
 ]);
 
-// 3. Bootstrap cloud/server store if empty with initial client data
+// 3. Bootstrap cloud/server store ONLY if empty or still on factory seed (never overwrite real persisted data!)
 app.post('/api/sync/bootstrap', (req: Request, res: Response) => {
   try {
     const { schoolCode, seedData: rawSeed } = req.body;
     const cleanCode = sanitizeCode(schoolCode);
     const current = loadSchoolData(cleanCode);
 
-    const hasData = hasMeaningfulData(current);
+    const hasRealPersistedData = hasMeaningfulData(current) && current.isSeed !== true;
 
-    if (!hasData && rawSeed && typeof rawSeed === 'object') {
+    if (!hasRealPersistedData && rawSeed && typeof rawSeed === 'object') {
       const seedData = sanitizePayload(rawSeed);
       saveSchoolData(cleanCode, {
         settings: seedData.settings || current.settings || null,
-        students: Array.isArray(seedData.students) && seedData.students.length > 0 ? seedData.students : (current.students || []),
-        classes: Array.isArray(seedData.classes) && seedData.classes.length > 0 ? seedData.classes : (current.classes || []),
-        subjects: Array.isArray(seedData.subjects) && seedData.subjects.length > 0 ? seedData.subjects : (current.subjects || []),
-        teachers: Array.isArray(seedData.teachers) && seedData.teachers.length > 0 ? seedData.teachers : (current.teachers || []),
-        grades: Array.isArray(seedData.grades) && seedData.grades.length > 0 ? seedData.grades : (current.grades || []),
-        payments: Array.isArray(seedData.payments) && seedData.payments.length > 0 ? seedData.payments : (current.payments || []),
-        attendance: Array.isArray(seedData.attendance) && seedData.attendance.length > 0 ? seedData.attendance : (current.attendance || []),
+        users: Array.isArray(seedData.users) ? seedData.users : (current.users || []),
+        students: Array.isArray(seedData.students) ? seedData.students : (current.students || []),
+        classes: Array.isArray(seedData.classes) ? seedData.classes : (current.classes || []),
+        subjects: Array.isArray(seedData.subjects) ? seedData.subjects : (current.subjects || []),
+        teachers: Array.isArray(seedData.teachers) ? seedData.teachers : (current.teachers || []),
+        grades: Array.isArray(seedData.grades) ? seedData.grades : (current.grades || []),
+        payments: Array.isArray(seedData.payments) ? seedData.payments : (current.payments || []),
+        attendance: Array.isArray(seedData.attendance) ? seedData.attendance : (current.attendance || []),
         expenses: Array.isArray(seedData.expenses) ? seedData.expenses : (current.expenses || []),
+        cash_closures: Array.isArray(seedData.cash_closures) ? seedData.cash_closures : (current.cash_closures || []),
         exam_sessions: Array.isArray(seedData.exam_sessions) ? seedData.exam_sessions : (current.exam_sessions || []),
         exam_slots: Array.isArray(seedData.exam_slots) ? seedData.exam_slots : (current.exam_slots || []),
-        updatedAt: new Date().toISOString()
+        audit_logs: Array.isArray(seedData.audit_logs) ? seedData.audit_logs : (current.audit_logs || [])
       });
       broadcastToSchool(cleanCode, 'state_reset', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) });
-      return res.json({ success: true, bootstrapped: true });
+      return res.json({ success: true, bootstrapped: true, currentStore: loadSchoolData(cleanCode) });
     }
 
     return res.json({ success: true, bootstrapped: false, currentStore: current });
@@ -320,9 +366,13 @@ app.post('/api/sync/push', (req: Request, res: Response) => {
 
     const data = sanitizePayload(rawData);
     const current = loadSchoolData(cleanCode);
+    if (hasMeaningfulData(current) && current.isSeed !== true) {
+      backupExistingSchoolFile(cleanCode);
+    }
 
     saveSchoolData(cleanCode, {
       settings: data.settings || current.settings || null,
+      users: Array.isArray(data.users) ? data.users : (current.users || []),
       students: Array.isArray(data.students) ? data.students : (current.students || []),
       classes: Array.isArray(data.classes) ? data.classes : (current.classes || []),
       subjects: Array.isArray(data.subjects) ? data.subjects : (current.subjects || []),
@@ -331,9 +381,10 @@ app.post('/api/sync/push', (req: Request, res: Response) => {
       payments: Array.isArray(data.payments) ? data.payments : (current.payments || []),
       attendance: Array.isArray(data.attendance) ? data.attendance : (current.attendance || []),
       expenses: Array.isArray(data.expenses) ? data.expenses : (current.expenses || []),
+      cash_closures: Array.isArray(data.cash_closures) ? data.cash_closures : (current.cash_closures || []),
       exam_sessions: Array.isArray(data.exam_sessions) ? data.exam_sessions : (current.exam_sessions || []),
       exam_slots: Array.isArray(data.exam_slots) ? data.exam_slots : (current.exam_slots || []),
-      updatedAt: new Date().toISOString()
+      audit_logs: Array.isArray(data.audit_logs) ? data.audit_logs : (current.audit_logs || [])
     });
 
     broadcastToSchool(cleanCode, 'state_updated', { schoolCode: cleanCode, store: loadSchoolData(cleanCode) }, senderId);

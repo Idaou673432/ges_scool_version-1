@@ -54,6 +54,7 @@ import { MenOfficialStatsModal } from '../../components/students/MenOfficialStat
 import { StudentProfileView } from '../../components/students/StudentProfileView';
 import { HorizontalReceiptModal } from '../../components/receipts/HorizontalReceiptModal';
 import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation } from '../../constants/maliEducation';
+import { compressImageToDataUrl } from '../../utils/imageCompression';
 
 const AVATAR_GRADIENTS = [
   'from-[#0ea5e9] to-[#1d4ed8]',
@@ -228,15 +229,21 @@ export const StudentsModule: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedDataUrl = await compressImageToDataUrl(file, {
+          maxWidth: 400,
+          maxHeight: 400,
+          quality: 0.82
+        });
+        setFormData(prev => ({ ...prev, photoUrl: compressedDataUrl }));
+      } catch {
+        // Fallback ignoré si lecture impossible
+      }
     }
+    e.target.value = '';
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1171,10 +1178,21 @@ export const StudentsModule: React.FC = () => {
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-slate-500 block">
-                    Photo d'Identité (Optionnelle)
-                  </label>
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-[11px] font-bold uppercase text-slate-500 block">
+                      Photo d'Identité (Optionnelle)
+                    </label>
+                    {formData.photoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}
+                        className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                      >
+                        Retirer
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="file"
                     accept="image/*"

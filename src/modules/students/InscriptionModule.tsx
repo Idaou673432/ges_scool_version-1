@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { Student, Gender, SchoolLevelCategory } from '../../types';
+import { compressImageToDataUrl } from '../../utils/imageCompression';
 
 interface InscriptionModuleProps {
   onNavigateToStudents?: () => void;
@@ -149,27 +150,35 @@ export const InscriptionModule: React.FC<InscriptionModuleProps> = ({ onNavigate
     setFormData(prev => ({ ...prev, birthDate: `${targetYear}-${month}-${day}` }));
   };
 
-  const processPhotoFile = (file: File) => {
+  const processPhotoFile = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setValidationError('Format non pris en charge. Veuillez choisir une image JPG ou PNG.');
+      setValidationError('Format non pris en charge. Veuillez choisir une image JPG, PNG ou WEBP.');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setValidationError('La photo dépasse 2 Mo. Veuillez choisir un fichier plus léger.');
+    if (file.size > 10 * 1024 * 1024) {
+      setValidationError('La photo dépasse 10 Mo. Veuillez choisir un fichier plus léger.');
       return;
     }
 
     setValidationError(null);
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedDataUrl = await compressImageToDataUrl(file, {
+        maxWidth: 400,
+        maxHeight: 400,
+        quality: 0.82
+      });
+      setFormData(prev => ({ ...prev, photoUrl: compressedDataUrl }));
+    } catch {
+      setValidationError('Impossible de traiter cette image. Veuillez réessayer avec un autre fichier.');
+    }
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processPhotoFile(file);
+    if (file) {
+      processPhotoFile(file);
+    }
+    e.target.value = '';
   };
 
   const handlePhotoDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -311,7 +320,15 @@ export const InscriptionModule: React.FC<InscriptionModuleProps> = ({ onNavigate
           className="bg-emerald-50/90 border border-emerald-200 rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            {enrolledStudent.photoUrl ? (
+              <img
+                src={enrolledStudent.photoUrl}
+                alt={`${enrolledStudent.firstName} ${enrolledStudent.lastName}`}
+                className="w-10 h-10 rounded-lg object-cover border border-emerald-300 shrink-0"
+              />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            )}
             <div className="text-xs sm:text-sm text-emerald-950 min-w-0">
               <p className="font-bold truncate">
                 {enrolledStudent.lastName} {enrolledStudent.firstName} inscrit(e)
@@ -921,9 +938,22 @@ export const InscriptionModule: React.FC<InscriptionModuleProps> = ({ onNavigate
               <ul className="space-y-2">
                 {recentEnrolled.map(item => (
                   <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="font-medium text-slate-800 truncate">
-                      {item.lastName} {item.firstName}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {item.photoUrl ? (
+                        <img
+                          src={item.photoUrl}
+                          alt={`${item.firstName} ${item.lastName}`}
+                          className="w-6 h-6 rounded-md object-cover border border-slate-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-md bg-slate-100 text-slate-500 font-bold text-[10px] flex items-center justify-center shrink-0">
+                          {(item.firstName?.[0] || '') + (item.lastName?.[0] || '')}
+                        </div>
+                      )}
+                      <span className="font-medium text-slate-800 truncate">
+                        {item.lastName} {item.firstName}
+                      </span>
+                    </div>
                     <span className="font-mono text-slate-500 tabular-nums shrink-0">
                       {item.matricule}
                     </span>

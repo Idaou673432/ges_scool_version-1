@@ -1,14 +1,105 @@
 {
   "entities": {
     "School": {
-      "fields": {
-        "id": { "type": "string" },
+      "title": "School",
+      "description": "Directory entry for a registered school",
+      "type": "object",
+      "properties": {
         "schoolCode": { "type": "string" },
-        "name": { "type": "string" },
+        "schoolName": { "type": "string" },
         "pinCode": { "type": "string" },
-        "createdAt": { "type": "string" },
+        "lastSyncAt": { "type": "string" },
         "updatedAt": { "type": "string" }
-      }
+      },
+      "required": ["schoolCode", "schoolName"]
+    },
+    "SchoolSettings": {
+      "title": "SchoolSettings",
+      "description": "School configuration and academic preferences",
+      "type": "object",
+      "properties": {
+        "schoolName": { "type": "string" },
+        "schoolType": { "type": "string" },
+        "schoolCategory": { "type": "string" },
+        "currentAcademicYear": { "type": "string" },
+        "adminPassword": { "type": "string" }
+      },
+      "required": ["schoolName"]
+    },
+    "GenericRecord": {
+      "title": "GenericRecord",
+      "description": "Persisted school domain record (student, class, subject, teacher, grade, payment, expense, attendance, closure, user, exam session/slot)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" }
+      },
+      "required": ["id"]
+    }
+  },
+  "firestore": {
+    "/school_directory/{schoolCode}": {
+      "schema": { "$ref": "#/entities/School" },
+      "description": "Registered school directory metadata"
+    },
+    "/schools/{schoolCode}/settings/config": {
+      "schema": { "$ref": "#/entities/SchoolSettings" },
+      "description": "School configuration document"
+    },
+    "/schools/{schoolCode}/users/{userId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "School staff user profiles and access credentials"
+    },
+    "/schools/{schoolCode}/students/{studentId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Student records"
+    },
+    "/schools/{schoolCode}/classes/{classId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Class records"
+    },
+    "/schools/{schoolCode}/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Curriculum subjects"
+    },
+    "/schools/{schoolCode}/teachers/{teacherId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Teacher records"
+    },
+    "/schools/{schoolCode}/grades/{gradeId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Student evaluation grades"
+    },
+    "/schools/{schoolCode}/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Tuition and fee payment receipts"
+    },
+    "/schools/{schoolCode}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "School cash expenses"
+    },
+    "/schools/{schoolCode}/cash_closures/{closureId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Daily cash register closures"
+    },
+    "/schools/{schoolCode}/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Daily attendance records"
+    },
+    "/schools/{schoolCode}/exam_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Exam schedule sessions"
+    },
+    "/schools/{schoolCode}/exam_slots/{slotId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Exam schedule slots"
+    },
+    "/schools/{schoolCode}/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "School audit trail logs"
+    },
+    "/scan_history/{docId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Global QR scan history entries"
     }
   }
 }

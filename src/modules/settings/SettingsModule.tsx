@@ -15,6 +15,7 @@ import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel, MALI_DEFAULT_C
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
 import { SchoolEnabledFeatures, SchoolCategory, User, UserRole, Subject } from '../../types';
 import { secureLocalStorage } from '../../services/secureStorage';
+import { compressImageToDataUrl } from '../../utils/imageCompression';
 import { AuthService } from '../../services/authService';
 
 const MONTH_OPTIONS = [
@@ -484,39 +485,47 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image trop lourde. Veuillez choisir une image de moins de 2 Mo.');
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image trop lourde. Veuillez choisir une image de moins de 5 Mo.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const base64 = evt.target?.result as string;
-        if (base64) {
-          setFormData(prev => ({ ...prev, logoUrl: base64 }));
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageToDataUrl(file, {
+          maxWidth: 360,
+          maxHeight: 360,
+          quality: 0.85,
+          preserveTransparency: true
+        });
+        setFormData(prev => ({ ...prev, logoUrl: compressed }));
+      } catch {
+        alert('Impossible de lire le fichier image.');
+      }
     }
   };
 
-  const handleStampUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStampUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert('Image trop lourde. Veuillez choisir une image de moins de 2 Mo.');
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image trop lourde. Veuillez choisir une image de moins de 5 Mo.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const base64 = evt.target?.result as string;
-        if (base64) {
-          setFormData(prev => ({ ...prev, stampUrl: base64 }));
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressed = await compressImageToDataUrl(file, {
+          maxWidth: 360,
+          maxHeight: 360,
+          quality: 0.85,
+          preserveTransparency: true
+        });
+        setFormData(prev => ({ ...prev, stampUrl: compressed }));
+      } catch {
+        alert('Impossible de lire le fichier image.');
+      }
     }
   };
 

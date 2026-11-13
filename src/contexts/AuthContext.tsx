@@ -7,6 +7,7 @@ import { User, UserRole } from '../types';
 import { storageService } from '../services/storageService';
 import { AuthService } from '../services/authService';
 import { secureLocalStorage } from '../services/secureStorage';
+import { cloudSyncService } from '../services/cloudSyncService';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -41,6 +42,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     storageService.initDatabase();
     reloadUsers();
+
+    const handleRemoteUsersUpdate = () => {
+      reloadUsers();
+    };
+    window.addEventListener('somasikolo_users_updated', handleRemoteUsersUpdate);
+    return () => {
+      window.removeEventListener('somasikolo_users_updated', handleRemoteUsersUpdate);
+    };
   }, []);
 
   const loginAsUser = (userId: string) => {
@@ -75,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser && currentUser.id === saved.id) {
       setCurrentUser(saved);
     }
+    cloudSyncService.syncDoc('users', saved);
     return saved;
   };
 
@@ -84,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     const res = storageService.deleteUser(userId);
     if (res) {
+      cloudSyncService.deleteCloudDoc('users', userId);
       const updatedUsers = storageService.getUsers();
       setUsers(updatedUsers);
       if (currentUser && currentUser.id === userId) {

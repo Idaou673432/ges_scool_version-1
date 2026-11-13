@@ -29,6 +29,22 @@ export const ExamScheduleModule: React.FC = () => {
     selectedSessionId ? ExamScheduleService.getSlotsForSession(selectedSessionId) : []
   );
 
+  useEffect(() => {
+    const handleExamCloudSync = () => {
+      const freshSessions = ExamScheduleService.getSessions(settings.currentAcademicYear);
+      setSessions(freshSessions);
+      const targetSession = selectedSessionId || freshSessions[0]?.id || '';
+      if (!selectedSessionId && targetSession) {
+        setSelectedSessionId(targetSession);
+      }
+      if (targetSession) {
+        setSlots(ExamScheduleService.getSlotsForSession(targetSession));
+      }
+    };
+    window.addEventListener('soma_exam_updated', handleExamCloudSync);
+    return () => window.removeEventListener('soma_exam_updated', handleExamCloudSync);
+  }, [selectedSessionId, settings.currentAcademicYear]);
+
   const activeSession = useMemo(() => {
     return sessions.find(s => s.id === selectedSessionId) || sessions[0];
   }, [sessions, selectedSessionId]);

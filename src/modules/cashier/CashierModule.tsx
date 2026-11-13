@@ -38,56 +38,22 @@ import { ReceiptVerificationModal } from '../../components/receipts/ReceiptVerif
 import { HorizontalReceiptModal } from '../../components/receipts/HorizontalReceiptModal';
 
 export const CashierModule: React.FC = () => {
-  const { payments, settings, cloudSchoolCode } = useSchool();
+  const {
+    payments,
+    expenses,
+    closures,
+    saveExpense,
+    deleteExpense,
+    clearAllExpenses,
+    saveClosure,
+    settings
+  } = useSchool();
 
   // Navigation interne simple de la caisse
   const [cashTab, setCashTab] = useState<'RECEIPTS' | 'EXPENSES' | 'CLOSURES'>('RECEIPTS');
 
   // Recherche dans le journal des reçus
   const [searchReceipts, setSearchReceipts] = useState('');
-
-  // Gestion des dépenses
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    try {
-      return secureLocalStorage.getJSON<Expense[]>('soma_expenses', [
-        {
-          id: 'exp-1',
-          reference: 'DEP-2025-001',
-          category: 'SALAIRE',
-          description: 'Acompte Salaire Enseignants Vacataires - Octobre',
-          amount: 450000,
-          expenseDate: '2025-10-15',
-          beneficiary: 'Corps Professoral Mandaté',
-          paymentMethod: 'ESPECES',
-          approvedBy: 'Le Directeur Général'
-        },
-        {
-          id: 'exp-2',
-          reference: 'DEP-2025-002',
-          category: 'ELECTRICITE_EAU',
-          description: 'Facture Électricité EDM-SA & Eau SOMAGEP',
-          amount: 85000,
-          expenseDate: '2025-10-18',
-          beneficiary: 'EDM-SA / SOMAGEP',
-          paymentMethod: 'ORANGE_MONEY',
-          approvedBy: 'Service Comptabilité'
-        },
-        {
-          id: 'exp-3',
-          reference: 'DEP-2025-003',
-          category: 'FOURNITURES',
-          description: 'Achat de rames de papier, craies blanches & registres',
-          amount: 125000,
-          expenseDate: '2025-10-22',
-          beneficiary: 'Librairie Papeterie du Fleuve',
-          paymentMethod: 'ESPECES',
-          approvedBy: 'Le Directeur Général'
-        }
-      ]);
-    } catch {
-      return [];
-    }
-  });
 
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseFormData, setExpenseFormData] = useState<{
@@ -111,14 +77,6 @@ export const CashierModule: React.FC = () => {
   const [expenseToDeleteModal, setExpenseToDeleteModal] = useState<Expense | null>(null);
   const [showDeleteAllExpensesModal, setShowDeleteAllExpensesModal] = useState(false);
 
-  // Clôtures journalières de caisse
-  const [closures, setClosures] = useState<DailyCashClosure[]>(() => {
-    try {
-      return secureLocalStorage.getJSON<DailyCashClosure[]>('kalangest_cash_closures', []);
-    } catch {
-      return [];
-    }
-  });
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
 
   // Modals de visualisation & quittance
@@ -185,10 +143,7 @@ export const CashierModule: React.FC = () => {
       approvedBy: expenseFormData.approvedBy || 'Direction'
     };
 
-    const updated = [newExpense, ...expenses];
-    setExpenses(updated);
-    secureLocalStorage.setJSON('soma_expenses', updated);
-    cloudSyncService.syncExpense(newExpense, cloudSchoolCode);
+    saveExpense(newExpense);
     setIsExpenseModalOpen(false);
     setExpenseFormData({
       category: 'SALAIRE',
@@ -206,10 +161,7 @@ export const CashierModule: React.FC = () => {
   // Suppression d'une dépense
   const handleDeleteExpenseConfirm = () => {
     if (expenseToDeleteModal) {
-      const updated = expenses.filter(e => e.id !== expenseToDeleteModal.id);
-      setExpenses(updated);
-      secureLocalStorage.setJSON('soma_expenses', updated);
-      cloudSyncService.deleteExpense(expenseToDeleteModal.id, cloudSchoolCode);
+      deleteExpense(expenseToDeleteModal.id);
       setExpenseToDeleteModal(null);
       setToastMessage('Dépense supprimée avec succès. Le solde de la caisse a été mis à jour.');
       setTimeout(() => setToastMessage(null), 3000);
@@ -218,20 +170,14 @@ export const CashierModule: React.FC = () => {
 
   // Suppression de toutes les dépenses
   const handleDeleteAllExpensesConfirm = () => {
-    expenses.forEach(e => {
-      cloudSyncService.deleteExpense(e.id, cloudSchoolCode);
-    });
-    setExpenses([]);
-    secureLocalStorage.setJSON('soma_expenses', []);
+    clearAllExpenses();
     setShowDeleteAllExpensesModal(false);
     setToastMessage('Toutes les dépenses ont été supprimées. Le solde de la caisse a été recalculé.');
     setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleSaveClosure = (newClosure: DailyCashClosure) => {
-    const updated = [newClosure, ...closures];
-    setClosures(updated);
-    secureLocalStorage.setJSON('kalangest_cash_closures', updated);
+    saveClosure(newClosure);
     setToastMessage(`Procès-Verbal N° ${newClosure.reference} enregistré.`);
     setTimeout(() => setToastMessage(null), 3500);
   };

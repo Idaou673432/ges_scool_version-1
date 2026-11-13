@@ -1,21 +1,20 @@
 /**
  * SomaSikolo / KalanGest - Real-time Multi-tenant Multi-Device Synchronization Service
- * Enables seamless instant synchronization across all devices (PC, mobile, tablet)
- * using Server-Sent Events (SSE), HTTP Sync Engine, BroadcastChannel, and Cloud Firestore.
+ * Permanent persistence backed by Cloud Firestore, Server JSON Store + SSE, BroadcastChannel, and Encrypted LocalStorage.
  */
 
 import {
   collection,
   doc,
   setDoc,
-  getDoc,
+  getDocFromServer,
   deleteDoc,
   onSnapshot,
   getDocs,
   writeBatch,
   Unsubscribe
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, handleFirestoreError, OperationType } from './firebase';
 import {
   Student,
   SchoolClass,
@@ -24,9 +23,13 @@ import {
   EvaluationGrade,
   Payment,
   Expense,
+  DailyCashClosure,
   SchoolSettings,
+  User,
   AuditLog,
-  AttendanceRecord
+  AttendanceRecord,
+  ExamSession,
+  ExamSlot
 } from '../types';
 import { secureLocalStorage } from './secureStorage';
 import { getPublicBaseUrl } from './urlService';
@@ -56,8 +59,25 @@ export function cleanForFirestore<T>(data: T): any {
   return cleanObj;
 }
 
+export interface FullSchoolSeedPayload {
+  settings: SchoolSettings;
+  users?: User[];
+  students: Student[];
+  classes: SchoolClass[];
+  subjects: Subject[];
+  teachers: Teacher[];
+  grades: EvaluationGrade[];
+  payments: Payment[];
+  attendance: AttendanceRecord[];
+  expenses?: Expense[];
+  cash_closures?: DailyCashClosure[];
+  exam_sessions?: ExamSession[];
+  exam_slots?: ExamSlot[];
+}
+
 export interface CloudSyncListeners {
   onSettingsChange?: (settings: SchoolSettings) => void;
+  onUsersChange?: (users: User[]) => void;
   onStudentsChange?: (students: Student[]) => void;
   onClassesChange?: (classes: SchoolClass[]) => void;
   onSubjectsChange?: (subjects: Subject[]) => void;
@@ -65,13 +85,16 @@ export interface CloudSyncListeners {
   onGradesChange?: (grades: EvaluationGrade[]) => void;
   onPaymentsChange?: (payments: Payment[]) => void;
   onExpensesChange?: (expenses: Expense[]) => void;
+  onClosuresChange?: (closures: DailyCashClosure[]) => void;
   onAttendanceChange?: (attendance: AttendanceRecord[]) => void;
+  onExamSessionsChange?: (sessions: ExamSession[]) => void;
+  onExamSlotsChange?: (slots: ExamSlot[]) => void;
   onAuditLogsChange?: (logs: AuditLog[]) => void;
   onSyncStatusChange?: (status: 'CONNECTED' | 'SYNCING' | 'OFFLINE' | 'ERROR', msg?: string) => void;
 }
 
-// Generate unique device/tab id to filter out self-echoes
 const DEVICE_CLIENT_ID = 'dev_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+const USER_DATA_FLAG_PREFIX = 'kalangest_has_user_data_';
 
 class CloudSyncService {
   private activeSchoolCode: string = '';
@@ -80,7 +103,8 @@ class CloudSyncService {
   private broadcastChannel: BroadcastChannel | null = null;
   private currentListeners: CloudSyncListeners | null = null;
   private isOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
-  private sseReconnectTimeout: any = null;
+  private sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private firestoreHydratedCode: string | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -92,6 +116,22 @@ class CloudSyncService {
         this.isOnline = false;
         this.currentListeners?.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne local');
       });
+    }
+  }
+
+  public markHasUserData(schoolCode?: string): void {
+    const code = schoolCode || this.getActiveSchoolCode();
+    try {
+      secureLocalStorage.setItem(`${USER_DATA_FLAG_PREFIX}${code}`, 'true');
+    } catch {}
+  }
+
+  public hasLocalUserData(schoolCode?: string): boolean {
+    const code = schoolCode || this.getActiveSchoolCode();
+    try {
+      return secureLocalStorage.getItem(`${USER_DATA_FLAG_PREFIX}${code}`) === 'true';
+    } catch {
+      return false;
     }
   }
 
@@ -108,7 +148,7 @@ class CloudSyncService {
             return clean;
           }
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -151,7 +191,6 @@ class CloudSyncService {
 
       this.setActiveSchoolCode(cleanCode);
 
-      // Register with Server Sync
       try {
         await fetch('/api/sync/mutate', {
           method: 'POST',
@@ -165,7 +204,6 @@ class CloudSyncService {
         });
       } catch {}
 
-      // Try Firestore directory in parallel
       try {
         const schoolRef = doc(db, 'school_directory', cleanCode);
         await setDoc(schoolRef, {
@@ -176,7 +214,7 @@ class CloudSyncService {
           updatedAt: new Date().toISOString()
         }, { merge: true });
       } catch (e) {
-        // Firestore permission notice, handled gracefully
+        handleFirestoreError(e, OperationType.WRITE, `school_directory/${cleanCode}`);
       }
 
       return true;
@@ -187,52 +225,204 @@ class CloudSyncService {
   }
 
   /**
-   * Check if server/cloud database has data for this school; if empty, initialize with local seed.
+   * Commit array of Firestore write operations safely in chunks of max 350 ops (below Firestore's 500-op batch cap)
+   */
+  private async commitInChunks(
+    operations: Array<{ ref: ReturnType<typeof doc>; data: any }>
+  ): Promise<void> {
+    const CHUNK_SIZE = 350;
+    for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+      const slice = operations.slice(i, i + CHUNK_SIZE);
+      const batch = writeBatch(db);
+      for (const op of slice) {
+        batch.set(op.ref, op.data, { merge: true });
+      }
+      await batch.commit();
+    }
+  }
+
+  /**
+   * Fetch all permanent data from Cloud Firestore for the given school.
+   * Explicitly separates FOUND, EMPTY, and ERROR so a read error never triggers an accidental factory-seed overwrite.
+   */
+  private async fetchAllFromFirestore(
+    code: string
+  ): Promise<
+    | { status: 'FOUND'; data: Partial<FullSchoolSeedPayload> }
+    | { status: 'EMPTY' }
+    | { status: 'ERROR' }
+  > {
+    try {
+      const settingsSnap = await getDocFromServer(doc(db, `schools/${code}/settings`, 'config'));
+
+      const [
+        usersSnap,
+        studentsSnap,
+        classesSnap,
+        subjectsSnap,
+        teachersSnap,
+        gradesSnap,
+        paymentsSnap,
+        expensesSnap,
+        closuresSnap,
+        attendanceSnap,
+        examSessionsSnap,
+        examSlotsSnap
+      ] = await Promise.all([
+        getDocs(collection(db, `schools/${code}/users`)),
+        getDocs(collection(db, `schools/${code}/students`)),
+        getDocs(collection(db, `schools/${code}/classes`)),
+        getDocs(collection(db, `schools/${code}/subjects`)),
+        getDocs(collection(db, `schools/${code}/teachers`)),
+        getDocs(collection(db, `schools/${code}/grades`)),
+        getDocs(collection(db, `schools/${code}/payments`)),
+        getDocs(collection(db, `schools/${code}/expenses`)),
+        getDocs(collection(db, `schools/${code}/cash_closures`)),
+        getDocs(collection(db, `schools/${code}/attendance`)),
+        getDocs(collection(db, `schools/${code}/exam_sessions`)),
+        getDocs(collection(db, `schools/${code}/exam_slots`))
+      ]);
+
+      const hasAnyCloudDocs =
+        settingsSnap.exists() ||
+        !usersSnap.empty ||
+        !studentsSnap.empty ||
+        !classesSnap.empty ||
+        !subjectsSnap.empty ||
+        !teachersSnap.empty ||
+        !gradesSnap.empty ||
+        !paymentsSnap.empty ||
+        !expensesSnap.empty ||
+        !closuresSnap.empty ||
+        !attendanceSnap.empty ||
+        !examSessionsSnap.empty ||
+        !examSlotsSnap.empty;
+
+      if (!hasAnyCloudDocs) {
+        return { status: 'EMPTY' };
+      }
+
+      const mapSnap = <T,>(snap: Awaited<ReturnType<typeof getDocs>>): T[] => {
+        const arr: T[] = [];
+        snap.forEach(d => arr.push({ ...(d.data() as Record<string, any>), id: d.id } as T));
+        return arr;
+      };
+
+      const payments = mapSnap<Payment>(paymentsSnap).sort((a, b) =>
+        (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
+        (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
+        (b.id || '').localeCompare(a.id || '')
+      );
+      const expenses = mapSnap<Expense>(expensesSnap).sort((a, b) =>
+        (b.expenseDate || '').localeCompare(a.expenseDate || '')
+      );
+      const closures = mapSnap<DailyCashClosure>(closuresSnap).sort((a, b) =>
+        (b.date || '').localeCompare(a.date || '')
+      );
+
+      this.firestoreHydratedCode = code;
+      this.markHasUserData(code);
+
+      return {
+        status: 'FOUND',
+        data: {
+          settings: settingsSnap.exists() ? (settingsSnap.data() as SchoolSettings) : undefined,
+          users: mapSnap<User>(usersSnap),
+          students: mapSnap<Student>(studentsSnap),
+          classes: mapSnap<SchoolClass>(classesSnap),
+          subjects: mapSnap<Subject>(subjectsSnap),
+          teachers: mapSnap<Teacher>(teachersSnap),
+          grades: mapSnap<EvaluationGrade>(gradesSnap),
+          payments,
+          expenses,
+          cash_closures: closures,
+          attendance: mapSnap<AttendanceRecord>(attendanceSnap),
+          exam_sessions: mapSnap<ExamSession>(examSessionsSnap),
+          exam_slots: mapSnap<ExamSlot>(examSlotsSnap)
+        }
+      };
+    } catch (e) {
+      handleFirestoreError(e, OperationType.GET, `schools/${code}`);
+      return { status: 'ERROR' };
+    }
+  }
+
+  /**
+   * Check Cloud Firestore & Node Server on startup so existing permanent database records
+   * are ALWAYS preserved across code updates, Git pushes, and restarts.
    */
   public async bootstrapCloudIfEmpty(
     schoolCode: string,
-    seedData: {
-      settings: SchoolSettings;
-      students: Student[];
-      classes: SchoolClass[];
-      subjects: Subject[];
-      teachers: Teacher[];
-      grades: EvaluationGrade[];
-      payments: Payment[];
-      attendance: AttendanceRecord[];
-    }
+    seedData: FullSchoolSeedPayload
   ): Promise<boolean> {
     const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
 
+    // 1. Check permanent Cloud Firestore first
+    const firestoreResult = await this.fetchAllFromFirestore(code);
+    if (firestoreResult.status === 'FOUND') {
+      const firestoreData = firestoreResult.data;
+      this.applyFullServerStore(firestoreData);
+      // Only heal the Node server store if the server is currently on factory seed
+      try {
+        const stateRes = await fetch(`/api/sync/state?school=${encodeURIComponent(code)}`);
+        const stateJson = stateRes.ok ? await stateRes.json() : null;
+        if (!stateJson?.store || stateJson.store.isSeed === true) {
+          await fetch('/api/sync/push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              schoolCode: code,
+              data: firestoreData,
+              senderId: DEVICE_CLIENT_ID
+            })
+          });
+        }
+      } catch {}
+      this.currentListeners?.onSyncStatusChange?.('CONNECTED', `Données permanentes restaurées [${code}]`);
+      return true;
+    }
+
+    // 2. Consult local/Node server store (without overwriting real persisted server data)
+    let authoritativeData: FullSchoolSeedPayload = seedData;
     try {
-      // 1. Bootstrap Server Store
       const response = await fetch('/api/sync/bootstrap', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ schoolCode: code, seedData })
+        body: JSON.stringify({
+          schoolCode: code,
+          seedData
+        })
       });
       if (response.ok) {
         const resJson = await response.json();
-        // If server already had fresh data, update current listeners with it
-        if (!resJson.bootstrapped && resJson.currentStore) {
+        if (!resJson.bootstrapped && resJson.currentStore && !resJson.currentStore.isSeed) {
           this.applyFullServerStore(resJson.currentStore);
+          authoritativeData = {
+            settings: resJson.currentStore.settings || seedData.settings,
+            users: resJson.currentStore.users || seedData.users,
+            students: resJson.currentStore.students || seedData.students,
+            classes: resJson.currentStore.classes || seedData.classes,
+            subjects: resJson.currentStore.subjects || seedData.subjects,
+            teachers: resJson.currentStore.teachers || seedData.teachers,
+            grades: resJson.currentStore.grades || seedData.grades,
+            payments: resJson.currentStore.payments || seedData.payments,
+            attendance: resJson.currentStore.attendance || seedData.attendance,
+            expenses: resJson.currentStore.expenses || seedData.expenses,
+            cash_closures: resJson.currentStore.cash_closures || seedData.cash_closures,
+            exam_sessions: resJson.currentStore.exam_sessions || seedData.exam_sessions,
+            exam_slots: resJson.currentStore.exam_slots || seedData.exam_slots
+          };
         }
       }
     } catch (e) {
       console.info('[SyncService] Local server bootstrap ping:', e);
     }
 
-    // 2. Also attempt Firestore bootstrap in parallel if available
-    try {
-      const settingsRef = doc(db, `schools/${code}/settings`, 'config');
-      const snap = await getDoc(settingsRef);
-      if (!snap.exists()) {
-        await this.pushAllDataToCloud(code, seedData);
-      }
-    } catch (e) {
-      // Ignore Firestore permission errors
+    // 3. CRITICAL PROTECTION: Only seed Firestore when confirmed genuinely EMPTY (never on ERROR!)
+    if (firestoreResult.status === 'EMPTY') {
+      await this.pushAllDataToCloud(code, authoritativeData);
+      this.firestoreHydratedCode = code;
     }
-
     return true;
   }
 
@@ -247,16 +437,9 @@ class CloudSyncService {
 
     listeners.onSyncStatusChange?.('SYNCING', `Connexion en cours [${code}]...`);
 
-    // 1. Fetch latest server state immediately
     this.fetchServerState(code);
-
-    // 2. Connect to Server-Sent Events (SSE) for instant cross-device updates
     this.connectSSE(code);
-
-    // 3. Connect to BroadcastChannel for instant intra-browser tab sync
     this.connectBroadcastChannel(code);
-
-    // 4. Connect Firestore listeners if available
     this.connectFirestoreListeners(code);
   }
 
@@ -265,6 +448,10 @@ class CloudSyncService {
       .then(res => res.json())
       .then(data => {
         if (data.success && data.store) {
+          // NEVER overwrite real Firestore or local user data with a restarted server's factory seed!
+          if (data.store.isSeed && (this.firestoreHydratedCode === code || this.hasLocalUserData(code))) {
+            return;
+          }
           this.applyFullServerStore(data.store);
           this.currentListeners?.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}]`);
         }
@@ -279,6 +466,9 @@ class CloudSyncService {
 
     if (store.settings) {
       this.currentListeners.onSettingsChange?.(store.settings);
+    }
+    if (Array.isArray(store.users) && store.users.length > 0) {
+      this.currentListeners.onUsersChange?.(store.users);
     }
     if (Array.isArray(store.students)) {
       this.currentListeners.onStudentsChange?.(store.students);
@@ -304,15 +494,22 @@ class CloudSyncService {
     if (Array.isArray(store.expenses)) {
       this.currentListeners.onExpensesChange?.(store.expenses);
     }
-    if (Array.isArray(store.exam_sessions) && store.exam_sessions.length > 0) {
+    if (Array.isArray(store.cash_closures)) {
+      this.currentListeners.onClosuresChange?.(store.cash_closures);
+    }
+    if (Array.isArray(store.exam_sessions)) {
       try {
         secureLocalStorage.setJSON('soma_exam_sessions', store.exam_sessions);
+        window.dispatchEvent(new CustomEvent('soma_exam_updated'));
       } catch {}
+      this.currentListeners.onExamSessionsChange?.(store.exam_sessions);
     }
-    if (Array.isArray(store.exam_slots) && store.exam_slots.length > 0) {
+    if (Array.isArray(store.exam_slots)) {
       try {
         secureLocalStorage.setJSON('soma_exam_slots', store.exam_slots);
+        window.dispatchEvent(new CustomEvent('soma_exam_updated'));
       } catch {}
+      this.currentListeners.onExamSlotsChange?.(store.exam_slots);
     }
   }
 
@@ -326,14 +523,13 @@ class CloudSyncService {
 
       this.eventSource = new EventSource(`/api/sync/events?school=${encodeURIComponent(code)}`);
 
-      this.eventSource.addEventListener('connected', (e: MessageEvent) => {
+      this.eventSource.addEventListener('connected', () => {
         this.currentListeners?.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}] (Multi-appareils actif)`);
       });
 
       this.eventSource.addEventListener('mutation', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          // Ignore echo from this exact device/tab
           if (data.senderId === DEVICE_CLIENT_ID) return;
 
           this.handleIncomingMutation(data.mutationType, data.payload, code);
@@ -356,7 +552,8 @@ class CloudSyncService {
       this.eventSource.addEventListener('state_reset', (e: MessageEvent) => {
         try {
           const data = JSON.parse(e.data);
-          if (data.store) {
+          if (data.senderId === DEVICE_CLIENT_ID) return;
+          if (data.store && !data.store.isSeed) {
             this.applyFullServerStore(data.store);
           }
         } catch {}
@@ -367,8 +564,7 @@ class CloudSyncService {
           this.eventSource.close();
           this.eventSource = null;
         }
-        // Auto reconnect after 3 seconds
-        clearTimeout(this.sseReconnectTimeout);
+        if (this.sseReconnectTimeout) clearTimeout(this.sseReconnectTimeout);
         this.sseReconnectTimeout = setTimeout(() => {
           if (this.isOnline) {
             this.connectSSE(code);
@@ -405,11 +601,8 @@ class CloudSyncService {
         break;
 
       case 'SYNC_PAYMENT':
-        // Re-fetch all fresh payments from server to ensure perfect list ordering
         this.fetchAllCloudPayments(code).then(payments => {
-          if (payments.length > 0) {
-            this.currentListeners?.onPaymentsChange?.(payments);
-          }
+          this.currentListeners?.onPaymentsChange?.(payments);
         });
         break;
 
@@ -418,7 +611,7 @@ class CloudSyncService {
         fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
           .then(r => r.json())
           .then(res => {
-            if (res.store?.expenses) {
+            if (Array.isArray(res.store?.expenses)) {
               this.currentListeners?.onExpensesChange?.(res.store.expenses);
             }
           });
@@ -427,11 +620,10 @@ class CloudSyncService {
       case 'SYNC_DOC':
       case 'DELETE_DOC':
       case 'CLEAR_COLLECTION':
-        // Re-fetch state for collection
         fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
           .then(r => r.json())
           .then(res => {
-            if (res.store) {
+            if (res.store && !res.store.isSeed) {
               this.applyFullServerStore(res.store);
             }
           });
@@ -442,83 +634,106 @@ class CloudSyncService {
   private connectFirestoreListeners(code: string): void {
     try {
       // 1. Settings Listener
-      const settingsDocRef = doc(db, `schools/${code}/settings`, 'config');
+      const settingsPath = `schools/${code}/settings`;
+      const settingsDocRef = doc(db, settingsPath, 'config');
       const unsubSettings = onSnapshot(settingsDocRef, (snapshot) => {
         if (snapshot.exists()) {
+          this.firestoreHydratedCode = code;
+          this.markHasUserData(code);
           const data = snapshot.data() as SchoolSettings;
           this.currentListeners?.onSettingsChange?.(data);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.GET, `${settingsPath}/config`));
       this.firestoreUnsubscribers.push(unsubSettings);
 
-      // 2. Students Collection
-      const studentsCollRef = collection(db, `schools/${code}/students`);
-      const unsubStudents = onSnapshot(studentsCollRef, (snapshot) => {
+      // 2. Users Collection
+      const usersPath = `schools/${code}/users`;
+      const unsubUsers = onSnapshot(collection(db, usersPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
+        const list: User[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id } as User);
+        });
+        if (list.length > 0) {
+          this.currentListeners?.onUsersChange?.(list);
+        }
+      }, (err) => handleFirestoreError(err, OperationType.LIST, usersPath));
+      this.firestoreUnsubscribers.push(unsubUsers);
+
+      // 3. Students Collection
+      const studentsPath = `schools/${code}/students`;
+      const unsubStudents = onSnapshot(collection(db, studentsPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: Student[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Student);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           this.currentListeners?.onStudentsChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, studentsPath));
       this.firestoreUnsubscribers.push(unsubStudents);
 
-      // 3. Classes Collection
-      const classesCollRef = collection(db, `schools/${code}/classes`);
-      const unsubClasses = onSnapshot(classesCollRef, (snapshot) => {
+      // 4. Classes Collection
+      const classesPath = `schools/${code}/classes`;
+      const unsubClasses = onSnapshot(collection(db, classesPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: SchoolClass[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as SchoolClass);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           this.currentListeners?.onClassesChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, classesPath));
       this.firestoreUnsubscribers.push(unsubClasses);
 
-      // 4. Subjects Collection
-      const subjectsCollRef = collection(db, `schools/${code}/subjects`);
-      const unsubSubjects = onSnapshot(subjectsCollRef, (snapshot) => {
+      // 5. Subjects Collection
+      const subjectsPath = `schools/${code}/subjects`;
+      const unsubSubjects = onSnapshot(collection(db, subjectsPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: Subject[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Subject);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           this.currentListeners?.onSubjectsChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, subjectsPath));
       this.firestoreUnsubscribers.push(unsubSubjects);
 
-      // 5. Teachers Collection
-      const teachersCollRef = collection(db, `schools/${code}/teachers`);
-      const unsubTeachers = onSnapshot(teachersCollRef, (snapshot) => {
+      // 6. Teachers Collection
+      const teachersPath = `schools/${code}/teachers`;
+      const unsubTeachers = onSnapshot(collection(db, teachersPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: Teacher[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Teacher);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           this.currentListeners?.onTeachersChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, teachersPath));
       this.firestoreUnsubscribers.push(unsubTeachers);
 
-      // 6. Grades Collection
-      const gradesCollRef = collection(db, `schools/${code}/grades`);
-      const unsubGrades = onSnapshot(gradesCollRef, (snapshot) => {
+      // 7. Grades Collection
+      const gradesPath = `schools/${code}/grades`;
+      const unsubGrades = onSnapshot(collection(db, gradesPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: EvaluationGrade[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as EvaluationGrade);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           this.currentListeners?.onGradesChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, gradesPath));
       this.firestoreUnsubscribers.push(unsubGrades);
 
-      // 7. Payments Collection
-      const paymentsCollRef = collection(db, `schools/${code}/payments`);
-      const unsubPayments = onSnapshot(paymentsCollRef, (snapshot) => {
+      // 8. Payments Collection
+      const paymentsPath = `schools/${code}/payments`;
+      const unsubPayments = onSnapshot(collection(db, paymentsPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: Payment[] = [];
         snapshot.forEach((docSnap) => {
           const d = docSnap.data();
@@ -542,44 +757,98 @@ class CloudSyncService {
             notes: d.notes || ''
           } as Payment);
         });
-        if (list.length > 0) {
-          list.sort((a, b) => 
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
+          list.sort((a, b) =>
             (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
             (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
             (b.id || '').localeCompare(a.id || '')
           );
           this.currentListeners?.onPaymentsChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, paymentsPath));
       this.firestoreUnsubscribers.push(unsubPayments);
 
-      // 8. Attendance Collection
-      const attendanceCollRef = collection(db, `schools/${code}/attendance`);
-      const unsubAttendance = onSnapshot(attendanceCollRef, (snapshot) => {
+      // 9. Attendance Collection
+      const attendancePath = `schools/${code}/attendance`;
+      const unsubAttendance = onSnapshot(collection(db, attendancePath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: AttendanceRecord[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as AttendanceRecord);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           this.currentListeners?.onAttendanceChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, attendancePath));
       this.firestoreUnsubscribers.push(unsubAttendance);
 
-      // 9. Expenses Collection
-      const expensesCollRef = collection(db, `schools/${code}/expenses`);
-      const unsubExpenses = onSnapshot(expensesCollRef, (snapshot) => {
+      // 10. Expenses Collection
+      const expensesPath = `schools/${code}/expenses`;
+      const unsubExpenses = onSnapshot(collection(db, expensesPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         const list: Expense[] = [];
         snapshot.forEach((docSnap) => {
           list.push({ ...docSnap.data(), id: docSnap.id } as Expense);
         });
-        if (list.length > 0) {
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
           list.sort((a, b) => (b.expenseDate || '').localeCompare(a.expenseDate || ''));
           this.currentListeners?.onExpensesChange?.(list);
         }
-      }, () => {});
+      }, (err) => handleFirestoreError(err, OperationType.LIST, expensesPath));
       this.firestoreUnsubscribers.push(unsubExpenses);
-    } catch {}
+
+      // 11. Cash Closures Collection
+      const closuresPath = `schools/${code}/cash_closures`;
+      const unsubClosures = onSnapshot(collection(db, closuresPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
+        const list: DailyCashClosure[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id } as DailyCashClosure);
+        });
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
+          list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+          this.currentListeners?.onClosuresChange?.(list);
+        }
+      }, (err) => handleFirestoreError(err, OperationType.LIST, closuresPath));
+      this.firestoreUnsubscribers.push(unsubClosures);
+
+      // 12. Exam Sessions & Slots Collections
+      const examSessionsPath = `schools/${code}/exam_sessions`;
+      const unsubExamSessions = onSnapshot(collection(db, examSessionsPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
+        const list: ExamSession[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id } as ExamSession);
+        });
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
+          try {
+            secureLocalStorage.setJSON('soma_exam_sessions', list);
+            window.dispatchEvent(new CustomEvent('soma_exam_updated'));
+          } catch {}
+          this.currentListeners?.onExamSessionsChange?.(list);
+        }
+      }, (err) => handleFirestoreError(err, OperationType.LIST, examSessionsPath));
+      this.firestoreUnsubscribers.push(unsubExamSessions);
+
+      const examSlotsPath = `schools/${code}/exam_slots`;
+      const unsubExamSlots = onSnapshot(collection(db, examSlotsPath), (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
+        const list: ExamSlot[] = [];
+        snapshot.forEach((docSnap) => {
+          list.push({ ...docSnap.data(), id: docSnap.id } as ExamSlot);
+        });
+        if (list.length > 0 || this.firestoreHydratedCode === code) {
+          try {
+            secureLocalStorage.setJSON('soma_exam_slots', list);
+            window.dispatchEvent(new CustomEvent('soma_exam_updated'));
+          } catch {}
+          this.currentListeners?.onExamSlotsChange?.(list);
+        }
+      }, (err) => handleFirestoreError(err, OperationType.LIST, examSlotsPath));
+      this.firestoreUnsubscribers.push(unsubExamSlots);
+    } catch (e) {
+      handleFirestoreError(e, OperationType.LIST, `schools/${code}`);
+    }
   }
 
   private reconnectAll(): void {
@@ -599,11 +868,14 @@ class CloudSyncService {
       this.broadcastChannel.close();
       this.broadcastChannel = null;
     }
-    clearTimeout(this.sseReconnectTimeout);
+    if (this.sseReconnectTimeout) {
+      clearTimeout(this.sseReconnectTimeout);
+      this.sseReconnectTimeout = null;
+    }
     this.firestoreUnsubscribers.forEach((unsub) => {
       try {
         unsub();
-      } catch (e) {}
+      } catch {}
     });
     this.firestoreUnsubscribers = [];
   }
@@ -613,15 +885,14 @@ class CloudSyncService {
    */
   private async dispatchMutation(mutationType: string, payload: any, schoolCode?: string): Promise<void> {
     const code = schoolCode || this.getActiveSchoolCode();
+    this.markHasUserData(code);
 
-    // 1. Intra-browser tab broadcast
     try {
       if (this.broadcastChannel) {
         this.broadcastChannel.postMessage({ mutationType, payload, senderId: DEVICE_CLIENT_ID });
       }
     } catch {}
 
-    // 2. Server API mutation for cross-device broadcast
     try {
       await fetch('/api/sync/mutate', {
         method: 'POST',
@@ -639,28 +910,23 @@ class CloudSyncService {
   }
 
   /**
-   * Push an entire local database to Cloud & Server for this school
+   * Push an entire local database to Cloud Firestore & Server for this school
    */
   public async pushAllDataToCloud(
     schoolCode: string,
-    data: {
-      settings: SchoolSettings;
-      students: Student[];
-      classes: SchoolClass[];
-      subjects: Subject[];
-      teachers: Teacher[];
-      grades: EvaluationGrade[];
-      payments: Payment[];
-      attendance: AttendanceRecord[];
-      expenses?: Expense[];
-    }
+    data: FullSchoolSeedPayload
   ): Promise<boolean> {
     const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
+    this.markHasUserData(code);
+
+    const examSessions = data.exam_sessions ?? secureLocalStorage.getJSON<ExamSession[]>('soma_exam_sessions', []);
+    const examSlots = data.exam_slots ?? secureLocalStorage.getJSON<ExamSlot[]>('soma_exam_slots', []);
+    const expenses = data.expenses ?? secureLocalStorage.getJSON<Expense[]>('soma_expenses', []);
+    const closures = data.cash_closures ?? secureLocalStorage.getJSON<DailyCashClosure[]>('kalangest_cash_closures', []);
+    const users = data.users ?? secureLocalStorage.getJSON<User[]>('somasikolo_users', []);
 
     // 1. Send to server sync store
     try {
-      const examSessions = secureLocalStorage.getJSON('soma_exam_sessions', []);
-      const examSlots = secureLocalStorage.getJSON('soma_exam_slots', []);
       await fetch('/api/sync/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -668,6 +934,9 @@ class CloudSyncService {
           schoolCode: code,
           data: {
             ...data,
+            users,
+            expenses,
+            cash_closures: closures,
             exam_sessions: examSessions,
             exam_slots: examSlots
           },
@@ -678,71 +947,56 @@ class CloudSyncService {
       console.warn('[SyncService] Server push notice:', e);
     }
 
-    // 2. Try Firestore batch write
+    // 2. Write to Cloud Firestore using safe chunked batches
     try {
-      const batch = writeBatch(db);
+      const ops: Array<{ ref: ReturnType<typeof doc>; data: any }> = [];
 
-      const settingsRef = doc(db, `schools/${code}/settings`, 'config');
-      batch.set(settingsRef, cleanForFirestore(data.settings), { merge: true });
-
-      data.students.forEach((s) => {
-        if (!s.id) return;
-        batch.set(doc(db, `schools/${code}/students`, s.id), cleanForFirestore(s), { merge: true });
+      ops.push({
+        ref: doc(db, `schools/${code}/settings`, 'config'),
+        data: cleanForFirestore({ ...data.settings, updatedAt: new Date().toISOString() })
       });
 
-      data.classes.forEach((c) => {
-        if (!c.id) return;
-        batch.set(doc(db, `schools/${code}/classes`, c.id), cleanForFirestore(c), { merge: true });
-      });
-
-      data.subjects.forEach((subj) => {
-        if (!subj.id) return;
-        batch.set(doc(db, `schools/${code}/subjects`, subj.id), cleanForFirestore(subj), { merge: true });
-      });
-
-      data.teachers.forEach((t) => {
-        if (!t.id) return;
-        batch.set(doc(db, `schools/${code}/teachers`, t.id), cleanForFirestore(t), { merge: true });
-      });
-
-      data.grades.forEach((g) => {
-        if (!g.id) return;
-        batch.set(doc(db, `schools/${code}/grades`, g.id), cleanForFirestore(g), { merge: true });
-      });
-
-      data.payments.forEach((p) => {
-        if (!p.id) return;
-        batch.set(doc(db, `schools/${code}/payments`, p.id), cleanForFirestore(p), { merge: true });
-      });
-
-      data.attendance.forEach((att) => {
-        if (!att.id) return;
-        batch.set(doc(db, `schools/${code}/attendance`, att.id), cleanForFirestore(att), { merge: true });
-      });
-
-      if (data.expenses && data.expenses.length > 0) {
-        data.expenses.forEach((e) => {
-          if (!e.id) return;
-          batch.set(doc(db, `schools/${code}/expenses`, e.id), cleanForFirestore(e), { merge: true });
+      const enqueueList = (collName: string, list: any[]) => {
+        list.forEach((item) => {
+          if (!item?.id) return;
+          ops.push({
+            ref: doc(db, `schools/${code}/${collName}`, item.id),
+            data: cleanForFirestore(item)
+          });
         });
-      }
+      };
 
-      await batch.commit();
+      enqueueList('users', users);
+      enqueueList('students', data.students || []);
+      enqueueList('classes', data.classes || []);
+      enqueueList('subjects', data.subjects || []);
+      enqueueList('teachers', data.teachers || []);
+      enqueueList('grades', data.grades || []);
+      enqueueList('payments', data.payments || []);
+      enqueueList('attendance', data.attendance || []);
+      enqueueList('expenses', expenses);
+      enqueueList('cash_closures', closures);
+      enqueueList('exam_sessions', examSessions);
+      enqueueList('exam_slots', examSlots);
+
+      await this.commitInChunks(ops);
 
       await setDoc(doc(db, 'school_directory', code), cleanForFirestore({
         schoolCode: code,
         schoolName: data.settings.schoolName || 'Établissement Scolaire',
         pinCode: data.settings.adminPassword || '00223',
         lastSyncAt: new Date().toISOString(),
-        totalStudents: data.students.length,
-        totalClasses: data.classes.length,
-        totalPayments: data.payments.length
+        totalStudents: (data.students || []).length,
+        totalClasses: (data.classes || []).length,
+        totalPayments: (data.payments || []).length
       }), { merge: true });
-    } catch (e) {
-      // Handled gracefully
-    }
 
-    return true;
+      this.firestoreHydratedCode = code;
+      return true;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `schools/${code}`);
+      return false;
+    }
   }
 
   // --- Dedicated Payment Realtime Cloud Sync ---
@@ -771,16 +1025,16 @@ class CloudSyncService {
       updatedAt: new Date().toISOString()
     });
 
-    // 1. Broadcast mutation to all devices via server
     await this.dispatchMutation('SYNC_PAYMENT', cleanPayment, code);
 
-    // 2. Also try Firestore
+    const path = `schools/${code}/payments`;
     try {
-      const docRef = doc(db, `schools/${code}/payments`, payment.id);
-      await setDoc(docRef, cleanPayment, { merge: true });
-    } catch {}
-
-    return true;
+      await setDoc(doc(db, path, payment.id), cleanPayment, { merge: true });
+      return true;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `${path}/${payment.id}`);
+      return false;
+    }
   }
 
   // --- Dedicated Expense Realtime Cloud Sync ---
@@ -796,12 +1050,14 @@ class CloudSyncService {
 
     await this.dispatchMutation('SYNC_EXPENSE', cleanData, code);
 
+    const path = `schools/${code}/expenses`;
     try {
-      const docRef = doc(db, `schools/${code}/expenses`, expense.id);
-      await setDoc(docRef, cleanData, { merge: true });
-    } catch {}
-
-    return true;
+      await setDoc(doc(db, path, expense.id), cleanData, { merge: true });
+      return true;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `${path}/${expense.id}`);
+      return false;
+    }
   }
 
   public async deleteExpense(expenseId: string, schoolCode?: string): Promise<boolean> {
@@ -810,11 +1066,24 @@ class CloudSyncService {
 
     await this.dispatchMutation('DELETE_EXPENSE', { id: expenseId }, code);
 
+    const path = `schools/${code}/expenses`;
     try {
-      const docRef = doc(db, `schools/${code}/expenses`, expenseId);
-      await deleteDoc(docRef);
-    } catch {}
+      await deleteDoc(doc(db, path, expenseId));
+      return true;
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `${path}/${expenseId}`);
+      return false;
+    }
+  }
 
+  // --- Dedicated Cash Closure Cloud Sync ---
+  public async syncClosure(closure: DailyCashClosure, schoolCode?: string): Promise<boolean> {
+    await this.syncDoc('cash_closures', closure, schoolCode);
+    return true;
+  }
+
+  public async deleteClosure(closureId: string, schoolCode?: string): Promise<boolean> {
+    await this.deleteCloudDoc('cash_closures', closureId, schoolCode);
     return true;
   }
 
@@ -824,21 +1093,19 @@ class CloudSyncService {
   public async fetchAllCloudPayments(schoolCode?: string): Promise<Payment[]> {
     const code = schoolCode || this.getActiveSchoolCode();
 
-    // 1. Try server state first
     try {
       const res = await fetch(`/api/sync/state?school=${encodeURIComponent(code)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.store?.payments && Array.isArray(data.store.payments)) {
+        if (data.store && !data.store.isSeed && Array.isArray(data.store.payments)) {
           return data.store.payments;
         }
       }
     } catch {}
 
-    // 2. Fallback to Firestore
+    const paymentsPath = `schools/${code}/payments`;
     try {
-      const paymentsCollRef = collection(db, `schools/${code}/payments`);
-      const snap = await getDocs(paymentsCollRef);
+      const snap = await getDocs(collection(db, paymentsPath));
       const list: Payment[] = [];
       snap.forEach((docSnap) => {
         const d = docSnap.data();
@@ -862,13 +1129,14 @@ class CloudSyncService {
           notes: d.notes || ''
         } as Payment);
       });
-      list.sort((a, b) => 
+      list.sort((a, b) =>
         (b.paymentDate || '').localeCompare(a.paymentDate || '') ||
         (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
         (b.id || '').localeCompare(a.id || '')
       );
       return list;
     } catch (e) {
+      handleFirestoreError(e, OperationType.LIST, paymentsPath);
       return [];
     }
   }
@@ -884,10 +1152,12 @@ class CloudSyncService {
 
     await this.dispatchMutation('SYNC_DOC', { collectionName, item: cleanData }, code);
 
+    const path = `schools/${code}/${collectionName}`;
     try {
-      const docRef = doc(db, `schools/${code}/${collectionName}`, item.id);
-      await setDoc(docRef, cleanData, { merge: true });
-    } catch {}
+      await setDoc(doc(db, path, item.id), cleanData, { merge: true });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `${path}/${item.id}`);
+    }
   }
 
   public async deleteCloudDoc(
@@ -899,10 +1169,12 @@ class CloudSyncService {
 
     await this.dispatchMutation('DELETE_DOC', { collectionName, id }, code);
 
+    const path = `schools/${code}/${collectionName}`;
     try {
-      const docRef = doc(db, `schools/${code}/${collectionName}`, id);
-      await deleteDoc(docRef);
-    } catch {}
+      await deleteDoc(doc(db, path, id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `${path}/${id}`);
+    }
   }
 
   public async clearCloudCollection(
@@ -913,25 +1185,39 @@ class CloudSyncService {
 
     await this.dispatchMutation('CLEAR_COLLECTION', { collectionName }, code);
 
+    const path = `schools/${code}/${collectionName}`;
     try {
-      const collRef = collection(db, `schools/${code}/${collectionName}`);
-      const snap = await getDocs(collRef);
-      const batch = writeBatch(db);
-      snap.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-    } catch {}
+      const snap = await getDocs(collection(db, path));
+      const docs = snap.docs;
+      const CHUNK_SIZE = 350;
+      for (let i = 0; i < docs.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        docs.slice(i, i + CHUNK_SIZE).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, path);
+    }
   }
 
   public async syncSettings(settings: SchoolSettings, schoolCode?: string): Promise<void> {
     const code = schoolCode || this.getActiveSchoolCode();
-    const cleanData = cleanForFirestore(settings);
+    const cleanData = cleanForFirestore({ ...settings, updatedAt: new Date().toISOString() });
 
     await this.dispatchMutation('SYNC_SETTINGS', cleanData, code);
 
+    const path = `schools/${code}/settings`;
     try {
-      const docRef = doc(db, `schools/${code}/settings`, 'config');
-      await setDoc(docRef, cleanData, { merge: true });
-    } catch {}
+      await setDoc(doc(db, path, 'config'), cleanData, { merge: true });
+      await setDoc(doc(db, 'school_directory', code), cleanForFirestore({
+        schoolCode: code,
+        schoolName: settings.schoolName || 'Établissement Scolaire',
+        pinCode: settings.adminPassword || '00223',
+        lastSyncAt: new Date().toISOString()
+      }), { merge: true });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `${path}/config`);
+    }
   }
 }
 
