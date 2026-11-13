@@ -9,21 +9,22 @@ import {
   Printer, 
   CheckCircle2, 
   Search, 
-  BookOpen, 
   X, 
   FileSpreadsheet, 
-  Edit3, 
   ArrowUpDown,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ReportCard, StudentSubjectAverage, EvaluationGrade, EvaluationTerm } from '../../types';
 import { PdfService } from '../../services/pdfService';
-import { getMaliScoreAppreciation, getTermLabel, getMaliEvaluationTerms, getFilteredEvaluationTerms } from '../../constants/maliEducation';
+import { getMaliScoreAppreciation, getTermLabel, getMaliEvaluationTerms, getFilteredEvaluationTerms, getRelatedTermsForPeriod } from '../../constants/maliEducation';
 
 export const BulletinsModule: React.FC = () => {
-  const { students, classes, subjects, grades, saveGrade, generateReportCard, settings } = useSchool();
+  const { students, classes, subjects, grades, saveGrade, deleteGrade, generateReportCard, settings } = useSchool();
+  const { hasPermission } = useAuth();
+  const canEditGrades = hasPermission('grades:entry');
 
   // Classes filtrées selon le type d'établissement configuré
   const availableClasses = useMemo(() => {
@@ -47,8 +48,6 @@ export const BulletinsModule: React.FC = () => {
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
   const [isPrintAllMode, setIsPrintAllMode] = useState<boolean>(false);
   const [teacherComments, setTeacherComments] = useState<Record<string, string>>({});
-  const [showBatchModal, setShowBatchModal] = useState<boolean>(false);
-  const [batchSubjectId, setBatchSubjectId] = useState<string>('');
 
   // Synchronisation de la classe sélectionnée si la liste disponible change
   useEffect(() => {
@@ -114,10 +113,16 @@ export const BulletinsModule: React.FC = () => {
       return [...filtered].sort((a, b) => a.lastName.localeCompare(b.lastName, 'fr') || a.firstName.localeCompare(b.firstName, 'fr'));
     }
 
-    // Default: Tri du 1er au dernier selon le rang officiel et la moyenne
+    // Default: Élèves notés classés du 1er au dernier, puis élèves non notés par ordre alphabétique
     return [...filtered].sort((a, b) => {
       const cardA = generateReportCard(a.id, selectedTerm);
       const cardB = generateReportCard(b.id, selectedTerm);
+      const gradedA = Boolean(cardA && cardA.totalCoefficients > 0);
+      const gradedB = Boolean(cardB && cardB.totalCoefficients > 0);
+      if (gradedA !== gradedB) return gradedA ? -1 : 1;
+      if (!gradedA && !gradedB) {
+        return a.lastName.localeCompare(b.lastName, 'fr') || a.firstName.localeCompare(b.firstName, 'fr');
+      }
       const rankA = cardA ? cardA.rankInClass : 999;
       const rankB = cardB ? cardB.rankInClass : 999;
       if (rankA !== rankB) return rankA - rankB;
@@ -175,34 +180,65 @@ export const BulletinsModule: React.FC = () => {
     });
   }, [students, selectedClassId, selectedTerm, generateReportCard, grades]);
 
+  // Regroupement des bulletins par paires (1er & 2ème, 3ème & 4ème, ...) pour impression 2 par feuille A4 horizontale
+  const bulletinPairs = useMemo(() => {
+    const pairs: Array<[ReportCard, ReportCard | null]> = [];
+    for (let i = 0; i < allClassReportCards.length; i += 2) {
+      pairs.push([allClassReportCards[i], allClassReportCards[i + 1] || null]);
+    }
+    return pairs;
+  }, [allClassReportCards]);
+
   // Direct grade update logic right inside bulletin
-  const handleClassScoreChange = (subjectId: string, val: string) => {
-    if (!activeStudent) return;
+  const handleClassScoreChange = (subjectId: string, val: string, targetStudentId?: string) => {
+    if (!canEditGrades) return;
+    const studentIdToUse = targetStudentId || activeStudent?.id;
+    const studentObj = students.find(s => s.id === studentIdToUse) || activeStudent;
+    if (!studentObj) return;
+
     const isFirstCycle = currentClass?.category === 'FONDAMENTAL_1';
     const maxScore = isFirstCycle ? 10 : 20;
+    const relatedTerms = getRelatedTermsForPeriod(selectedTerm, settings.evaluationCount || 9);
+
+    const exactClassGrades = grades.filter(
+      g => g.studentId === studentObj.id && g.subjectId === subjectId && g.term === selectedTerm && g.type !== 'COMPOSITION' && g.type !== 'EXAMEN'
+    );
+    const relatedClassGrades = exactClassGrades.length > 0
+      ? exactClassGrades
+      : grades.filter(
+          g => g.studentId === studentObj.id && g.subjectId === subjectId && relatedTerms.includes(g.term) && g.type !== 'COMPOSITION' && g.type !== 'EXAMEN'
+        );
+
+    // Si champ vidé : supprimer la note existante pour garder la case vide (ne pas forcer 0)
+    if (val.trim() === '') {
+      if (relatedClassGrades.length > 0) {
+        relatedClassGrades.forEach(g => deleteGrade(g.id));
+        setSavedNotice('Note de classe effacée');
+        setTimeout(() => setSavedNotice(null), 1500);
+      }
+      return;
+    }
 
     let scoreNum = parseFloat(val);
-    if (isNaN(scoreNum)) scoreNum = 0;
+    if (isNaN(scoreNum)) return;
     scoreNum = Math.min(maxScore, Math.max(0, scoreNum));
 
-    const classGrades = grades.filter(
-      g => g.studentId === activeStudent.id && g.subjectId === subjectId && g.term === selectedTerm && g.type !== 'COMPOSITION' && g.type !== 'EXAMEN'
-    );
-
     const subjectObj = subjects.find(sub => sub.id === subjectId);
-    const coef = subjectObj ? subjectObj.coefficient : 1;
+    const coef = (currentClass?.customCoefficients && currentClass.customCoefficients[subjectId] !== undefined)
+      ? currentClass.customCoefficients[subjectId]
+      : (subjectObj ? subjectObj.coefficient : 1);
 
-    if (classGrades.length > 0) {
+    if (exactClassGrades.length > 0) {
       saveGrade({
-        ...classGrades[0],
+        ...exactClassGrades[0],
         score: scoreNum,
         maxScore,
         coefficient: coef
       });
     } else {
       saveGrade({
-        studentId: activeStudent.id,
-        classId: activeStudent.classId,
+        studentId: studentObj.id,
+        classId: studentObj.classId,
         subjectId,
         term: selectedTerm,
         academicYear: settings.currentAcademicYear,
@@ -218,33 +254,55 @@ export const BulletinsModule: React.FC = () => {
     setTimeout(() => setSavedNotice(null), 1800);
   };
 
-  const handleCompositionScoreChange = (subjectId: string, val: string) => {
-    if (!activeStudent) return;
+  const handleCompositionScoreChange = (subjectId: string, val: string, targetStudentId?: string) => {
+    if (!canEditGrades) return;
+    const studentIdToUse = targetStudentId || activeStudent?.id;
+    const studentObj = students.find(s => s.id === studentIdToUse) || activeStudent;
+    if (!studentObj) return;
+
     const isFirstCycle = currentClass?.category === 'FONDAMENTAL_1';
     const maxCompScore = isFirstCycle ? 10 : 40;
+    const relatedTerms = getRelatedTermsForPeriod(selectedTerm, settings.evaluationCount || 9);
+
+    const exactCompGrades = grades.filter(
+      g => g.studentId === studentObj.id && g.subjectId === subjectId && g.term === selectedTerm && (g.type === 'COMPOSITION' || g.type === 'EXAMEN')
+    );
+    const relatedCompGrades = exactCompGrades.length > 0
+      ? exactCompGrades
+      : grades.filter(
+          g => g.studentId === studentObj.id && g.subjectId === subjectId && relatedTerms.includes(g.term) && (g.type === 'COMPOSITION' || g.type === 'EXAMEN')
+        );
+
+    // Si champ vidé : supprimer la note de composition existante
+    if (val.trim() === '') {
+      if (relatedCompGrades.length > 0) {
+        relatedCompGrades.forEach(g => deleteGrade(g.id));
+        setSavedNotice('Note de composition effacée');
+        setTimeout(() => setSavedNotice(null), 1500);
+      }
+      return;
+    }
 
     let scoreNum = parseFloat(val);
-    if (isNaN(scoreNum)) scoreNum = 0;
+    if (isNaN(scoreNum)) return;
     scoreNum = Math.min(maxCompScore, Math.max(0, scoreNum));
 
-    const compGrades = grades.filter(
-      g => g.studentId === activeStudent.id && g.subjectId === subjectId && g.term === selectedTerm && (g.type === 'COMPOSITION' || g.type === 'EXAMEN')
-    );
-
     const subjectObj = subjects.find(sub => sub.id === subjectId);
-    const coef = subjectObj ? subjectObj.coefficient : 1;
+    const coef = (currentClass?.customCoefficients && currentClass.customCoefficients[subjectId] !== undefined)
+      ? currentClass.customCoefficients[subjectId]
+      : (subjectObj ? subjectObj.coefficient : 1);
 
-    if (compGrades.length > 0) {
+    if (exactCompGrades.length > 0) {
       saveGrade({
-        ...compGrades[0],
+        ...exactCompGrades[0],
         score: scoreNum,
         maxScore: maxCompScore,
         coefficient: coef
       });
     } else {
       saveGrade({
-        studentId: activeStudent.id,
-        classId: activeStudent.classId,
+        studentId: studentObj.id,
+        classId: studentObj.classId,
         subjectId,
         term: selectedTerm,
         academicYear: settings.currentAcademicYear,
@@ -476,21 +534,6 @@ export const BulletinsModule: React.FC = () => {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-1.5 ml-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setShowBatchModal(true);
-                if (!batchSubjectId && subjects.length > 0) {
-                  const classSubj = subjects.filter(s => !currentClass || s.classCategory === currentClass.category);
-                  if (classSubj.length > 0) setBatchSubjectId(classSubj[0].id);
-                }
-              }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-              title="Saisir rapidement les notes pour toute la classe"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Saisie</span>
-            </button>
 
             <button
               type="button"
@@ -570,8 +613,9 @@ export const BulletinsModule: React.FC = () => {
               {classStudents.map(std => {
                 const isSelected = activeStudent?.id === std.id;
                 const card = generateReportCard(std.id, selectedTerm);
+                const isGraded = Boolean(card && card.totalCoefficients > 0);
                 const avg = card ? card.generalAverage : 0;
-                const rank = card ? card.rankInClass : null;
+                const rank = isGraded && card ? card.rankInClass : null;
                 const cardMax = card?.maxScore || 20;
                 const passThreshold = cardMax === 10 ? 5 : 10;
 
@@ -612,7 +656,13 @@ export const BulletinsModule: React.FC = () => {
                           }`}>
                             {rank}e
                           </span>
-                        ) : null}
+                        ) : (
+                          <span className={`inline-flex items-center justify-center min-w-[24px] px-1 py-0.2 rounded font-semibold text-[9px] ${
+                            isSelected ? 'bg-blue-800 text-blue-200' : 'bg-slate-100 text-slate-400 border border-slate-200'
+                          }`}>
+                            —
+                          </span>
+                        )}
                       </div>
 
                       {std.photoUrl ? (
@@ -640,11 +690,19 @@ export const BulletinsModule: React.FC = () => {
                     </div>
 
                     <div className="text-right shrink-0 ml-1.5">
-                      <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-bold font-mono ${
-                        isSelected ? 'bg-white/20 text-white' : avg >= passThreshold ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}>
-                        {avg.toFixed(2)}
-                      </span>
+                      {isGraded ? (
+                        <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-bold font-mono ${
+                          isSelected ? 'bg-white/20 text-white' : avg >= passThreshold ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {avg.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-semibold ${
+                          isSelected ? 'bg-white/15 text-slate-200' : 'bg-slate-100 text-slate-400'
+                        }`}>
+                          —
+                        </span>
+                      )}
                     </div>
                   </button>
                 );
@@ -778,9 +836,10 @@ export const BulletinsModule: React.FC = () => {
                       <tbody className="text-xs font-bold text-slate-800 divide-y divide-slate-100 bg-white">
                         {activeReportCard.subjectAverages.map((s) => {
                           const sMaxScore = s.maxScore || activeReportCard.maxScore || 20;
-                          const { appreciation, badgeColor } = getMaliScoreAppreciation(s.finalScore, sMaxScore);
-                          const classScoreVal = s.classScore !== undefined ? s.classScore : s.finalScore;
-                          const compScoreVal = s.compositionScore !== undefined ? s.compositionScore : (activeReportCard.maxScore === 10 ? s.finalScore : s.finalScore * 2);
+                          const hasFinal = s.hasGrades ?? (s.classScore !== undefined || s.compositionScore !== undefined);
+                          const { appreciation } = getMaliScoreAppreciation(s.finalScore, sMaxScore);
+                          const classScoreVal = s.classScore !== undefined ? String(s.classScore) : '';
+                          const compScoreVal = s.compositionScore !== undefined ? String(s.compositionScore) : '';
 
                           return (
                             <tr key={s.subjectId} className="hover:bg-slate-50/80 transition-colors">
@@ -796,9 +855,11 @@ export const BulletinsModule: React.FC = () => {
                                   step="0.25"
                                   min="0"
                                   max={activeReportCard.maxScore === 10 ? 10 : 20}
-                                  value={classScoreVal.toString()}
+                                  value={classScoreVal}
+                                  placeholder="—"
+                                  disabled={!canEditGrades}
                                   onChange={e => handleClassScoreChange(s.subjectId, e.target.value)}
-                                  className="w-20 py-1 px-2 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 focus:border-slate-900 focus:bg-white rounded-lg outline-none transition-all"
+                                  className="w-20 py-1 px-2 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 focus:border-slate-900 focus:bg-white disabled:opacity-70 disabled:cursor-not-allowed rounded-lg outline-none transition-all placeholder:text-slate-300"
                                   title="Note de classe / devoirs"
                                 />
                               </td>
@@ -810,17 +871,19 @@ export const BulletinsModule: React.FC = () => {
                                   step="0.25"
                                   min="0"
                                   max={activeReportCard.maxScore === 10 ? 10 : 40}
-                                  value={compScoreVal.toString()}
+                                  value={compScoreVal}
+                                  placeholder="—"
+                                  disabled={!canEditGrades}
                                   onChange={e => handleCompositionScoreChange(s.subjectId, e.target.value)}
-                                  className="w-20 py-1 px-2 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 focus:border-slate-900 focus:bg-white rounded-lg outline-none transition-all"
+                                  className="w-20 py-1 px-2 text-center font-mono font-bold text-xs bg-slate-50 border border-slate-200 focus:border-slate-900 focus:bg-white disabled:opacity-70 disabled:cursor-not-allowed rounded-lg outline-none transition-all placeholder:text-slate-300"
                                   title="Note de composition"
                                 />
                               </td>
 
                               {/* Calculated Moyenne Matière */}
                               <td className="py-2 px-2 text-center">
-                                <span className="font-mono font-bold text-xs text-slate-900">
-                                  {s.finalScore.toFixed(2)}
+                                <span className={`font-mono font-bold text-xs ${hasFinal ? 'text-slate-900' : 'text-slate-300'}`}>
+                                  {hasFinal ? s.finalScore.toFixed(2) : '—'}
                                 </span>
                               </td>
 
@@ -828,13 +891,13 @@ export const BulletinsModule: React.FC = () => {
                                 {s.coefficient}
                               </td>
 
-                              <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-900">
-                                {s.weightedScore.toFixed(2)}
+                              <td className={`py-2.5 px-2 text-center font-mono font-bold ${hasFinal ? 'text-slate-900' : 'text-slate-300'}`}>
+                                {hasFinal ? s.weightedScore.toFixed(2) : '—'}
                               </td>
 
                               <td className="py-2.5 px-4">
-                                <span className="text-xs font-medium text-slate-700">
-                                  {appreciation}
+                                <span className={`text-xs font-medium ${hasFinal ? 'text-slate-700' : 'text-slate-400 italic'}`}>
+                                  {hasFinal ? appreciation : 'Non noté'}
                                 </span>
                               </td>
                             </tr>
@@ -879,266 +942,49 @@ export const BulletinsModule: React.FC = () => {
         </div>
       </div>
 
-      {/* ----------------- SAISIE PAR ÉLÈVE AVEC TOUTES LES MATIÈRES AFFICHÉES VERTICALEMENT ----------------- */}
-      {showBatchModal && activeStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-4 py-2.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-amber-400 shrink-0" />
-                <div>
-                  <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wide">Saisie des Notes par Élève</h2>
-                  <p className="text-[10px] text-slate-400">
-                    {currentClass?.name || 'Classe'} • {getTermLabel(selectedTerm, settings.evaluationMonths)}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowBatchModal(false)}
-                className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-3 overflow-y-auto space-y-2.5 flex-1 custom-scrollbar">
-              {/* Student Selector & Navigation (Par Personne) */}
-              <div className="bg-slate-50 p-2 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
-                    Élève :
-                  </span>
-                  <select
-                    value={activeStudent.id}
-                    onChange={e => setActiveStudentId(e.target.value)}
-                    className="py-1 px-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-slate-800 cursor-pointer flex-1 max-w-sm truncate"
-                  >
-                    {classStudents.map((std, idx) => (
-                      <option key={std.id} value={std.id}>
-                        {idx + 1}. {std.lastName.toUpperCase()} {std.firstName} ({std.matricule})
-                      </option>
-                    ))}
-                  </select>
-
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={handlePrevStudent}
-                      disabled={!hasPrevStudent}
-                      className={`p-1 rounded-lg border flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer ${
-                        hasPrevStudent 
-                          ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300' 
-                          : 'opacity-40 text-slate-400 border-slate-200 cursor-not-allowed'
-                      }`}
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">Précédent</span>
-                    </button>
-
-                    <span className="text-[11px] font-mono font-bold text-slate-500 px-1">
-                      {activeStudentIndex + 1} / {classStudents.length}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={handleNextStudent}
-                      disabled={!hasNextStudent}
-                      className={`p-1 rounded-lg border flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer ${
-                        hasNextStudent 
-                          ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300' 
-                          : 'opacity-40 text-slate-400 border-slate-200 cursor-not-allowed'
-                      }`}
-                    >
-                      <span className="hidden sm:inline">Suivant</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Live Student Performance */}
-                {activeReportCard && (
-                  <div className="flex items-center gap-2 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shrink-0 text-[11px]">
-                    <span className="text-slate-500">Moyenne :</span>
-                    <span className="font-mono font-bold text-slate-900 text-xs">
-                      {activeReportCard.generalAverage.toFixed(2)} / {activeReportCard.maxScore || 20}
-                    </span>
-                    <span className="text-slate-300">•</span>
-                    <span className="font-semibold text-slate-600">
-                      Rang : <strong>{activeReportCard.rankInClass}e</strong> / {allClassReportCards.length}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Table Vertical des Matières pour cet Élève */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-slate-100 font-bold text-[10px] uppercase tracking-wider text-slate-600 border-b border-slate-200">
-                    <tr>
-                      <th className="py-2 px-3">#</th>
-                      <th className="py-2 px-3">Matière du Programme (Vertical)</th>
-                      <th className="py-2 px-2 text-center w-20">Coef</th>
-                      <th className="py-2 px-2 text-center w-28">
-                        N.Classe /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 20}
-                      </th>
-                      <th className="py-2 px-2 text-center w-28">
-                        Compos /{(currentClass?.category === 'FONDAMENTAL_1') ? 10 : 40}
-                      </th>
-                      <th className="py-2 px-2 text-center w-24">Moyenne</th>
-                      <th className="py-2 px-3 text-center">Appréciation</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-xs font-medium text-slate-800 divide-y divide-slate-100 bg-white">
-                    {subjects
-                      .filter(s => !currentClass || s.classCategory === currentClass.category)
-                      .map((sub, idx) => {
-                        const subjAvg = activeReportCard?.subjectAverages.find(sa => sa.subjectId === sub.id);
-                        const isFirstCycle = currentClass?.category === 'FONDAMENTAL_1';
-                        const maxScore = isFirstCycle ? 10 : 20;
-                        const maxComp = isFirstCycle ? 10 : 40;
-
-                        const classScoreVal = subjAvg?.classScore !== undefined ? subjAvg.classScore : (subjAvg?.finalScore || 0);
-                        const compScoreVal = subjAvg?.compositionScore !== undefined ? subjAvg.compositionScore : (maxScore === 10 ? (subjAvg?.finalScore || 0) : ((subjAvg?.finalScore || 0) * 2));
-                        const finalVal = subjAvg?.finalScore || 0;
-                        const { appreciation, badgeColor } = getMaliScoreAppreciation(finalVal, maxScore);
-
-                        return (
-                          <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-2 px-3 font-mono text-slate-400 font-bold">{idx + 1}</td>
-                            <td className="py-2 px-3">
-                              <span className="font-bold text-slate-900 text-xs">{sub.name}</span>
-                              <span className="text-[10px] text-slate-400 font-mono ml-1">({sub.code})</span>
-                            </td>
-                            <td className="py-2 px-2 text-center">
-                              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">
-                                Coef {sub.coefficient}
-                              </span>
-                            </td>
-                            <td className="py-1 px-2 text-center">
-                              <input
-                                type="number"
-                                step="0.25"
-                                min="0"
-                                max={maxScore}
-                                value={classScoreVal || ''}
-                                placeholder="0.00"
-                                onChange={e => handleClassScoreChange(sub.id, e.target.value)}
-                                className="w-20 py-1 px-1.5 text-center font-mono font-bold text-xs text-amber-950 bg-amber-50 border border-amber-300 focus:border-amber-600 focus:bg-white rounded-lg outline-none transition-all shadow-2xs"
-                              />
-                            </td>
-                            <td className="py-1 px-2 text-center">
-                              <input
-                                type="number"
-                                step="0.25"
-                                min="0"
-                                max={maxComp}
-                                value={compScoreVal || ''}
-                                placeholder="0.00"
-                                onChange={e => handleCompositionScoreChange(sub.id, e.target.value)}
-                                className="w-20 py-1 px-1.5 text-center font-mono font-bold text-xs text-purple-950 bg-purple-50 border border-purple-300 focus:border-purple-600 focus:bg-white rounded-lg outline-none transition-all shadow-2xs"
-                              />
-                            </td>
-                            <td className="py-2 px-2 text-center font-mono font-bold text-blue-900 bg-blue-50/50">
-                              {finalVal.toFixed(2)}
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border ${badgeColor}`}>
-                                {appreciation}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-
-                  {/* Footer Total */}
-                  {activeReportCard && (
-                    <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300 text-xs">
-                      <tr>
-                        <td colSpan={2} className="py-2 px-3 uppercase text-[10px] text-slate-600">
-                          Bilan Général de l'Élève
-                        </td>
-                        <td className="py-2 px-2 text-center font-mono">
-                          {activeReportCard.totalCoefficients} Coefs
-                        </td>
-                        <td colSpan={2} className="py-2 px-2 text-center font-mono text-slate-700">
-                          Total Points : {activeReportCard.totalPoints.toFixed(2)} pts
-                        </td>
-                        <td className="py-2 px-2 text-center font-mono text-sm text-blue-900 bg-blue-100/70">
-                          {activeReportCard.generalAverage.toFixed(2)}
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <span className="font-bold text-slate-800">
-                            {activeReportCard.directorDecision}
-                          </span>
-                        </td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <p className="text-[11px] text-slate-500 italic">
-                Saisie directe des notes : les moyennes et rangs sont recalculés automatiquement.
-              </p>
-              <div className="flex items-center gap-2">
-                {hasNextStudent && (
-                  <button
-                    type="button"
-                    onClick={handleNextStudent}
-                    className="px-3.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg cursor-pointer shadow-2xs flex items-center gap-1"
-                  >
-                    <span>Élève Suivant</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setShowBatchModal(false)}
-                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg cursor-pointer shadow-2xs"
-                >
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ----------------- OFFICIAL PRINTABLE DOCUMENT (1 BULLETIN PER STUDENT - PORTRAIT A4) ----------------- */}
+      {/* ----------------- OFFICIAL PRINTABLE DOCUMENT (2 BULLETINS PER HORIZONTAL A4 SHEET) ----------------- */}
       <div className="print-only" id="printable-bulletins-container">
         {isPrintAllMode ? (
-          /* Bulk print all class bulletins: strictly ordered 1er to last, 1 student per page, zero repetition */
+          /* Impression groupée : 2 bulletins côte à côte par feuille A4 horizontale dans l'ordre du classement (1er+2e, 3e+4e...) */
           <div>
-            {allClassReportCards.map((rc, idx) => (
+            {bulletinPairs.map(([leftCard, rightCard], pairIdx) => (
               <div
-                key={rc.studentId}
-                className={`w-[190mm] h-[270mm] max-h-[275mm] mx-auto p-1 bg-white flex flex-col justify-between ${
-                  idx < allClassReportCards.length - 1 ? 'page-break' : ''
+                key={leftCard.studentId}
+                className={`bulletin-pair-sheet w-[288mm] h-[199mm] mx-auto bg-white grid grid-cols-2 gap-[5mm] ${
+                  pairIdx < bulletinPairs.length - 1 ? 'page-break' : ''
                 }`}
               >
-                <PrintableBulletin
-                  report={rc}
-                  settings={settings}
-                  comment={getCommentForStudent(rc.studentId)}
-                />
+                <div className="bulletin-half-slot h-[199mm] flex flex-col">
+                  <PrintableBulletin
+                    report={leftCard}
+                    settings={settings}
+                    comment={getCommentForStudent(leftCard.studentId)}
+                  />
+                </div>
+                <div className="bulletin-half-slot h-[199mm] flex flex-col">
+                  {rightCard && (
+                    <PrintableBulletin
+                      report={rightCard}
+                      settings={settings}
+                      comment={getCommentForStudent(rightCard.studentId)}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          /* Single printable bulletin: exactly 1 student, 1 page, zero repetition */
+          /* Impression d'un bulletin individuel sur demi-feuille A4 horizontale */
           activeReportCard && (
-            <div className="w-[190mm] h-[270mm] max-h-[275mm] mx-auto p-1 bg-white flex flex-col justify-between">
-              <PrintableBulletin
-                report={activeReportCard}
-                settings={settings}
-                comment={getCommentForStudent(activeReportCard.studentId)}
-              />
+            <div className="bulletin-pair-sheet w-[288mm] h-[199mm] mx-auto bg-white grid grid-cols-2 gap-[5mm]">
+              <div className="bulletin-half-slot h-[199mm] flex flex-col">
+                <PrintableBulletin
+                  report={activeReportCard}
+                  settings={settings}
+                  comment={getCommentForStudent(activeReportCard.studentId)}
+                />
+              </div>
+              <div className="bulletin-half-slot h-[199mm] flex flex-col" />
             </div>
           )
         )}
@@ -1148,7 +994,7 @@ export const BulletinsModule: React.FC = () => {
 };
 
 /* -------------------------------------------------------------------------- */
-/* PRINTABLE BULLETIN COMPONENT (EXACT FORMAT MATCHING OFFICIAL MALI BULLETIN) */
+/* PRINTABLE BULLETIN COMPONENT (2-UP HORIZONTAL A4 HALF-SHEET MALI FORMAT)   */
 /* -------------------------------------------------------------------------- */
 
 interface PrintableBulletinProps {
@@ -1162,142 +1008,141 @@ const PrintableBulletin: React.FC<PrintableBulletinProps> = ({ report, settings,
   const maxScore = report.maxScore || 20;
 
   return (
-    <div className="w-full bg-white text-slate-900 font-sans text-[9px] leading-tight p-3 border-2 border-slate-900 flex flex-col justify-between h-full box-border">
+    <div className="w-full bg-white text-slate-900 font-sans text-[8px] leading-tight p-2 border-2 border-slate-900 flex flex-col justify-between h-full box-border">
       
       {/* 1. TOP HEADER SECTION */}
-      <div className="text-center space-y-1 border-b-2 border-slate-900 pb-2">
-        <p className="font-bold uppercase text-[9.5px] tracking-tight">
+      <div className="text-center space-y-0.5 border-b-2 border-slate-900 pb-1">
+        <p className="font-bold uppercase text-[8px] tracking-tight truncate">
           {settings.academyName || "ACADEMIE D'ENSEIGNEMENT BAMAKO RIVE DROITE"} {settings.capName ? `CAP DE ${settings.capName}` : "CAP DE FALADIE"} {settings.schoolName || "ECOLE PRIVEE LE BIRGO NIAMAKORO"}
         </p>
-        <p className="font-bold text-[9px] text-slate-700">
+        <p className="font-bold text-[8px] text-slate-700">
           TEL: {settings.phone || '76041281 / 75167282'}
         </p>
-        <h1 className="font-black text-sm uppercase tracking-widest mt-1 underline">
+        <h1 className="font-black text-xs uppercase tracking-widest mt-0.5 underline">
           BULLETIN DE NOTES
         </h1>
       </div>
 
       {/* 2. TOP 3-BOX GRID */}
-      <div className="grid grid-cols-12 gap-1.5 my-1.5 text-[9px]">
+      <div className="grid grid-cols-12 gap-1 my-1 text-[8px]">
         {/* Left Box */}
-        <div className="col-span-5 border border-slate-900 p-2 flex flex-col justify-center space-y-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-700">ELEVE :</span>
-            <span className="font-black uppercase text-[10.5px] text-slate-900 truncate">{report.studentName}</span>
+        <div className="col-span-5 border border-slate-900 p-1.5 flex flex-col justify-center space-y-0.5 min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="font-bold text-slate-700 shrink-0">ELEVE :</span>
+            <span className="font-black uppercase text-[9px] text-slate-900 truncate">{report.studentName}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-700">N° Mle :</span>
-            <span className="font-mono font-bold text-slate-900">{report.studentMatricule || '---'}</span>
+          <div className="flex items-center gap-1">
+            <span className="font-bold text-slate-700 shrink-0">N° Mle :</span>
+            <span className="font-mono font-bold text-slate-900 truncate">{report.studentMatricule || '---'}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-700">CLASSE :</span>
-            <span className="font-black text-slate-900 uppercase">{report.className}</span>
+          <div className="flex items-center gap-1 min-w-0">
+            <span className="font-bold text-slate-700 shrink-0">CLASSE :</span>
+            <span className="font-black text-slate-900 uppercase truncate">{report.className}</span>
           </div>
         </div>
 
         {/* Center Box: Large Class Badge */}
-        <div className="col-span-3 border border-slate-900 p-1.5 flex items-center justify-center text-center bg-slate-50 relative overflow-hidden">
-          <div className="border border-slate-300 p-1.5 w-full h-full flex items-center justify-center">
-            <span className="font-black text-lg uppercase tracking-tight text-slate-900">{report.className}</span>
+        <div className="col-span-3 border border-slate-900 p-1 flex items-center justify-center text-center bg-slate-50 relative overflow-hidden">
+          <div className="border border-slate-300 p-1 w-full h-full flex items-center justify-center">
+            <span className="font-black text-xs uppercase tracking-tight text-slate-900 leading-tight">{report.className}</span>
           </div>
         </div>
 
         {/* Right Box */}
-        <div className="col-span-4 border border-slate-900 p-2 flex flex-col justify-center space-y-1 text-right">
-          <div className="flex justify-between items-center">
-            <span className="font-bold text-slate-700">Année scolaire :</span>
+        <div className="col-span-4 border border-slate-900 p-1.5 flex flex-col justify-center space-y-0.5 text-right min-w-0">
+          <div className="flex justify-between items-center gap-1">
+            <span className="font-bold text-slate-700">Année :</span>
             <span className="font-bold text-slate-900">{report.academicYear}</span>
           </div>
-          <div className="font-black uppercase text-blue-950 text-[10px] text-center border-y border-slate-300 py-0.5 my-0.5">
+          <div className="font-black uppercase text-blue-950 text-[8.5px] text-center border-y border-slate-300 py-0.5 truncate">
             {termFormatted}
           </div>
-          <div className="flex justify-between items-center text-[8.5px]">
-            <span className="font-bold text-slate-700">Effectif Classe :</span>
+          <div className="flex justify-between items-center text-[7.5px]">
+            <span className="font-bold text-slate-700">Effectif :</span>
             <span className="font-black text-slate-900">{report.totalClassStudents} élèves</span>
           </div>
         </div>
       </div>
 
       {/* 3. MAIN GRADES TABLE */}
-      <div className="flex-1 my-1">
-        <table className="w-full border-collapse border border-slate-900 text-center text-[8.5px]">
+      <div className="flex-1 my-0.5">
+        <table className="w-full border-collapse border border-slate-900 text-center text-[7.5px]">
           <thead>
-            <tr className="bg-slate-100 font-black text-[8px] uppercase tracking-tight text-slate-900 border-b border-slate-900">
-              <th className="border-r border-slate-900 p-1 text-left w-[32%]">MATIERES</th>
-              <th className="border-r border-slate-900 p-1 w-[8%]">COEF</th>
-              <th className="border-r border-slate-900 p-1 w-[15%]">
-                {maxScore === 10 ? 'N.CLASSE /10' : 'NOTES CLASSE /20'}
+            <tr className="bg-slate-100 font-black text-[7px] uppercase tracking-tight text-slate-900 border-b border-slate-900">
+              <th className="border-r border-slate-900 p-0.5 text-left w-[30%]">MATIERES</th>
+              <th className="border-r border-slate-900 p-0.5 w-[7%]">COEF</th>
+              <th className="border-r border-slate-900 p-0.5 w-[14%]">
+                {maxScore === 10 ? 'N.CLASSE /10' : 'N.CLASSE /20'}
               </th>
-              <th className="border-r border-slate-900 p-1 w-[15%]">
-                {maxScore === 10 ? 'COMPOS /10' : 'NOTE COMP /40'}
+              <th className="border-r border-slate-900 p-0.5 w-[14%]">
+                {maxScore === 10 ? 'COMPOS /10' : 'COMPOS /40'}
               </th>
-              <th className="border-r border-slate-900 p-1 w-[10%]">MOY GEN</th>
-              <th className="border-r border-slate-900 p-1 w-[10%]">NOTES COEF</th>
-              <th className="p-1 text-left w-[10%]">APPRECIATIONS</th>
+              <th className="border-r border-slate-900 p-0.5 w-[10%]">MOY GEN</th>
+              <th className="border-r border-slate-900 p-0.5 w-[11%]">N.COEF</th>
+              <th className="p-0.5 text-left w-[14%]">APPRECIATIONS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-900 font-semibold text-slate-900">
             {report.subjectAverages.map((sub) => {
-              const classVal = sub.classScore !== undefined ? sub.classScore : sub.finalScore;
-              const compVal = sub.compositionScore !== undefined ? sub.compositionScore : (maxScore === 10 ? sub.finalScore : sub.finalScore * 2);
+              const hasGrades = sub.hasGrades ?? (sub.classScore !== undefined || sub.compositionScore !== undefined);
               const { appreciation } = getMaliScoreAppreciation(sub.finalScore, maxScore);
 
               return (
-                <tr key={sub.subjectId} className="h-5">
-                  <td className="border-r border-slate-900 px-1.5 py-1 text-left font-bold uppercase truncate max-w-[130px]">
+                <tr key={sub.subjectId} className="h-4">
+                  <td className="border-r border-slate-900 px-1 py-0.5 text-left font-bold uppercase truncate max-w-[100px]">
                     {sub.subjectName}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-1 font-bold">
+                  <td className="border-r border-slate-900 px-0.5 py-0.5 font-bold">
                     {sub.coefficient}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-1 font-mono">
-                    {classVal.toFixed(2).replace('.', ',')}
+                  <td className="border-r border-slate-900 px-0.5 py-0.5 font-mono">
+                    {sub.classScore !== undefined ? sub.classScore.toFixed(2).replace('.', ',') : ''}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-1 font-mono">
-                    {compVal.toFixed(2).replace('.', ',')}
+                  <td className="border-r border-slate-900 px-0.5 py-0.5 font-mono">
+                    {sub.compositionScore !== undefined ? sub.compositionScore.toFixed(2).replace('.', ',') : ''}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-1 font-mono font-black">
-                    {sub.finalScore.toFixed(2).replace('.', ',')}
+                  <td className="border-r border-slate-900 px-0.5 py-0.5 font-mono font-black">
+                    {hasGrades ? sub.finalScore.toFixed(2).replace('.', ',') : ''}
                   </td>
-                  <td className="border-r border-slate-900 px-1 py-1 font-mono font-bold">
-                    {sub.weightedScore.toFixed(2).replace('.', ',')}
+                  <td className="border-r border-slate-900 px-0.5 py-0.5 font-mono font-bold">
+                    {hasGrades ? sub.weightedScore.toFixed(2).replace('.', ',') : ''}
                   </td>
-                  <td className="px-1.5 py-1 text-left text-[8px] font-bold uppercase truncate">
-                    {sub.appreciation || appreciation.toUpperCase()}
+                  <td className="px-1 py-0.5 text-left text-[7px] font-bold uppercase truncate max-w-[65px]">
+                    {hasGrades ? (sub.appreciation || appreciation.toUpperCase()) : ''}
                   </td>
                 </tr>
               );
             })}
 
             {/* TOTAL COEFFICIENTS ROW */}
-            <tr className="border-t border-slate-900 font-black h-5">
-              <td className="border-r border-slate-900 px-1.5 py-1 text-left uppercase text-[8px]">
+            <tr className="border-t border-slate-900 font-black h-4">
+              <td className="border-r border-slate-900 px-1 py-0.5 text-left uppercase text-[7px]">
                 TOTAL DES COEFFICIENTS
               </td>
-              <td className="border-r border-slate-900 px-1 py-1 font-black text-center">
+              <td className="border-r border-slate-900 px-0.5 py-0.5 font-black text-center">
                 {report.totalCoefficients}
               </td>
               <td className="border-r border-slate-900" colSpan={5}></td>
             </tr>
 
             {/* TOTAL NOTES COEFFICIEES ROW */}
-            <tr className="border-t border-slate-900 font-black h-5">
-              <td className="border-r border-slate-900 px-1.5 py-1 text-left uppercase text-[8px]" colSpan={5}>
+            <tr className="border-t border-slate-900 font-black h-4">
+              <td className="border-r border-slate-900 px-1 py-0.5 text-left uppercase text-[7px]" colSpan={5}>
                 TOTAL DES NOTES COEFFICIEES
               </td>
-              <td className="border-r border-slate-900 px-1 py-1 font-mono font-black text-center">
+              <td className="border-r border-slate-900 px-0.5 py-0.5 font-mono font-black text-center">
                 {report.totalPoints.toFixed(2).replace('.', ',')}
               </td>
-              <td className="px-1 py-1"></td>
+              <td className="px-0.5 py-0.5"></td>
             </tr>
 
             {/* MOYENNE & RANG ROW */}
-            <tr className="border-t-2 border-slate-900 font-black bg-slate-50 h-7">
-              <td className="border-r border-slate-900 px-2 py-1.5 text-left uppercase" colSpan={3}>
-                MOYENNE DE L'ELEVE : <span className="font-mono text-[11px] ml-1">{report.generalAverage.toFixed(2).replace('.', ',')}</span>
+            <tr className="border-t-2 border-slate-900 font-black bg-slate-50 h-5">
+              <td className="border-r border-slate-900 px-1.5 py-1 text-left uppercase" colSpan={3}>
+                MOYENNE : <span className="font-mono text-[9.5px] ml-1">{report.totalCoefficients > 0 ? report.generalAverage.toFixed(2).replace('.', ',') : '—'}</span>
               </td>
-              <td className="border-r border-slate-900 px-2 py-1.5 text-center uppercase" colSpan={4}>
-                RANG : <span className="font-mono text-[11px] ml-1">{report.rankInClass} / {report.totalClassStudents}</span>
+              <td className="border-r border-slate-900 px-1.5 py-1 text-center uppercase" colSpan={4}>
+                RANG : <span className="font-mono text-[9.5px] ml-1">{report.totalCoefficients > 0 ? `${report.rankInClass}${report.rankInClass === 1 ? 'er' : 'e'} / ${report.totalClassStudents}` : '—'}</span>
               </td>
             </tr>
           </tbody>
@@ -1305,25 +1150,25 @@ const PrintableBulletin: React.FC<PrintableBulletinProps> = ({ report, settings,
       </div>
 
       {/* 4. BOTTOM APPRECIATION & SIGNATURE BLOCK */}
-      <div className="border border-slate-900 p-2.5 space-y-1.5 my-1 text-[8.5px]">
-        <div className="flex items-baseline justify-between border-b border-dashed border-slate-400 pb-1">
+      <div className="border border-slate-900 p-1.5 space-y-1 my-0.5 text-[7.5px]">
+        <div className="flex items-baseline justify-between border-b border-dashed border-slate-400 pb-0.5">
           <span className="font-bold text-slate-800 uppercase">Appréciation du Directeur :</span>
-          <span className="font-black text-[9.5px] uppercase tracking-wider text-slate-900">
-            {comment || (report.generalAverage >= 14 ? 'BIEN - FELICITATIONS' : report.generalAverage >= 10 ? 'PASSABLE - SATISFAISANT' : report.generalAverage >= 8 ? 'INSUFFISANT' : 'MEDIOCRE')}
+          <span className="font-black text-[8.5px] uppercase tracking-wider text-slate-900">
+            {comment || (report.totalCoefficients === 0 ? '' : (report.generalAverage >= 14 ? 'BIEN - FELICITATIONS' : report.generalAverage >= 10 ? 'PASSABLE - SATISFAISANT' : report.generalAverage >= 8 ? 'INSUFFISANT' : 'MEDIOCRE'))}
           </span>
         </div>
 
-        <div className="flex justify-between items-end pt-1 font-bold">
+        <div className="flex justify-between items-end pt-0.5 font-bold">
           <div>
             <span>{settings.city || 'Bamako'} le </span>
             <span className="font-mono">..../..../{new Date().getFullYear()}</span>
           </div>
-          <div className="text-right pr-3 relative">
-            <span className="uppercase text-[9px] font-black block">Le Directeur</span>
+          <div className="text-right pr-2 relative">
+            <span className="uppercase text-[8px] font-black block">Le Directeur</span>
             {settings.stampUrl ? (
-              <img src={settings.stampUrl} alt="Cachet et Signature" className="h-10 max-w-[90px] object-contain ml-auto my-0.5" />
+              <img src={settings.stampUrl} alt="Cachet et Signature" className="h-8 max-w-[75px] object-contain ml-auto my-0.5" />
             ) : (
-              <div className="h-7"></div>
+              <div className="h-5"></div>
             )}
           </div>
         </div>

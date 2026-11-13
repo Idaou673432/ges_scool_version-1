@@ -56,24 +56,24 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-950 via-slate-950 to-black">
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl p-8 space-y-8 border border-slate-800 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 bg-slate-950 overflow-y-auto flex items-center justify-center p-3 sm:p-4 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-950 via-slate-950 to-black">
+      <div className="w-full max-w-sm sm:max-w-md my-auto bg-white rounded-3xl sm:rounded-[2rem] shadow-2xl p-5 sm:p-6 space-y-4 sm:space-y-5 border border-slate-800 relative overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         
         {/* Top Decorative Gradient Accent */}
-        <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-900 via-emerald-600 to-amber-500" />
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-900 via-emerald-600 to-amber-500" />
 
         {/* Branding & Logo */}
-        <div className="text-center space-y-3 pt-2">
+        <div className="text-center space-y-2 pt-1">
           <div className="inline-flex items-center justify-center">
             {settings.logoUrl ? (
               <img
                 src={settings.logoUrl}
                 alt="Logo Établissement"
-                className="w-20 h-20 object-contain rounded-2xl border-2 border-slate-100 p-1 bg-white shadow-md"
+                className="w-14 h-14 sm:w-16 sm:h-16 object-contain rounded-2xl border-2 border-slate-100 p-1 bg-white shadow-md"
               />
             ) : (
-              <div className="w-16 h-16 bg-blue-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/30">
-                <Building2 className="w-8 h-8" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-blue-900 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/30">
+                <Building2 className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
             )}
           </div>
@@ -82,7 +82,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
               {settings.academyName || 'Académie d\'Enseignement'}
             </span>
-            <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+            <h1 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
               {settings.schoolName || 'KalanGest Mali'}
             </h1>
           </div>
@@ -94,8 +94,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
         </div>
 
         {/* Form */}
-        <form onSubmit={handleUnlock} className="space-y-6">
-          <div className="space-y-2">
+        <form onSubmit={handleUnlock} className="space-y-4">
+          <div className="space-y-1.5">
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -106,7 +106,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
                   setError(false);
                 }}
                 placeholder="Saisissez votre Code PIN / Mot de passe"
-                className={`w-full p-4 pr-12 text-center text-lg font-black font-mono text-slate-900 bg-slate-50 border rounded-2xl outline-none transition-all ${
+                className={`w-full p-3 sm:p-3.5 pr-11 text-center text-base sm:text-lg font-black font-mono text-slate-900 bg-slate-50 border rounded-2xl outline-none transition-all ${
                   error 
                     ? 'border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20' 
                     : 'border-slate-200 focus:border-blue-900 focus:ring-2 focus:ring-blue-900/20'
@@ -115,9 +115,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-1"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer p-1"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
             </div>
 
@@ -130,13 +130,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
           </div>
 
           {/* Quick Keypad for Touch / PIN entry */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
               <button
                 key={num}
                 type="button"
                 onClick={() => handleKeypadPress(num)}
-                className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-blue-900 active:text-white rounded-xl text-base font-black text-slate-800 transition-all cursor-pointer shadow-xs"
+                className="py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 active:bg-blue-900 active:text-white rounded-xl text-sm sm:text-base font-black text-slate-800 transition-all cursor-pointer shadow-xs"
               >
                 {num}
               </button>
@@ -144,21 +144,21 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
             <button
               type="button"
               onClick={() => handleKeypadPress('CLEAR')}
-              className="py-3 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-xl text-xs font-black uppercase transition-all cursor-pointer"
+              className="py-2.5 sm:py-3 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-xl text-xs font-black uppercase transition-all cursor-pointer"
             >
               Effacer
             </button>
             <button
               type="button"
               onClick={() => handleKeypadPress('0')}
-              className="py-3 bg-slate-100 hover:bg-slate-200 active:bg-blue-900 active:text-white rounded-xl text-base font-black text-slate-800 transition-all cursor-pointer shadow-xs"
+              className="py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 active:bg-blue-900 active:text-white rounded-xl text-sm sm:text-base font-black text-slate-800 transition-all cursor-pointer shadow-xs"
             >
               0
             </button>
             <button
               type="button"
               onClick={() => handleKeypadPress('BACK')}
-              className="py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase transition-all cursor-pointer"
+              className="py-2.5 sm:py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-black uppercase transition-all cursor-pointer"
             >
               ⌫
             </button>
@@ -166,9 +166,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock, onOpenQrScanne
 
           <button
             type="submit"
-            className="w-full py-4 bg-blue-900 hover:bg-blue-950 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
+            className="w-full py-3 sm:py-3.5 bg-blue-900 hover:bg-blue-950 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]"
           >
-            <ShieldCheck className="w-5 h-5" />
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
             <span>Déverrouiller l'Application</span>
             <ArrowRight className="w-4 h-4" />
           </button>

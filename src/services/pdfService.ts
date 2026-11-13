@@ -165,8 +165,9 @@ export class PdfService {
     doc.setFontSize(isFullPage ? 7.5 : 6.5);
 
     reportCard.subjectAverages.forEach((sub) => {
-      const classVal = sub.classScore !== undefined ? sub.classScore : sub.finalScore;
-      const compVal = sub.compositionScore !== undefined ? sub.compositionScore : (maxScore === 10 ? sub.finalScore : sub.finalScore * 2);
+      const hasGrades = sub.hasGrades ?? (sub.classScore !== undefined || sub.compositionScore !== undefined);
+      const classText = sub.classScore !== undefined ? sub.classScore.toFixed(2).replace('.', ',') : '';
+      const compText = sub.compositionScore !== undefined ? sub.compositionScore.toFixed(2).replace('.', ',') : '';
 
       doc.rect(x0, y, w, rowH);
 
@@ -185,30 +186,40 @@ export class PdfService {
 
       // N.CLASSE
       doc.setFont('Helvetica', 'normal');
-      doc.text(classVal.toFixed(2).replace('.', ','), xPos + colW[2] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      if (classText) {
+        doc.text(classText, xPos + colW[2] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      }
       xPos += colW[2];
       doc.line(xPos, y, xPos, y + rowH);
 
       // N.COMP
-      doc.text(compVal.toFixed(2).replace('.', ','), xPos + colW[3] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      if (compText) {
+        doc.text(compText, xPos + colW[3] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      }
       xPos += colW[3];
       doc.line(xPos, y, xPos, y + rowH);
 
       // MOY GEN
       doc.setFont('Helvetica', 'bold');
-      doc.text(sub.finalScore.toFixed(2).replace('.', ','), xPos + colW[4] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      if (hasGrades) {
+        doc.text(sub.finalScore.toFixed(2).replace('.', ','), xPos + colW[4] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      }
       xPos += colW[4];
       doc.line(xPos, y, xPos, y + rowH);
 
       // NOTES COEF
-      doc.text(sub.weightedScore.toFixed(2).replace('.', ','), xPos + colW[5] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      if (hasGrades) {
+        doc.text(sub.weightedScore.toFixed(2).replace('.', ','), xPos + colW[5] / 2, y + (isFullPage ? 4.2 : 3.2), { align: 'center' });
+      }
       xPos += colW[5];
       doc.line(xPos, y, xPos, y + rowH);
 
       // APPRECIATIONS
-      const apprText = sub.appreciation || (sub.finalScore >= 16 ? 'EXCELLENT' : sub.finalScore >= 14 ? 'BIEN' : sub.finalScore >= 12 ? 'ASSEZ-BIEN' : sub.finalScore >= 10 ? 'PASSABLE' : sub.finalScore >= 8 ? 'INSUFFISANT' : 'MAL');
-      doc.setFont('Helvetica', 'normal');
-      doc.text(apprText.toUpperCase(), xPos + 1.5, y + (isFullPage ? 4.2 : 3.2), { maxWidth: colW[6] - 2 });
+      if (hasGrades) {
+        const apprText = sub.appreciation || (sub.finalScore >= 16 ? 'EXCELLENT' : sub.finalScore >= 14 ? 'BIEN' : sub.finalScore >= 12 ? 'ASSEZ-BIEN' : sub.finalScore >= 10 ? 'PASSABLE' : sub.finalScore >= 8 ? 'INSUFFISANT' : 'MAL');
+        doc.setFont('Helvetica', 'normal');
+        doc.text(apprText.toUpperCase(), xPos + 1.5, y + (isFullPage ? 4.2 : 3.2), { maxWidth: colW[6] - 2 });
+      }
 
       y += rowH;
     });
@@ -255,8 +266,12 @@ export class PdfService {
       doc.setFont('Helvetica', 'bold');
       doc.text('Appréciation du Directeur :', x0 + 3, y + (isFullPage ? 6 : 4));
 
-      const directorAppr = reportCard.generalAverage >= 14 ? 'BIEN - FELICITATIONS' : reportCard.generalAverage >= 10 ? 'PASSABLE - SATISFAISANT' : reportCard.generalAverage >= 8 ? 'INSUFFISANT' : 'MEDIOCRE';
-      doc.text(directorAppr, x0 + (isFullPage ? 45 : 35), y + (isFullPage ? 6 : 4));
+      const directorAppr = reportCard.totalCoefficients === 0
+        ? ''
+        : (reportCard.generalAverage >= 14 ? 'BIEN - FELICITATIONS' : reportCard.generalAverage >= 10 ? 'PASSABLE - SATISFAISANT' : reportCard.generalAverage >= 8 ? 'INSUFFISANT' : 'MEDIOCRE');
+      if (directorAppr) {
+        doc.text(directorAppr, x0 + (isFullPage ? 45 : 35), y + (isFullPage ? 6 : 4));
+      }
 
       doc.setFont('Helvetica', 'normal');
       doc.text(`${settings.city || 'Bamako'} le ...../...../${new Date().getFullYear()}`, x0 + 3, y + botH - (isFullPage ? 4 : 2.5));
@@ -293,7 +308,7 @@ export class PdfService {
 
   /**
    * Génère un seul PDF multi-pages contenant TOUS les bulletins de la classe :
-   * 1 page A4 Portrait par élève, strictement classés par rang (1er au dernier) sans répétition.
+   * 2 bulletins côte à côte par feuille A4 horizontale (paysage), strictement classés par rang (1er+2ème, 3ème+4ème, ...).
    */
   public static async generateClassReportCardsPdf(
     reportCards: ReportCard[],
@@ -311,16 +326,25 @@ export class PdfService {
     });
 
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4'
     });
 
-    for (let i = 0; i < sortedReportCards.length; i++) {
+    const halfW = 139;
+    const halfH = 198;
+
+    for (let i = 0; i < sortedReportCards.length; i += 2) {
       if (i > 0) {
-        doc.addPage('a4', 'portrait');
+        doc.addPage('a4', 'landscape');
       }
-      this.renderSingleBulletinOnDoc(doc, sortedReportCards[i], settings, 10, 10, 190, 277);
+      // Bulletin de gauche (1er, 3ème, 5ème...)
+      this.renderSingleBulletinOnDoc(doc, sortedReportCards[i], settings, 6, 6, halfW, halfH);
+
+      // Bulletin de droite (2ème, 4ème, 6ème...) si présent
+      if (sortedReportCards[i + 1]) {
+        this.renderSingleBulletinOnDoc(doc, sortedReportCards[i + 1], settings, 152, 6, halfW, halfH);
+      }
     }
 
     const safeClassName = className.replace(/[^a-zA-Z0-9_-]/g, '_');

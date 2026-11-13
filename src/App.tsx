@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SchoolProvider } from './contexts/SchoolContext';
 import { Sidebar, NavTab } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
@@ -12,6 +12,7 @@ import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { LockScreen } from './components/auth/LockScreen';
 
 import { DashboardModule } from './modules/dashboard/DashboardModule';
+import { InscriptionModule } from './modules/students/InscriptionModule';
 import { StudentsModule } from './modules/students/StudentsModule';
 import { ClassesModule } from './modules/classes/ClassesModule';
 import { SubjectsModule } from './modules/subjects/SubjectsModule';
@@ -37,10 +38,12 @@ import { secureLocalStorage, secureSessionStorage } from './services/secureStora
 
 export function AppContent() {
   const { classes, isFeatureEnabled, payments, settings, students } = useSchool();
+  const { currentUser, canAccessTab } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
 
   useEffect(() => {
     const tabFeatureMap: Record<string, keyof SchoolEnabledFeatures | null> = {
+      inscription: 'students',
       students: 'students',
       classes: 'classes',
       subjects: 'subjects',
@@ -54,10 +57,10 @@ export function AppContent() {
       cashier: 'payments'
     };
     const reqFeature = tabFeatureMap[activeTab];
-    if (reqFeature && !isFeatureEnabled(reqFeature)) {
+    if ((reqFeature && !isFeatureEnabled(reqFeature)) || (currentUser && !canAccessTab(activeTab))) {
       setActiveTab('dashboard');
     }
-  }, [activeTab, isFeatureEnabled]);
+  }, [activeTab, isFeatureEnabled, currentUser, canAccessTab]);
   const [isGlobalQrScannerOpen, setIsGlobalQrScannerOpen] = useState(false);
   const [globalScannedStudent, setGlobalScannedStudent] = useState<Student | null>(null);
   
@@ -205,7 +208,7 @@ export function AppContent() {
   }
 
   return (
-    <div className="flex h-screen bg-[#f8fafc] text-slate-900 overflow-hidden font-sans">
+    <div className="flex h-dvh w-full bg-[#f8fafc] text-slate-900 overflow-hidden font-sans">
       {/* Sidebar Navigation (Desktop Collapsible + Mobile Slide-In Drawer) */}
       <Sidebar 
         activeTab={activeTab} 
@@ -229,28 +232,31 @@ export function AppContent() {
         {/* Global Offline Status & Scan Queue Synchronization Banner */}
         <OfflineScanBanner />
 
-        <main className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-3.5 pb-20 lg:pb-4 custom-scrollbar">
-          {activeTab === 'dashboard' && (
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-3 lg:p-4 pb-20 lg:pb-4 custom-scrollbar">
+          {activeTab === 'dashboard' && canAccessTab('dashboard') && (
             <DashboardModule 
               onNavigate={setActiveTab} 
               onOpenQrScanner={() => setIsGlobalQrScannerOpen(true)}
               onViewStudentProfile={(student) => setGlobalScannedStudent(student)}
             />
           )}
-          {activeTab === 'students' && <StudentsModule />}
-          {activeTab === 'classes' && <ClassesModule />}
-          {activeTab === 'subjects' && <SubjectsModule />}
-          {activeTab === 'teachers' && <TeachersModule />}
-          {activeTab === 'grades' && <GradesModule />}
-          {activeTab === 'attendance' && <AttendanceModule />}
-          {activeTab === 'examSchedule' && <ExamScheduleModule />}
-          {activeTab === 'bulletins' && <BulletinsModule />}
-          {activeTab === 'cards' && <CardsModule />}
-          {activeTab === 'payments' && <PaymentsModule />}
-          {activeTab === 'cashier' && <CashierModule />}
-          {activeTab === 'modules' && <SettingsModule initialTab="FEATURES" />}
-          {activeTab === 'settings' && <SettingsModule initialTab="INFO" />}
-          {activeTab === 'backup' && <SettingsModule initialTab="INFO" />}
+          {activeTab === 'inscription' && canAccessTab('inscription') && (
+            <InscriptionModule onNavigateToStudents={() => setActiveTab('students')} />
+          )}
+          {activeTab === 'students' && canAccessTab('students') && <StudentsModule />}
+          {activeTab === 'classes' && canAccessTab('classes') && <ClassesModule />}
+          {activeTab === 'subjects' && canAccessTab('subjects') && <SubjectsModule />}
+          {activeTab === 'teachers' && canAccessTab('teachers') && <TeachersModule />}
+          {activeTab === 'grades' && canAccessTab('grades') && <GradesModule />}
+          {activeTab === 'attendance' && canAccessTab('attendance') && <AttendanceModule />}
+          {activeTab === 'examSchedule' && canAccessTab('examSchedule') && <ExamScheduleModule />}
+          {activeTab === 'bulletins' && canAccessTab('bulletins') && <BulletinsModule />}
+          {activeTab === 'cards' && canAccessTab('cards') && <CardsModule />}
+          {activeTab === 'payments' && canAccessTab('payments') && <PaymentsModule />}
+          {activeTab === 'cashier' && canAccessTab('cashier') && <CashierModule />}
+          {activeTab === 'modules' && canAccessTab('modules') && <SettingsModule initialTab="FEATURES" />}
+          {activeTab === 'settings' && canAccessTab('settings') && <SettingsModule initialTab="INFO" />}
+          {activeTab === 'backup' && canAccessTab('backup') && <SettingsModule initialTab="INFO" />}
         </main>
 
         {/* Mobile Quick Bottom Navigation Bar */}
@@ -284,12 +290,12 @@ export function AppContent() {
             setGlobalScannedStudent(null);
             setIsGlobalQrScannerOpen(true);
           }}
-          onNavigateToBulletin={() => {
+          onNavigateToBulletin={canAccessTab('bulletins') ? () => {
             setActiveTab('bulletins');
-          }}
-          onNavigateToPayments={() => {
+          } : undefined}
+          onNavigateToPayments={canAccessTab('payments') ? () => {
             setActiveTab('payments');
-          }}
+          } : undefined}
         />
       )}
     </div>

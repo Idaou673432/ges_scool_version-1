@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { NavTab } from './Sidebar';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface MobileBottomNavProps {
   activeTab: NavTab;
@@ -28,15 +29,16 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenQrScanner,
 }) => {
   const { isFeatureEnabled } = useSchool();
+  const { canAccessTab } = useAuth();
 
   const leftItems = [
-    { id: 'dashboard' as NavTab, label: 'Accueil', icon: LayoutDashboard },
-    ...(isFeatureEnabled('students') ? [{ id: 'students' as NavTab, label: 'Élèves', icon: Users }] : []),
+    ...(canAccessTab('dashboard') ? [{ id: 'dashboard' as NavTab, label: 'Accueil', icon: LayoutDashboard }] : []),
+    ...(isFeatureEnabled('students') && canAccessTab('students') ? [{ id: 'students' as NavTab, label: 'Élèves', icon: Users }] : []),
   ];
 
   const rightItems = [
-    ...(isFeatureEnabled('grades') ? [{ id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList }] : []),
-    ...(isFeatureEnabled('payments') ? [{ id: 'payments' as NavTab, label: 'Caisse', icon: CreditCard }] : []),
+    ...(isFeatureEnabled('grades') && canAccessTab('grades') ? [{ id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList }] : []),
+    ...(isFeatureEnabled('payments') && canAccessTab('payments') ? [{ id: 'payments' as NavTab, label: 'Caisse', icon: CreditCard }] : []),
   ];
 
   return (

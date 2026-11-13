@@ -17,12 +17,15 @@ import {
   ChevronRight, 
   ChevronLeft,
   User,
+  Users,
   Search,
   Check,
   Percent,
-  Calculator
+  Calculator,
+  X
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { EvaluationType, EvaluationGrade, EvaluationTerm, Student } from '../../types';
 import { getMaliScoreAppreciation, getMaliEvaluationTerms, getFilteredEvaluationTerms, getTermLabel } from '../../constants/maliEducation';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
@@ -30,6 +33,9 @@ import { PromotionManager } from '../../components/grades/PromotionManager';
 
 export const GradesModule: React.FC = () => {
   const { classes, subjects, students, grades, saveGrade, deleteGrade, deleteAllGrades, settings } = useSchool();
+  const { hasPermission } = useAuth();
+  const canEditGrades = hasPermission('grades:entry');
+  const canBulkDeleteGrades = hasPermission('classes:manage');
   
   // Classes filtrées selon le type d'établissement configuré
   const availableClasses = useMemo(() => {
@@ -51,6 +57,11 @@ export const GradesModule: React.FC = () => {
   const [evaluationType, setEvaluationType] = useState<EvaluationType>('COMPOSITION');
   const [term, setTerm] = useState<EvaluationTerm>('EVALUATION_1');
   const [activeTab, setActiveTab] = useState<'BATCH' | 'HISTORY' | 'PROMOTION'>('BATCH');
+  const [entryMode, setEntryMode] = useState<'BY_STUDENT' | 'BY_SUBJECT'>('BY_STUDENT');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedBatchStudentIds, setSelectedBatchStudentIds] = useState<string[]>([]);
+  const [batchOnlySelected, setBatchOnlySelected] = useState<boolean>(false);
+  const [batchScoresMap, setBatchScoresMap] = useState<Record<string, number>>({});
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
 
   // Synchronisation de la classe sélectionnée si la liste disponible change
@@ -113,6 +124,12 @@ export const GradesModule: React.FC = () => {
     const filtered = subjects.filter(s => s.classCategory === selectedClassObj.category);
     return filtered.length > 0 ? filtered : subjects;
   }, [subjects, selectedClassObj]);
+
+  useEffect(() => {
+    if (classSubjects.length > 0 && !classSubjects.some(s => s.id === selectedSubjectId)) {
+      setSelectedSubjectId(classSubjects[0].id);
+    }
+  }, [classSubjects, selectedSubjectId]);
 
   // Élèves actifs de la classe
   const currentClassStudents = useMemo(() => {
@@ -178,8 +195,37 @@ export const GradesModule: React.FC = () => {
     setScoresMap(loadedScores);
   }, [currentStudent, selectedClassId, term, evaluationType, classSubjects, grades]);
 
-  // Saisie directe d'une note pour une matière
+  // Pré-chargement des notes existantes pour le mode Sélection d'Élèves (Par Matière)
+  useEffect(() => {
+    if (!selectedSubjectId) {
+      setBatchScoresMap({});
+      return;
+    }
+    const loaded: Record<string, number> = {};
+    currentClassStudents.forEach(std => {
+      const existing = grades.find(
+        g => g.studentId === std.id &&
+             g.classId === selectedClassId &&
+             g.subjectId === selectedSubjectId &&
+             g.term === term &&
+             g.type === evaluationType
+      );
+      if (existing) {
+        loaded[std.id] = existing.score;
+      }
+    });
+    setBatchScoresMap(loaded);
+  }, [currentClassStudents, selectedClassId, selectedSubjectId, term, evaluationType, grades]);
+
+  // Réinitialiser la sélection quand la classe change
+  useEffect(() => {
+    setSelectedBatchStudentIds([]);
+    setBatchOnlySelected(false);
+  }, [selectedClassId]);
+
+  // Saisie directe d'une note pour une matière (mode par élève)
   const handleScoreChange = (subjectId: string, val: string) => {
+    if (!canEditGrades) return;
     if (val === '') {
       setScoresMap(prev => {
         const copy = { ...prev };
@@ -193,15 +239,48 @@ export const GradesModule: React.FC = () => {
     setScoresMap(prev => ({ ...prev, [subjectId]: scoreNum }));
   };
 
-  // Enregistrement des notes de cet élève
+  // Saisie directe d'une note pour un élève (mode sélection d'élèves par matière)
+  const handleBatchStudentScoreChange = (studentId: string, val: string) => {
+    if (!canEditGrades) return;
+    if (val === '') {
+      setBatchScoresMap(prev => {
+        const copy = { ...prev };
+        delete copy[studentId];
+        return copy;
+      });
+      return;
+    }
+    const parsed = parseFloat(val);
+    const scoreNum = Math.min(currentMaxScore, Math.max(0, isNaN(parsed) ? 0 : parsed));
+    setBatchScoresMap(prev => ({ ...prev, [studentId]: scoreNum }));
+    if (!selectedBatchStudentIds.includes(studentId)) {
+      setSelectedBatchStudentIds(prev => [...prev, studentId]);
+    }
+  };
+
+  const toggleSelectBatchStudent = (studentId: string) => {
+    setSelectedBatchStudentIds(prev =>
+      prev.includes(studentId) ? prev.filter(id => id !== studentId) : [...prev, studentId]
+    );
+  };
+
+  // Enregistrement des notes de cet élève (et suppression des notes vidées)
   const handleSaveStudentGrades = (moveToNext = false) => {
-    if (!currentStudent) return;
+    if (!canEditGrades || !currentStudent) return;
 
     let savedCount = 0;
     classSubjects.forEach(sub => {
       const score = scoresMap[sub.id];
+      const existing = grades.find(
+        g => g.studentId === currentStudent.id &&
+             g.classId === selectedClassId &&
+             g.subjectId === sub.id &&
+             g.term === term &&
+             g.type === evaluationType
+      );
       if (score !== undefined) {
         saveGrade({
+          ...(existing || {}),
           studentId: currentStudent.id,
           classId: selectedClassId,
           subjectId: sub.id,
@@ -216,6 +295,8 @@ export const GradesModule: React.FC = () => {
           date: new Date().toISOString().split('T')[0]
         });
         savedCount++;
+      } else if (existing) {
+        deleteGrade(existing.id);
       }
     });
 
@@ -226,6 +307,60 @@ export const GradesModule: React.FC = () => {
     if (moveToNext && hasNextStudent) {
       setSelectedStudentId(currentClassStudents[currentStudentIndex + 1].id);
     }
+  };
+
+  // Enregistrement des notes uniquement pour les élèves sélectionnés (mode par matière)
+  const handleSaveSelectedStudentsBatch = () => {
+    if (!canEditGrades || !selectedSubjectId) return;
+    const targetSub = classSubjects.find(s => s.id === selectedSubjectId);
+    if (!targetSub) return;
+
+    const targetIds = selectedBatchStudentIds.length > 0
+      ? selectedBatchStudentIds
+      : Object.keys(batchScoresMap);
+
+    if (targetIds.length === 0) {
+      setSavedSuccess('Sélectionnez au moins un élève et saisissez sa note.');
+      setTimeout(() => setSavedSuccess(null), 2500);
+      return;
+    }
+
+    let savedCount = 0;
+    const coef = (selectedClassObj?.customCoefficients && selectedClassObj.customCoefficients[targetSub.id] !== undefined)
+      ? selectedClassObj.customCoefficients[targetSub.id]
+      : (targetSub.coefficient || (evaluationType === 'COMPOSITION' ? 2 : 1));
+
+    targetIds.forEach(stdId => {
+      const score = batchScoresMap[stdId];
+      const existing = grades.find(
+        g => g.studentId === stdId &&
+             g.classId === selectedClassId &&
+             g.subjectId === targetSub.id &&
+             g.term === term &&
+             g.type === evaluationType
+      );
+      if (score !== undefined) {
+        saveGrade({
+          ...(existing || {}),
+          studentId: stdId,
+          classId: selectedClassId,
+          subjectId: targetSub.id,
+          term,
+          academicYear: settings.currentAcademicYear,
+          type: evaluationType,
+          score,
+          maxScore: currentMaxScore,
+          coefficient: coef,
+          date: new Date().toISOString().split('T')[0]
+        });
+        savedCount++;
+      } else if (existing) {
+        deleteGrade(existing.id);
+      }
+    });
+
+    setSavedSuccess(`${savedCount} note(s) enregistrée(s) en ${targetSub.name} pour les élèves sélectionnés.`);
+    setTimeout(() => setSavedSuccess(null), 3000);
   };
 
   const handlePrevStudent = () => {
@@ -413,7 +548,7 @@ export const GradesModule: React.FC = () => {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {activeTab === 'BATCH' && (
+            {activeTab === 'BATCH' && canEditGrades && entryMode === 'BY_STUDENT' && (
               <>
                 <button
                   type="button"
@@ -438,7 +573,18 @@ export const GradesModule: React.FC = () => {
               </>
             )}
 
-            {grades.length > 0 && (
+            {activeTab === 'BATCH' && canEditGrades && entryMode === 'BY_SUBJECT' && (
+              <button
+                type="button"
+                onClick={handleSaveSelectedStudentsBatch}
+                className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-2xs transition-all cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5 text-amber-400" />
+                <span>Enregistrer la sélection ({selectedBatchStudentIds.length})</span>
+              </button>
+            )}
+
+            {canBulkDeleteGrades && grades.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowDeleteAllModal(true)}
@@ -465,85 +611,46 @@ export const GradesModule: React.FC = () => {
       {activeTab === 'PROMOTION' ? (
         <PromotionManager selectedClassId={selectedClassId} term={term} />
       ) : activeTab === 'BATCH' ? (
-        /* ================= SAISIE PAR ÉLÈVE AVEC TOUTES LES MATIÈRES AFFICHÉES VERTICALEMENT ================= */
+        /* ================= SAISIE DES NOTES : PAR ÉLÈVE OU SÉLECTION D'ÉLÈVES PAR MATIÈRE ================= */
         <div className="space-y-2">
-          {/* Barre de sélection de l'élève & Navigation rapide */}
-          <div className="bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2.5 text-xs">
-            {/* Left: Élève Selector & Photo */}
-            <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
-              <div className="flex items-center gap-1 font-bold text-slate-700 uppercase text-[10px] tracking-wider shrink-0">
-                <User className="w-3.5 h-3.5 text-blue-900" />
-                <span>Élève à Noter :</span>
-              </div>
-
-              {/* Dropdown sélecteur de l'élève individuel */}
-              <select
-                value={selectedStudentId}
-                onChange={e => setSelectedStudentId(e.target.value)}
-                className="py-1 px-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-slate-800 cursor-pointer flex-1 max-w-sm truncate"
-              >
-                {currentClassStudents.map((std, idx) => {
-                  const studentGradesCount = classSubjects.filter(sub => 
-                    grades.some(g => g.studentId === std.id && g.classId === selectedClassId && g.subjectId === sub.id && g.term === term && g.type === evaluationType)
-                  ).length;
-                  return (
-                    <option key={std.id} value={std.id}>
-                      {idx + 1}. {std.lastName.toUpperCase()} {std.firstName} ({std.matricule}) — {studentGradesCount}/{classSubjects.length} notes
-                    </option>
-                  );
-                })}
-              </select>
-
-              {/* Navigation Précédent / Suivant */}
-              <div className="flex items-center gap-1 shrink-0">
+          {/* Barre de mode de saisie + recherche/sélection d'élèves */}
+          <div className="bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex bg-slate-100 p-0.5 rounded-lg">
                 <button
                   type="button"
-                  onClick={handlePrevStudent}
-                  disabled={!hasPrevStudent}
-                  className={`p-1 rounded-lg border flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer ${
-                    hasPrevStudent 
-                      ? 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300' 
-                      : 'opacity-40 text-slate-400 border-slate-200 cursor-not-allowed'
+                  onClick={() => setEntryMode('BY_STUDENT')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-all cursor-pointer ${
+                    entryMode === 'BY_STUDENT' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-semibold'
                   }`}
-                  title="Élève précédent dans la classe"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Précédent</span>
+                  <User className="w-3.5 h-3.5 text-blue-900" />
+                  <span>Par Élève (Toutes matières)</span>
                 </button>
-
-                <span className="text-[11px] font-mono font-bold text-slate-500 px-1">
-                  {currentStudentIndex >= 0 ? `${currentStudentIndex + 1} / ${currentClassStudents.length}` : '0 / 0'}
-                </span>
-
                 <button
                   type="button"
-                  onClick={handleNextStudent}
-                  disabled={!hasNextStudent}
-                  className={`p-1 rounded-lg border flex items-center gap-1 text-xs font-semibold transition-all cursor-pointer ${
-                    hasNextStudent 
-                      ? 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-300' 
-                      : 'opacity-40 text-slate-400 border-slate-200 cursor-not-allowed'
+                  onClick={() => setEntryMode('BY_SUBJECT')}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-all cursor-pointer ${
+                    entryMode === 'BY_SUBJECT' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-semibold'
                   }`}
-                  title="Élève suivant dans la classe"
                 >
-                  <span className="hidden sm:inline">Suivant</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <Users className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Sélectionner des Élèves (Par Matière)</span>
                 </button>
               </div>
             </div>
 
-            {/* Right: Live Student General Stats */}
-            {currentStudent && (
+            {entryMode === 'BY_STUDENT' && currentStudent && (
               <div className="flex items-center gap-2 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0 text-[11px]">
                 <div className="flex items-center gap-1">
                   <span className="text-slate-500">Moyenne :</span>
                   <span className="font-mono font-bold text-slate-900 text-xs">
-                    {studentMetrics.average.toFixed(2)} / {currentMaxScore}
+                    {studentMetrics.enteredCount > 0 ? studentMetrics.average.toFixed(2) : '—'} / {currentMaxScore}
                   </span>
                 </div>
                 <span className="text-slate-300">•</span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${studentMetrics.badgeColor}`}>
-                  {studentMetrics.appreciation}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${studentMetrics.enteredCount > 0 ? studentMetrics.badgeColor : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                  {studentMetrics.enteredCount > 0 ? studentMetrics.appreciation : 'Aucune note'}
                 </span>
                 <span className="text-slate-300">•</span>
                 <span className="font-semibold text-slate-600">
@@ -553,110 +660,392 @@ export const GradesModule: React.FC = () => {
             )}
           </div>
 
-          {/* TABLEAU VERTICAL DES MATIÈRES AVEC SAISIE DIRECTE DES NOTES */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-            {/* Header info bar of the selected student */}
-            {currentStudent ? (
-              <div className="bg-slate-900 text-white px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2.5">
-                  {currentStudent.photoUrl ? (
-                    <img
-                      src={currentStudent.photoUrl}
-                      alt=""
-                      className="w-7 h-7 rounded-lg object-cover border border-white/20 shrink-0"
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-lg bg-white/10 text-amber-300 font-bold flex items-center justify-center text-xs border border-white/10 shrink-0">
-                      {currentStudent.firstName[0]}{currentStudent.lastName[0]}
-                    </div>
+          {entryMode === 'BY_STUDENT' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5">
+              {/* Colonne gauche : Recherche & Liste cliquable des élèves */}
+              <div className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-2.5 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-blue-900" />
+                    <span>Choisir un élève ({filteredStudents.length}/{currentClassStudents.length})</span>
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={studentSearch}
+                    onChange={e => setStudentSearch(e.target.value)}
+                    placeholder="Rechercher nom, prénom ou matricule..."
+                    className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-slate-500 focus:bg-white"
+                  />
+                  {studentSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setStudentSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   )}
-                  <div>
-                    <span className="font-bold text-white text-xs sm:text-sm">
-                      {currentStudent.lastName.toUpperCase()} {currentStudent.firstName}
-                    </span>
-                    <span className="text-slate-400 font-mono text-[10px] ml-2">
-                      Matricule: {currentStudent.matricule} • {selectedClassObj?.name}
-                    </span>
+                </div>
+
+                <div className="space-y-1 max-h-[460px] overflow-y-auto pr-1 custom-scrollbar">
+                  {filteredStudents.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-slate-400 italic">
+                      Aucun élève ne correspond à cette recherche.
+                    </p>
+                  ) : (
+                    filteredStudents.map((std, idx) => {
+                      const isSelected = currentStudent?.id === std.id;
+                      const studentGradesCount = classSubjects.filter(sub =>
+                        grades.some(g => g.studentId === std.id && g.classId === selectedClassId && g.subjectId === sub.id && g.term === term && g.type === evaluationType)
+                      ).length;
+
+                      return (
+                        <button
+                          key={std.id}
+                          type="button"
+                          onClick={() => setSelectedStudentId(std.id)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-900 text-white border-blue-900 font-bold shadow-2xs'
+                              : 'bg-slate-50/80 text-slate-800 border-slate-200/70 hover:bg-slate-100 font-medium'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate">
+                              {idx + 1}. {std.lastName.toUpperCase()} {std.firstName}
+                            </p>
+                            <p className={`text-[10px] font-mono ${isSelected ? 'text-blue-200' : 'text-slate-400'}`}>
+                              {std.matricule}
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : studentGradesCount > 0
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-slate-200/70 text-slate-500'
+                          }`}>
+                            {studentGradesCount}/{classSubjects.length}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Colonne droite : Tableau vertical des matières de l'élève sélectionné */}
+              <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                {currentStudent ? (
+                  <>
+                    <div className="bg-slate-900 text-white px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        {currentStudent.photoUrl ? (
+                          <img
+                            src={currentStudent.photoUrl}
+                            alt=""
+                            className="w-7 h-7 rounded-lg object-cover border border-white/20 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-white/10 text-amber-300 font-bold flex items-center justify-center text-xs border border-white/10 shrink-0">
+                            {currentStudent.firstName[0]}{currentStudent.lastName[0]}
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-bold text-white text-xs sm:text-sm">
+                            {currentStudent.lastName.toUpperCase()} {currentStudent.firstName}
+                          </span>
+                          <span className="text-slate-400 font-mono text-[10px] ml-2">
+                            Matricule: {currentStudent.matricule} • {selectedClassObj?.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={handlePrevStudent}
+                          disabled={!hasPrevStudent}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white cursor-pointer"
+                          title="Élève précédent"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="font-mono text-slate-300 px-1">
+                          {currentStudentIndex >= 0 ? `${currentStudentIndex + 1}/${currentClassStudents.length}` : '0/0'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleNextStudent}
+                          disabled={!hasNextStudent}
+                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white cursor-pointer"
+                          title="Élève suivant"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-400/30 ml-1">
+                          {evaluationType}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 font-bold text-[10px] text-slate-500 uppercase tracking-wider">
+                          <tr>
+                            <th className="py-2 px-3 sm:px-4">Matières du Programme</th>
+                            <th className="py-2 px-2.5 text-center w-24">Coefficient</th>
+                            <th className="py-2 px-3 text-center w-44">
+                              Note Directe (sur {currentMaxScore})
+                            </th>
+                            <th className="py-2 px-3 text-center w-28">Points Coeff.</th>
+                            <th className="py-2 px-3 text-left">Appréciation</th>
+                            <th className="py-2 px-3 text-center w-24">Statut</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {classSubjects.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
+                                Aucune matière configurée pour cette classe. Ajoutez des matières dans le module Matières.
+                              </td>
+                            </tr>
+                          ) : (
+                            classSubjects.map((sub, index) => {
+                              const score = scoresMap[sub.id];
+                              const hasScore = score !== undefined && !isNaN(score);
+                              const coef = (selectedClassObj?.customCoefficients && selectedClassObj.customCoefficients[sub.id] !== undefined)
+                                ? selectedClassObj.customCoefficients[sub.id]
+                                : (sub.coefficient || 1);
+                              const points = hasScore ? (score * coef) : 0;
+                              const { appreciation, badgeColor } = hasScore
+                                ? getMaliScoreAppreciation(score, currentMaxScore)
+                                : { appreciation: 'En attente de note', badgeColor: 'bg-slate-100 text-slate-400 border-slate-200' };
+
+                              return (
+                                <tr key={sub.id} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-2 px-3 sm:px-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                        {index + 1}
+                                      </span>
+                                      <div>
+                                        <div className="font-bold text-slate-900 text-xs">{sub.name}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">Code: {sub.code}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-2.5 text-center">
+                                    <span className="font-mono font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs">
+                                      Coef {coef}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        step="0.25"
+                                        min="0"
+                                        max={currentMaxScore}
+                                        placeholder="—"
+                                        disabled={!canEditGrades}
+                                        value={hasScore ? score : ''}
+                                        onChange={e => handleScoreChange(sub.id, e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') {
+                                            handleSaveStudentGrades(false);
+                                          }
+                                        }}
+                                        className="w-24 text-center py-1 px-2 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:bg-white focus:border-blue-900 focus:ring-1 focus:ring-blue-900 disabled:opacity-60 disabled:cursor-not-allowed outline-none transition-all shadow-2xs placeholder:text-slate-300"
+                                      />
+                                      <span className="text-[11px] font-mono text-slate-400">/ {currentMaxScore}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 text-center font-mono font-bold text-xs text-slate-800">
+                                    {hasScore ? points.toFixed(2) : '—'}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeColor}`}>
+                                      {appreciation}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    {hasScore ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                        <Check className="w-3 h-3" />
+                                        <span>Saisie</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 font-medium italic">Vide</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                        {classSubjects.length > 0 && (
+                          <tfoot className="bg-slate-50/90 font-bold border-t-2 border-slate-200 text-xs">
+                            <tr>
+                              <td className="py-2.5 px-3 sm:px-4 text-slate-900 uppercase text-[11px]">
+                                Totaux & Moyenne Provisoire
+                              </td>
+                              <td className="py-2.5 px-2.5 text-center font-mono text-slate-900">
+                                {studentMetrics.totalCoeffs} Coeffs
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                  {studentMetrics.enteredCount} / {studentMetrics.totalSubjects} notées
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center font-mono text-blue-900 text-xs">
+                                {studentMetrics.totalPoints.toFixed(2)} pts
+                              </td>
+                              <td colSpan={2} className="py-2.5 px-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-600">Moyenne :</span>
+                                  <span className="font-mono text-sm font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-300">
+                                    {studentMetrics.enteredCount > 0 ? studentMetrics.average.toFixed(2) : '—'} / {currentMaxScore}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-8 text-center text-slate-400 font-medium text-xs">
+                    Aucun élève trouvé dans cette classe.
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* ================= SÉLECTION D'ÉLÈVES PAR MATIÈRE ================= */
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-lg px-2.5 py-1">
+                    <BookOpen className="w-3.5 h-3.5 text-blue-900 shrink-0" />
+                    <span className="text-[10px] font-bold uppercase text-slate-400">Matière</span>
+                    <select
+                      value={selectedSubjectId}
+                      onChange={e => setSelectedSubjectId(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-900 outline-none cursor-pointer max-w-[220px]"
+                    >
+                      {classSubjects.map(sub => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.name} (Coef {sub.coefficient})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="relative flex-1 min-w-[180px] max-w-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={studentSearch}
+                      onChange={e => setStudentSearch(e.target.value)}
+                      placeholder="Rechercher un élève à noter..."
+                      className="w-full pl-8 pr-7 py-1 bg-white border border-slate-300 rounded-lg text-xs outline-none focus:border-slate-700"
+                    />
+                    {studentSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setStudentSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px]">
-                  <span className="bg-white/10 px-2 py-0.5 rounded text-slate-300 font-medium">
-                    {getTermLabel(term, settings.evaluationMonths)}
-                  </span>
-                  <span className="bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded font-bold border border-amber-400/30">
-                    {evaluationType}
-                  </span>
+                <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatchStudentIds(filteredStudents.map(s => s.id))}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-[11px] font-semibold text-slate-700 cursor-pointer"
+                  >
+                    Tout cocher
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedBatchStudentIds([]);
+                      setBatchOnlySelected(false);
+                    }}
+                    className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-[11px] font-semibold text-slate-700 cursor-pointer"
+                  >
+                    Tout décocher
+                  </button>
+                  {selectedBatchStudentIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setBatchOnlySelected(prev => !prev)}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border cursor-pointer transition-colors ${
+                        batchOnlySelected
+                          ? 'bg-blue-900 text-white border-blue-900'
+                          : 'bg-blue-50 text-blue-900 border-blue-200 hover:bg-blue-100'
+                      }`}
+                    >
+                      Uniquement sélectionnés ({selectedBatchStudentIds.length})
+                    </button>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="p-8 text-center text-slate-400 font-medium text-xs">
-                Aucun élève trouvé dans cette classe.
-              </div>
-            )}
 
-            {/* Table vertical des matières */}
-            {currentStudent && (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 font-bold text-[10px] text-slate-500 uppercase tracking-wider">
+                  <thead className="bg-slate-100 font-bold text-[10px] text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <tr>
-                      <th className="py-2 px-3 sm:px-4">Matières du Programme (Vertical)</th>
-                      <th className="py-2 px-2.5 text-center w-24">Coefficient</th>
-                      <th className="py-2 px-3 text-center w-44">
-                        Note Directe (sur {currentMaxScore})
-                      </th>
-                      <th className="py-2 px-3 text-center w-32">Points Coeff.</th>
-                      <th className="py-2 px-3 text-left">Appréciation Officielle</th>
+                      <th className="py-2 px-3 w-12 text-center">Choix</th>
+                      <th className="py-2 px-3">Élève & Matricule</th>
+                      <th className="py-2 px-3 text-center w-48">Note / {currentMaxScore}</th>
+                      <th className="py-2 px-3">Appréciation</th>
                       <th className="py-2 px-3 text-center w-28">Statut</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {classSubjects.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
-                          Aucune matière configurée pour cette classe. Ajoutez des matières dans le module Matières.
-                        </td>
-                      </tr>
-                    ) : (
-                      classSubjects.map((sub, index) => {
-                        const score = scoresMap[sub.id];
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredStudents
+                      .filter(std => !batchOnlySelected || selectedBatchStudentIds.includes(std.id))
+                      .map((std, idx) => {
+                        const isChecked = selectedBatchStudentIds.includes(std.id);
+                        const score = batchScoresMap[std.id];
                         const hasScore = score !== undefined && !isNaN(score);
-                        const coef = (selectedClassObj?.customCoefficients && selectedClassObj.customCoefficients[sub.id] !== undefined)
-                          ? selectedClassObj.customCoefficients[sub.id]
-                          : (sub.coefficient || 1);
-                        const points = hasScore ? (score * coef) : 0;
-                        const { appreciation, badgeColor } = hasScore 
+                        const { appreciation, badgeColor } = hasScore
                           ? getMaliScoreAppreciation(score, currentMaxScore)
                           : { appreciation: 'En attente de note', badgeColor: 'bg-slate-100 text-slate-400 border-slate-200' };
 
                         return (
-                          <tr key={sub.id} className="hover:bg-slate-50/80 transition-colors">
-                            {/* Nom & Code de la matière */}
-                            <td className="py-2 px-3 sm:px-4">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {index + 1}
-                                </span>
-                                <div>
-                                  <div className="font-bold text-slate-900 text-xs">
-                                    {sub.name}
-                                  </div>
-                                  <div className="text-[10px] text-slate-400 font-mono">
-                                    Code: {sub.code}
-                                  </div>
-                                </div>
+                          <tr
+                            key={std.id}
+                            className={`transition-colors ${isChecked ? 'bg-blue-50/40' : 'hover:bg-slate-50'}`}
+                          >
+                            <td className="py-2 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSelectBatchStudent(std.id)}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-900 cursor-pointer"
+                              />
+                            </td>
+                            <td
+                              className="py-2 px-3 cursor-pointer"
+                              onClick={() => toggleSelectBatchStudent(std.id)}
+                            >
+                              <div className="font-bold text-slate-900">
+                                {idx + 1}. {std.lastName.toUpperCase()} {std.firstName}
                               </div>
+                              <div className="text-[10px] font-mono text-slate-400">{std.matricule}</div>
                             </td>
-
-                            {/* Coefficient */}
-                            <td className="py-2 px-2.5 text-center">
-                              <span className="font-mono font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs">
-                                Coef {coef}
-                              </span>
-                            </td>
-
-                            {/* Note directe (input fluide et réactif) */}
                             <td className="py-2 px-3 text-center">
                               <div className="flex items-center justify-center gap-1.5">
                                 <input
@@ -664,36 +1053,20 @@ export const GradesModule: React.FC = () => {
                                   step="0.25"
                                   min="0"
                                   max={currentMaxScore}
-                                  placeholder={`/ ${currentMaxScore}`}
+                                  placeholder="—"
+                                  disabled={!canEditGrades}
                                   value={hasScore ? score : ''}
-                                  onChange={e => handleScoreChange(sub.id, e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') {
-                                      // Focus next input or save
-                                      handleSaveStudentGrades(false);
-                                    }
-                                  }}
-                                  className="w-24 text-center py-1 px-2 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:bg-white focus:border-blue-900 focus:ring-1 focus:ring-blue-900 outline-none transition-all shadow-2xs placeholder:text-slate-300"
+                                  onChange={e => handleBatchStudentScoreChange(std.id, e.target.value)}
+                                  className="w-24 text-center py-1 px-2 border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 bg-slate-50 focus:bg-white focus:border-blue-900 focus:ring-1 focus:ring-blue-900 disabled:opacity-60 disabled:cursor-not-allowed outline-none placeholder:text-slate-300"
                                 />
-                                <span className="text-[11px] font-mono text-slate-400">
-                                  / {currentMaxScore}
-                                </span>
+                                <span className="text-[11px] font-mono text-slate-400">/ {currentMaxScore}</span>
                               </div>
                             </td>
-
-                            {/* Points Coeff */}
-                            <td className="py-2 px-3 text-center font-mono font-bold text-xs text-slate-800">
-                              {hasScore ? points.toFixed(2) : '-'}
-                            </td>
-
-                            {/* Appréciation officielle */}
                             <td className="py-2 px-3">
                               <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeColor}`}>
                                 {appreciation}
                               </span>
                             </td>
-
-                            {/* Statut de la note */}
                             <td className="py-2 px-3 text-center">
                               {hasScore ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -701,86 +1074,17 @@ export const GradesModule: React.FC = () => {
                                   <span>Saisie</span>
                                 </span>
                               ) : (
-                                <span className="text-[10px] text-slate-400 font-medium italic">
-                                  Non saisie
-                                </span>
+                                <span className="text-[10px] text-slate-400 italic">Vide</span>
                               )}
                             </td>
                           </tr>
                         );
-                      })
-                    )}
+                      })}
                   </tbody>
-
-                  {/* Ligne récapitulative totale pour cet élève */}
-                  {classSubjects.length > 0 && (
-                    <tfoot className="bg-slate-50/90 font-bold border-t-2 border-slate-200 text-xs">
-                      <tr>
-                        <td className="py-2.5 px-3 sm:px-4 text-slate-900 uppercase text-[11px]">
-                          Totaux & Moyenne Provisoire
-                        </td>
-                        <td className="py-2.5 px-2.5 text-center font-mono text-slate-900">
-                          {studentMetrics.totalCoeffs} Coeffs
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                            {studentMetrics.enteredCount} / {studentMetrics.totalSubjects} notées
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center font-mono text-blue-900 text-xs">
-                          {studentMetrics.totalPoints.toFixed(2)} pts
-                        </td>
-                        <td colSpan={2} className="py-2.5 px-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-slate-600">Moyenne :</span>
-                            <span className="font-mono text-sm font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-300">
-                              {studentMetrics.average.toFixed(2)} / {currentMaxScore}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${studentMetrics.badgeColor}`}>
-                              {studentMetrics.appreciation}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tfoot>
-                  )}
                 </table>
               </div>
-            )}
-
-            {/* Bottom Actions Bar */}
-            {currentStudent && (
-              <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="text-slate-500 font-medium text-[11px]">
-                  <span>Astuce : Saisissez directement les notes et cliquez sur </span>
-                  <strong className="text-slate-800">« Enregistrer & Suivant »</strong>
-                  <span> pour passer rapidement à l'élève suivant.</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleSaveStudentGrades(false)}
-                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Save className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Enregistrer {currentStudent.firstName}</span>
-                  </button>
-
-                  {hasNextStudent && (
-                    <button
-                      type="button"
-                      onClick={() => handleSaveStudentGrades(true)}
-                      className="px-4 py-1.5 bg-blue-900 hover:bg-blue-800 text-white font-semibold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>Enregistrer & Élève Suivant</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : (
         /* ================= ONGLET HISTORIQUE DES NOTES ================= */
@@ -846,24 +1150,26 @@ export const GradesModule: React.FC = () => {
                         {new Date(g.date).toLocaleDateString('fr-FR')}
                       </td>
                       <td className="py-2 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            type="button"
-                            onClick={() => setEditingGrade(g)}
-                            className="p-1 text-slate-400 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors cursor-pointer"
-                            title="Modifier cette note"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeletingGradeId(g.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors cursor-pointer"
-                            title="Supprimer cette note"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {canEditGrades && (
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingGrade(g)}
+                              className="p-1 text-slate-400 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                              title="Modifier cette note"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingGradeId(g.id)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Supprimer cette note"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

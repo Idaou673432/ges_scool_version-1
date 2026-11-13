@@ -45,6 +45,7 @@ import {
 } from 'lucide-react';
 import { Student, SchoolClass, Payment, AttendanceRecord, EvaluationTerm, PaymentCategory, PaymentMethod, ReportCard } from '../../types';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { PdfService } from '../../services/pdfService';
 import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation, getFilteredEvaluationTerms } from '../../constants/maliEducation';
 import { HorizontalReceiptModal } from '../receipts/HorizontalReceiptModal';
@@ -71,9 +72,19 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
     attendanceRecords, 
     saveAttendanceBatch 
   } = useSchool();
+  const { hasPermission } = useAuth();
+  const canViewPayments = hasPermission('payments:view');
+  const canRecordPayment = hasPermission('payments:record');
+  const canGenerateCards = hasPermission('cards:generate');
+  const canViewGrades = hasPermission('grades:view') || hasPermission('bulletins:view') || hasPermission('bulletins:generate');
+  const canViewAttendance = hasPermission('attendance:view');
+  const canEditStudent = hasPermission('students:edit');
 
-  // Onglet actif
-  const [activeTab, setActiveTab] = useState<'PAYMENTS' | 'CARDS' | 'GRADES' | 'ATTENDANCE' | 'INFO'>(initialTab);
+  // Onglet actif (basculer automatiquement si l'utilisateur n'a pas accès aux paiements)
+  const [activeTab, setActiveTab] = useState<'PAYMENTS' | 'CARDS' | 'GRADES' | 'ATTENDANCE' | 'INFO'>(() => {
+    if (initialTab === 'PAYMENTS' && !canViewPayments) return 'INFO';
+    return initialTab;
+  });
 
   // Classe de l'élève
   const studentClass = useMemo(() => {
@@ -204,6 +215,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   // 1. Action : Encaisser un versement direct
   const handleRecordPaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (studentFinance.remaining <= 0) return;
     const amt = Number(paymentAmount) || 0;
     if (amt <= 0) return;
 
@@ -366,7 +378,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
 
         {/* Actions Rapides en Entête */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {studentFinance.remaining > 0 && (
+          {canRecordPayment && studentFinance.remaining > 0 && (
             <button
               type="button"
               onClick={handleQuickSettleAll}
@@ -378,27 +390,31 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={handleDownloadCardPdf}
-            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-            title="Télécharger la Carte Scolaire A4 avec QR Code"
-          >
-            <QrCode className="w-3.5 h-3.5" />
-            <span>Carte PDF</span>
-          </button>
+          {canGenerateCards && (
+            <button
+              type="button"
+              onClick={handleDownloadCardPdf}
+              className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+              title="Télécharger la Carte Scolaire A4 avec QR Code"
+            >
+              <QrCode className="w-3.5 h-3.5" />
+              <span>Carte PDF</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={handleDownloadBulletinPdf}
-            className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-            title="Télécharger le Bulletin Trimestriel Officiel PDF"
-          >
-            <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>Bulletin PDF</span>
-          </button>
+          {canViewGrades && (
+            <button
+              type="button"
+              onClick={handleDownloadBulletinPdf}
+              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+              title="Télécharger le Bulletin Trimestriel Officiel PDF"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>Bulletin PDF</span>
+            </button>
+          )}
 
-          {onEditStudent && (
+          {onEditStudent && canEditStudent && (
             <button
               type="button"
               onClick={() => onEditStudent(student)}
@@ -426,70 +442,78 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
 
       {/* Barre d'Onglets Unifiée & Compacte */}
       <div className="bg-white px-2 py-1 rounded-xl border border-slate-200/90 flex items-center gap-1 overflow-x-auto shadow-2xs text-xs font-semibold">
-        <button
-          type="button"
-          onClick={() => setActiveTab('PAYMENTS')}
-          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
-            activeTab === 'PAYMENTS'
-              ? 'bg-slate-900 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Paiements</span>
-          <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-            studentFinance.remaining === 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
-          }`}>
-            {studentFinance.isUpToDate ? 'Soldé' : formatFCFA(studentFinance.remaining)}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('CARDS')}
-          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
-            activeTab === 'CARDS'
-              ? 'bg-slate-900 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <QrCode className="w-3.5 h-3.5 text-amber-400" />
-          <span>Carte & QR</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('GRADES')}
-          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
-            activeTab === 'GRADES'
-              ? 'bg-slate-900 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Award className="w-3.5 h-3.5 text-blue-400" />
-          <span>Notes & Bulletins</span>
-          {reportCard && (
-            <span className="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded text-[10px] font-mono">
-              {reportCard.generalAverage.toFixed(2)}/20
+        {canViewPayments && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('PAYMENTS')}
+            className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
+              activeTab === 'PAYMENTS'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Paiements</span>
+            <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+              studentFinance.remaining === 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+            }`}>
+              {studentFinance.isUpToDate ? 'Soldé' : formatFCFA(studentFinance.remaining)}
             </span>
-          )}
-        </button>
+          </button>
+        )}
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('ATTENDANCE')}
-          className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
-            activeTab === 'ATTENDANCE'
-              ? 'bg-slate-900 text-white shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5 text-violet-400" />
-          <span>Assiduité</span>
-          <span className="bg-violet-500/20 text-violet-300 px-1.5 py-0.2 rounded text-[10px] font-mono">
-            {studentAttendance.rate}%
-          </span>
-        </button>
+        {canGenerateCards && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('CARDS')}
+            className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
+              activeTab === 'CARDS'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <QrCode className="w-3.5 h-3.5 text-amber-400" />
+            <span>Carte & QR</span>
+          </button>
+        )}
+
+        {canViewGrades && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('GRADES')}
+            className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
+              activeTab === 'GRADES'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Award className="w-3.5 h-3.5 text-blue-400" />
+            <span>Notes & Bulletins</span>
+            {reportCard && (
+              <span className="bg-blue-500/20 text-blue-300 px-1.5 py-0.2 rounded text-[10px] font-mono">
+                {reportCard.generalAverage.toFixed(2)}/20
+              </span>
+            )}
+          </button>
+        )}
+
+        {canViewAttendance && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('ATTENDANCE')}
+            className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 text-xs ${
+              activeTab === 'ATTENDANCE'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 text-violet-400" />
+            <span>Assiduité</span>
+            <span className="bg-violet-500/20 text-violet-300 px-1.5 py-0.2 rounded text-[10px] font-mono">
+              {studentAttendance.rate}%
+            </span>
+          </button>
+        )}
 
         <button
           type="button"
@@ -508,7 +532,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
       {/* =========================================================================
           CONTENU DE L'ONGLET 1 : PAIEMENTS & CAISSE
           ========================================================================= */}
-      {activeTab === 'PAYMENTS' && (
+      {activeTab === 'PAYMENTS' && canViewPayments && (
         <div className="space-y-2">
           {/* Synthèse Financière & Actions en Ruban Compact */}
           <div className="bg-white px-3 py-2 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2.5 text-xs">
@@ -539,31 +563,22 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setIsCashFormOpen(!isCashFormOpen)}
-                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isCashFormOpen ? 'Fermer' : 'Encaisser'}</span>
-              </button>
-
-              {studentFinance.remaining > 0 && (
+            {canRecordPayment && studentFinance.remaining > 0 && (
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={handleQuickSettleAll}
-                  className="px-2.5 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+                  onClick={() => setIsCashFormOpen(!isCashFormOpen)}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
                 >
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Tout Solder</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{isCashFormOpen ? 'Fermer' : 'Encaisser'}</span>
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Formulaire de saisie d'un paiement dépliable */}
-          {isCashFormOpen && (
+          {canRecordPayment && isCashFormOpen && studentFinance.remaining > 0 && (
             <form onSubmit={handleRecordPaymentSubmit} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5 text-xs">
               <div className="flex items-center justify-between">
                 <h4 className="font-bold text-slate-900 text-xs">Enregistrer un Nouveau Paiement</h4>
@@ -813,15 +828,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               <div className="flex flex-wrap justify-center gap-2 w-full">
                 <button
                   type="button"
-                  onClick={handleDownloadCardPdf}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Carte Scolaire PDF A4</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(`${window.location.origin}/?verify=${student.matricule}`);
                     setCopiedLink(true);
@@ -905,15 +911,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                 </>
               )}
             </div>
-
-            <button
-              type="button"
-              onClick={handleDownloadBulletinPdf}
-              className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-amber-400" />
-              <span>Bulletin PDF</span>
-            </button>
           </div>
 
           {/* Grille Détaillée des Matières */}
@@ -942,10 +939,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {reportCard.subjectAverages.map((sub) => {
-                      const classVal = sub.classScore !== undefined ? sub.classScore : sub.finalScore;
-                      const compVal = sub.compositionScore !== undefined 
-                        ? sub.compositionScore 
-                        : ((reportCard.maxScore || 20) === 10 ? sub.finalScore : sub.finalScore * 2);
+                      const hasGrades = sub.hasGrades ?? (sub.classScore !== undefined || sub.compositionScore !== undefined);
                       const sMax = sub.maxScore || reportCard.maxScore || 20;
                       const { appreciation } = getMaliScoreAppreciation(sub.finalScore, sMax);
 
@@ -958,16 +952,16 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                             {sub.coefficient}
                           </td>
                           <td className="py-1.5 px-2.5 font-mono text-slate-700">
-                            {classVal.toFixed(2)}
+                            {sub.classScore !== undefined ? sub.classScore.toFixed(2) : '—'}
                           </td>
                           <td className="py-1.5 px-2.5 font-mono text-slate-700">
-                            {compVal.toFixed(2)}
+                            {sub.compositionScore !== undefined ? sub.compositionScore.toFixed(2) : '—'}
                           </td>
                           <td className="py-1.5 px-2.5 font-mono font-bold text-blue-900">
-                            {sub.finalScore.toFixed(2)} / {sMax}
+                            {hasGrades ? `${sub.finalScore.toFixed(2)} / ${sMax}` : '—'}
                           </td>
                           <td className="py-1.5 px-3 text-slate-600 font-medium">
-                            {sub.appreciation || appreciation}
+                            {hasGrades ? (sub.appreciation || appreciation) : 'Non noté'}
                           </td>
                         </tr>
                       );

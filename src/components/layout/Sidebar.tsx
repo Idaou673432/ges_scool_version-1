@@ -17,8 +17,7 @@ import {
   Settings, 
   Building2,
   CalendarCheck,
-  PanelLeftClose,
-  PanelLeftOpen,
+  UserPlus,
   X,
   ChevronRight,
   Shield,
@@ -33,6 +32,7 @@ import { PwaInstallModal } from '../common/PwaInstallModal';
 
 export type NavTab = 
   | 'dashboard'
+  | 'inscription'
   | 'students'
   | 'classes'
   | 'subjects'
@@ -65,12 +65,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isMobileOpen,
   setIsMobileOpen
 }) => {
-  const { currentUser, switchRoleSimulated } = useAuth();
+  const { currentUser, canAccessTab } = useAuth();
   const { settings, isFeatureEnabled } = useSchool();
   const [showPwaModal, setShowPwaModal] = useState(false);
 
   const featureMap: Record<NavTab, keyof import('../../types').SchoolEnabledFeatures | null> = {
     dashboard: null,
+    inscription: 'students',
     students: 'students',
     classes: 'classes',
     subjects: 'subjects',
@@ -92,6 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Général',
       items: [
         { id: 'dashboard' as NavTab, label: 'Tableau de bord', icon: LayoutDashboard, perm: 'dashboard:view' },
+        { id: 'inscription' as NavTab, label: 'Inscription', icon: UserPlus, perm: 'students:create' },
       ]
     },
     {
@@ -107,9 +109,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Évaluations & Vie Scolaire',
       items: [
         { id: 'grades' as NavTab, label: 'Notes', icon: ClipboardList, perm: 'grades:view' },
-        { id: 'attendance' as NavTab, label: 'Présences', icon: CalendarCheck, perm: 'students:view' },
+        { id: 'attendance' as NavTab, label: 'Présences', icon: CalendarCheck, perm: 'attendance:view' },
         { id: 'examSchedule' as NavTab, label: 'Plannings Examens', icon: CalendarDays, perm: 'bulletins:generate' },
-        { id: 'bulletins' as NavTab, label: 'Bulletins', icon: FileText, perm: 'bulletins:generate' },
+        { id: 'bulletins' as NavTab, label: 'Bulletins', icon: FileText, perm: 'bulletins:view' },
         { id: 'cards' as NavTab, label: 'Cartes & Badges', icon: QrCode, perm: 'cards:generate' },
       ]
     },
@@ -124,6 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ].map(sec => ({
     ...sec,
     items: sec.items.filter(item => {
+      if (!canAccessTab(item.id)) return false;
       const featKey = featureMap[item.id];
       if (!featKey) return true;
       return isFeatureEnabled(featKey);
@@ -150,12 +153,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* SIDEBAR ASIDE ELEMENT */}
       <aside 
-        className={`no-print bg-white border-r border-slate-200 flex flex-col h-screen select-none shadow-[4px_0_24px_rgba(0,0,0,0.03)] z-50 transition-all duration-300 ease-in-out
+        className={`no-print bg-white border-r border-slate-200 flex flex-col h-dvh select-none shadow-[4px_0_24px_rgba(0,0,0,0.03)] z-50 transition-all duration-300 ease-in-out
           /* Mobile Drawer Position */
           fixed lg:static top-0 bottom-0 left-0
-          ${isMobileOpen ? 'translate-x-0 w-80 max-w-[85vw]' : '-translate-x-full lg:translate-x-0'}
+          ${isMobileOpen ? 'translate-x-0 w-72 sm:w-80 max-w-[85vw]' : '-translate-x-full lg:translate-x-0'}
           /* Desktop Width (Expanded vs Collapsed) */
-          ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
+          ${isCollapsed ? 'lg:w-18 xl:w-20' : 'lg:w-60 xl:w-64'}
         `}
       >
         {/* Brand Header */}
@@ -190,22 +193,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Fermer le menu"
           >
             <X className="w-5 h-5" />
-          </button>
-
-          {/* Collapse/Expand Toggle on Desktop */}
-          <button
-            type="button"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`hidden lg:flex items-center justify-center p-2 text-slate-400 hover:text-blue-900 hover:bg-blue-50 rounded-xl transition-all cursor-pointer ${
-              isCollapsed ? 'mt-2' : ''
-            }`}
-            title={isCollapsed ? "Agrandir la barre latérale" : "Réduire la barre latérale pour plus d'espace"}
-          >
-            {isCollapsed ? (
-              <PanelLeftOpen className="w-5 h-5 text-blue-900" />
-            ) : (
-              <PanelLeftClose className="w-5 h-5" />
-            )}
           </button>
         </div>
 
@@ -282,21 +269,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className={`border-t border-slate-100 ${isCollapsed ? 'p-2' : 'm-2.5 p-3 rounded-xl bg-slate-50/70 border border-slate-200/80'}`}>
           {isCollapsed ? (
             /* Collapsed Desktop View for User Profile */
-            <div className="hidden lg:flex flex-col items-center gap-2 py-1">
+            <div className="hidden lg:flex flex-col items-center py-1">
               <div 
-                className="w-9 h-9 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-2xs cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center justify-center shadow-2xs cursor-default"
                 title={`${currentUser?.fullName} (${AuthService.getRoleLabel(currentUser?.role || 'ADMIN')})`}
               >
                 {currentUser?.fullName.charAt(0)}
               </div>
-              <button
-                type="button"
-                onClick={() => setIsCollapsed(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-white rounded-lg transition-colors cursor-pointer"
-                title="Agrandir le menu pour accéder aux options"
-              >
-                <PanelLeftOpen className="w-4 h-4" />
-              </button>
             </div>
           ) : (
             <div className="flex items-center gap-2.5">

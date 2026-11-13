@@ -512,8 +512,24 @@ async function startServer() {
 
   if (!isProduction) {
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true, hmr: false, ws: false },
       appType: 'spa'
+    });
+    app.get('/@vite/client', async (_req: Request, res: Response, next: () => void) => {
+      try {
+        const result = await vite.transformRequest('/@vite/client');
+        if (result?.code) {
+          const patched = result.code.replace(
+            'transport.connect(createHMRHandler(handleMessage));',
+            '/* HMR disabled */'
+          );
+          res.setHeader('Content-Type', 'application/javascript');
+          return res.send(patched);
+        }
+      } catch {
+        // Fallback to default Vite middleware
+      }
+      next();
     });
     app.use(vite.middlewares);
   } else {

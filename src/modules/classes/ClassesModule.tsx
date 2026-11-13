@@ -10,6 +10,7 @@ import {
   ArrowRight, Settings, Info, Filter, RotateCcw
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { SchoolClass, SchoolLevelCategory, Subject, SchoolCategory } from '../../types';
 import { 
   formatFCFA, 
@@ -22,6 +23,8 @@ import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 
 export const ClassesModule: React.FC = () => {
   const { classes, teachers, students, subjects, settings, saveClass, deleteClass, deleteAllClasses, saveSubject } = useSchool();
+  const { hasPermission } = useAuth();
+  const canManageClasses = hasPermission('classes:manage');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<SchoolClass | null>(null);
   const [deletingClass, setDeletingClass] = useState<SchoolClass | null>(null);
@@ -327,35 +330,39 @@ export const ClassesModule: React.FC = () => {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setIsAutoGenModalOpen(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-xs rounded-lg border border-amber-300 transition-colors cursor-pointer shadow-2xs"
-            title="Générer automatiquement les classes et matières d'un type d'établissement"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-            <span>⚡ Auto-Générer selon Type</span>
-          </button>
+        {canManageClasses && (
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            {classes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsAutoGenModalOpen(true)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-xs rounded-lg border border-amber-300 transition-colors cursor-pointer shadow-2xs"
+                title="Générer automatiquement les classes et matières d'un type d'établissement"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>⚡ Auto-Générer selon Type</span>
+              </button>
+            )}
 
-          {classes.length > 0 && (
+            {classes.length > 0 && (
+              <button
+                onClick={() => setShowDeleteAllModal(true)}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Supprimer Tout ({classes.length})</span>
+              </button>
+            )}
+
             <button
-              onClick={() => setShowDeleteAllModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Supprimer Tout ({classes.length})</span>
+              <Plus className="w-3.5 h-3.5 text-amber-400" />
+              <span>+ Créer une Classe</span>
             </button>
-          )}
-
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span>+ Créer une Classe</span>
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Notification Toast */}
@@ -455,26 +462,28 @@ export const ClassesModule: React.FC = () => {
                       {cls.name}
                     </h3>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        setSelectedClass(cls);
-                        setFormData(cls);
-                        setIsModalOpen(true);
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                      title="Modifier les informations de la classe"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setDeletingClass(cls)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                      title="Supprimer la classe"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                    </button>
-                  </div>
+                  {canManageClasses && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setSelectedClass(cls);
+                          setFormData(cls);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Modifier les informations de la classe"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingClass(cls)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Supprimer la classe"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs pt-2 mt-2 border-t border-slate-100">
@@ -523,14 +532,6 @@ export const ClassesModule: React.FC = () => {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => handleOpenClassSubjects(cls)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg font-bold text-xs transition-colors cursor-pointer shadow-2xs"
-                    title="Choisir et personnaliser les matières de cette classe"
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Matières ({assignedCount})</span>
-                  </button>
                   <button
                     onClick={() => handlePrintClassList(cls)}
                     className="flex items-center gap-1 px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs transition-colors cursor-pointer border border-slate-200"

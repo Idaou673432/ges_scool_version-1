@@ -70,9 +70,12 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   const [cleanToast, setCleanToast] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'INFO' | 'USERS_ROLES' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>(initialTab || 'INFO');
 
-  const { users, currentUser, saveUser, deleteUser, loginAsUser } = useAuth();
+  const { users, currentUser, isAdmin, hasPermission, saveUser, deleteUser, loginAsUser } = useAuth();
+  const canManageUsers = isAdmin && hasPermission('users:manage');
+  const canManageModules = isAdmin && hasPermission('modules:manage');
+  const canManageAdminSecurity = isAdmin && hasPermission('security:admin');
 
-  // User Management State (Multi-Rôles & Mots de passe)
+  // User Management State (Multi-Rôles & Mots de passe - ADMIN uniquement)
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [userEditing, setUserEditing] = useState<User | null>(null);
   const [userDeleting, setUserDeleting] = useState<User | null>(null);
@@ -100,6 +103,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   });
 
   const handleOpenAddUser = () => {
+    if (!canManageUsers) return;
     setUserEditing(null);
     setUserFormData({
       fullName: '',
@@ -115,6 +119,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   };
 
   const handleOpenEditUser = (u: User) => {
+    if (!canManageUsers) return;
     setUserEditing(u);
     setUserFormData({
       fullName: u.fullName,
@@ -172,13 +177,14 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   };
 
   const handleConfirmDeleteUser = () => {
-    if (!userDeleting) return;
+    if (!userDeleting || !canManageUsers) return;
 
     if (userDeleting.role === 'ADMIN') {
       const adminCount = users.filter(u => u.role === 'ADMIN').length;
       if (adminCount <= 1) {
-        alert('Action bloquée : Vous ne pouvez pas supprimer le seul compte Administrateur.');
+        setCleanToast('Action bloquée : Vous ne pouvez pas supprimer le seul compte Administrateur.');
         setUserDeleting(null);
+        setTimeout(() => setCleanToast(null), 3500);
         return;
       }
     }
@@ -260,9 +266,19 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      if ((initialTab === 'USERS_ROLES' && !canManageUsers) || (initialTab === 'FEATURES' && !canManageModules)) {
+        setActiveTab('INFO');
+      } else {
+        setActiveTab(initialTab);
+      }
     }
-  }, [initialTab]);
+  }, [initialTab, canManageUsers, canManageModules]);
+
+  useEffect(() => {
+    if ((activeTab === 'USERS_ROLES' && !canManageUsers) || (activeTab === 'FEATURES' && !canManageModules)) {
+      setActiveTab('INFO');
+    }
+  }, [activeTab, canManageUsers, canManageModules]);
 
   // Secure PIN access for settings & modules (Default PIN: 0000)
   const [isModulesUnlocked, setIsModulesUnlocked] = useState(false);
@@ -725,16 +741,18 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
           >
             Fiche École
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('USERS_ROLES')}
-            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-              activeTab === 'USERS_ROLES' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <Users className="w-3 h-3 text-amber-400" />
-            <span>Comptes & Rôles ({users.length})</span>
-          </button>
+          {canManageUsers && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('USERS_ROLES')}
+              className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                activeTab === 'USERS_ROLES' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
+              }`}
+            >
+              <Users className="w-3 h-3 text-amber-400" />
+              <span>Comptes & Rôles ({users.length})</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab('LOGO_SECURITY')}
@@ -742,27 +760,29 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
               activeTab === 'LOGO_SECURITY' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
             }`}
           >
-            Logo & Sécurité
+            {canManageAdminSecurity ? 'Logo & Sécurité' : 'Logo & Cachet'}
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('FEATURES')}
-            className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
-              activeTab === 'FEATURES' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
-            }`}
-          >
-            <Sliders className="w-3 h-3" />
-            <span>Modules</span>
-            {!isModulesUnlocked ? (
-              <span className="ml-0.5 px-1 py-0.2 rounded text-[9px] bg-amber-100 text-amber-900 font-bold flex items-center gap-0.5" title="Protégé par code PIN">
-                <Lock className="w-2.5 h-2.5" /> PIN
-              </span>
-            ) : (
-              <span className="ml-0.5 px-1 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold flex items-center gap-0.5" title="Déverrouillé">
-                <Check className="w-2.5 h-2.5" />
-              </span>
-            )}
-          </button>
+          {canManageModules && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('FEATURES')}
+              className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                activeTab === 'FEATURES' ? 'bg-slate-900 text-white shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900 font-medium'
+              }`}
+            >
+              <Sliders className="w-3 h-3" />
+              <span>Modules</span>
+              {!isModulesUnlocked ? (
+                <span className="ml-0.5 px-1 py-0.2 rounded text-[9px] bg-amber-100 text-amber-900 font-bold flex items-center gap-0.5" title="Protégé par code PIN">
+                  <Lock className="w-2.5 h-2.5" /> PIN
+                </span>
+              ) : (
+                <span className="ml-0.5 px-1 py-0.2 rounded text-[9px] bg-emerald-100 text-emerald-800 font-bold flex items-center gap-0.5" title="Déverrouillé">
+                  <Check className="w-2.5 h-2.5" />
+                </span>
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab('EVALUATION_CALENDAR')}
@@ -910,7 +930,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
           <div className="flex items-center justify-between gap-2 px-3 py-1 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs font-semibold">
             <div className="flex items-center gap-1.5 text-emerald-800">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Accès Administrateur Déverrouillé</span>
+              <span>{isAdmin ? 'Accès Administrateur Déverrouillé' : 'Accès Direction Déverrouillé'}</span>
             </div>
 
             <button
@@ -1194,8 +1214,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </form>
           )}
 
-          {/* ================= TAB: COMPTES & MULTI-RÔLES ================= */}
-          {activeTab === 'USERS_ROLES' && (
+          {/* ================= TAB: COMPTES & MULTI-RÔLES (ADMIN UNIQUEMENT) ================= */}
+          {activeTab === 'USERS_ROLES' && canManageUsers && (
             <div className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-4 shadow-2xs space-y-3">
               {/* Header & Bouton Ajouter */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
@@ -1496,7 +1516,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                 </div>
               </div>
 
-              {/* BLOC 2: MOT DE PASSE & CODE PIN (ULTRA COMPACT) */}
+              {/* BLOC 2: MOT DE PASSE & CODE PIN (ADMIN UNIQUEMENT) */}
+              {canManageAdminSecurity && (
               <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-2xs space-y-2">
                 <form onSubmit={handleSubmit} className="space-y-2">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
@@ -1593,6 +1614,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
                   </div>
                 </form>
               </div>
+              )}
 
               {/* BLOC 3: STOCKAGE LOCAL & CACHE (BARRE ULTRA COMPACTE) */}
               <div className="bg-white border border-slate-200/90 rounded-xl px-3 py-2 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -1622,8 +1644,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
             </div>
           )}
 
-          {/* ================= TAB 3: MODULES & FONCTIONNALITES (SCREENSHOT 1 COMPACTED) ================= */}
-          {activeTab === 'FEATURES' && (
+          {/* ================= TAB 3: MODULES & FONCTIONNALITES (ADMIN UNIQUEMENT) ================= */}
+          {activeTab === 'FEATURES' && canManageModules && (
             <div className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-3.5 shadow-2xs space-y-2.5 animate-fadeIn">
               {/* Header unifié avec presets intégrés sur 1 ligne */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 text-xs">
@@ -2162,7 +2184,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
       )}
 
       {/* Modal Création / Modification Utilisateur */}
-      {isUserModalOpen && (
+      {canManageUsers && isUserModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 sm:p-6 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
@@ -2318,7 +2340,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
       )}
 
       {/* Modal Confirmation Suppression Utilisateur */}
-      {userDeleting && (
+      {canManageUsers && userDeleting && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-3.5 shadow-xl border border-slate-200 text-center">
             <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">

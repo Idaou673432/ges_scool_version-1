@@ -318,20 +318,8 @@ const INITIAL_STUDENTS: Student[] = [
   }
 ];
 
-// Initial Grades
-const INITIAL_GRADES: EvaluationGrade[] = [
-  // Aïssata Coulibaly (std-1) - 9ème DEF
-  { id: 'grd-1', studentId: 'std-1', classId: 'cls-5', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'DEVOIR', score: 16.5, maxScore: 20, coefficient: 1, date: '2025-10-15' },
-  { id: 'grd-2', studentId: 'std-1', classId: 'cls-5', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 17, maxScore: 20, coefficient: 2, date: '2025-11-20' },
-  { id: 'grd-3', studentId: 'std-1', classId: 'cls-5', subjectId: 'subj-2', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'DEVOIR', score: 18, maxScore: 20, coefficient: 1, date: '2025-10-18' },
-  { id: 'grd-4', studentId: 'std-1', classId: 'cls-5', subjectId: 'subj-2', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 18.5, maxScore: 20, coefficient: 2, date: '2025-11-22' },
-  { id: 'grd-5', studentId: 'std-1', classId: 'cls-5', subjectId: 'subj-3', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 15, maxScore: 20, coefficient: 2, date: '2025-11-25' },
-
-  // Sekou Diabaté (std-2) - 9ème DEF
-  { id: 'grd-6', studentId: 'std-2', classId: 'cls-5', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'DEVOIR', score: 13, maxScore: 20, coefficient: 1, date: '2025-10-15' },
-  { id: 'grd-7', studentId: 'std-2', classId: 'cls-5', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 14, maxScore: 20, coefficient: 2, date: '2025-11-20' },
-  { id: 'grd-8', studentId: 'std-2', classId: 'cls-5', subjectId: 'subj-2', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 12.5, maxScore: 20, coefficient: 2, date: '2025-11-22' },
-];
+// Initial Grades (vide par défaut — aucune note automatique)
+const INITIAL_GRADES: EvaluationGrade[] = [];
 
 // Initial Payments (FCFA)
 const INITIAL_PAYMENTS: Payment[] = [
@@ -937,7 +925,7 @@ class StorageService {
         term: grade.term || 'TRIMESTRE_1',
         academicYear: grade.academicYear || '2025-2026',
         type: grade.type || 'COMPOSITION',
-        score: grade.score || 0,
+        score: grade.score ?? 0,
         maxScore: grade.maxScore || 20,
         coefficient: grade.coefficient || 1,
         date: grade.date || new Date().toISOString().split('T')[0],

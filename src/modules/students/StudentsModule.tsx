@@ -11,7 +11,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Users, 
-  Plus, 
   Search, 
   QrCode, 
   Phone, 
@@ -38,9 +37,15 @@ import {
   Check,
   UserCheck,
   UserX,
-  Copy
+  Copy,
+  User,
+  GraduationCap,
+  Coins,
+  Activity,
+  Settings
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Student, Gender, StudentStatus, PaymentCategory, PaymentMethod, Payment } from '../../types';
 import { PdfService } from '../../services/pdfService';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
@@ -49,6 +54,22 @@ import { MenOfficialStatsModal } from '../../components/students/MenOfficialStat
 import { StudentProfileView } from '../../components/students/StudentProfileView';
 import { HorizontalReceiptModal } from '../../components/receipts/HorizontalReceiptModal';
 import { formatFCFA, getAnnualTuitionFee, getMaliScoreAppreciation } from '../../constants/maliEducation';
+
+const AVATAR_GRADIENTS = [
+  'from-[#0ea5e9] to-[#1d4ed8]',
+  'from-[#8b5cf6] to-[#4f46e5]',
+  'from-[#2563eb] to-[#1e40af]',
+  'from-[#fb923c] to-[#ea580c]',
+  'from-[#14b8a6] to-[#0f766e]',
+];
+
+const getAvatarGradient = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+};
 
 export const StudentsModule: React.FC = () => {
   const { 
@@ -64,6 +85,14 @@ export const StudentsModule: React.FC = () => {
     attendanceRecords,
     saveAttendanceBatch
   } = useSchool();
+  const { hasPermission } = useAuth();
+  const canCreateStudent = hasPermission('students:create');
+  const canEditStudent = hasPermission('students:edit');
+  const canDeleteStudent = hasPermission('students:delete');
+  const canRecordPayment = hasPermission('payments:record');
+  const canViewPayments = hasPermission('payments:view');
+  const canGenerateCards = hasPermission('cards:generate');
+  const canViewBulletins = hasPermission('bulletins:generate') || hasPermission('bulletins:view');
 
   // Zone de recherche unique (allégée, sans filtres superflus)
   const [search, setSearch] = useState('');
@@ -192,36 +221,6 @@ export const StudentsModule: React.FC = () => {
     };
   };
 
-  // Ouvre le modal d'inscription vierge
-  const handleOpenAddModal = () => {
-    setSelectedStudent(null);
-    setFormData({
-      firstName: '',
-      lastName: '',
-      gender: 'M',
-      birthDate: '2010-05-15',
-      birthPlace: 'Bamako',
-      nationality: 'Mali',
-      address: 'Bamako',
-      phone: '',
-      photoUrl: '',
-      classId: classes[0]?.id || '',
-      status: 'ACTIF',
-      academicYear: settings.currentAcademicYear,
-      bloodType: undefined,
-      allergies: '',
-      emergencyContact: '',
-      parent: {
-        fatherName: '',
-        fatherPhone: '',
-        motherName: '',
-        motherPhone: ''
-      },
-      observations: ''
-    });
-    setIsModalOpen(true);
-  };
-
   // Ouvre la modification d'un élève
   const handleOpenEditModal = (student: Student) => {
     setSelectedStudent(student);
@@ -262,6 +261,7 @@ export const StudentsModule: React.FC = () => {
   // 1. Centralisé : Ouverture Encaissement / Solder pour un élève
   const handleOpenPayment = (student: Student, settleAll: boolean = false) => {
     const fin = getStudentFinance(student);
+    if (fin.remaining <= 0) return;
     setPaymentModalStudent(student);
     let amount = fin.cls?.monthlyFee || 25000;
     if (settleAll && fin.remaining > 0) {
@@ -284,6 +284,7 @@ export const StudentsModule: React.FC = () => {
     e.preventDefault();
     if (!paymentModalStudent) return;
     const fin = getStudentFinance(paymentModalStudent);
+    if (fin.remaining <= 0) return;
     const amt = Number(paymentFormData.amount) || 0;
     if (amt <= 0) return;
 
@@ -412,300 +413,562 @@ export const StudentsModule: React.FC = () => {
   }
 
   return (
-    <div className="space-y-2 max-w-7xl mx-auto pb-4">
-      
-      {/* Entête & Recherche Unifiés Ultra-Compacts */}
-      <div className="bg-white px-3 py-1.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-2 text-xs">
-        {/* Left: Title + Inlined Search */}
-        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 font-bold text-slate-900 pr-1 shrink-0">
-            <Users className="w-4 h-4 text-blue-900 shrink-0" />
-            <span>Élèves</span>
-            <span className="text-[11px] text-slate-400 font-normal">({filteredStudents.length}/{students.length})</span>
+    <div className="w-full min-h-full flex flex-col pb-2">
+      {/* Conteneur Principal Soft Blue Institutionnel */}
+      <div className="flex-1 w-full rounded-2xl sm:rounded-3xl bg-gradient-to-b from-[#eef5ff] via-[#f4f8ff] to-[#edf4ff] border border-[#c6dcff] shadow-md p-2.5 sm:p-4 space-y-3">
+
+        {/* Barre Entête & Recherche Blanche */}
+        <div className="bg-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl sm:rounded-2xl border border-[#cce0ff] shadow-xs flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          {/* Gauche : Badge Icône + Titre + Compteur + Barre de Recherche */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#eef4ff] border border-[#d6e4ff] flex items-center justify-center text-[#1356c8] shadow-2xs">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+              <span className="font-extrabold text-sm sm:text-base text-[#13294b] tracking-tight">
+                Élèves
+              </span>
+              <span className="px-2 py-0.5 rounded-full bg-[#e6f0ff] border border-[#cde0ff] text-[#175cd3] font-bold text-[11px] tabular-nums">
+                ({filteredStudents.length}/{students.length})
+              </span>
+            </div>
+
+            <div className="relative flex-1 min-w-[180px] sm:max-w-xl lg:max-w-2xl">
+              <Search className="w-4 h-4 text-[#4a74b8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Rechercher nom, matricule, classe..."
+                className="w-full pl-9 pr-8 py-1.5 sm:py-2 bg-[#f5f9ff] hover:bg-[#eef5ff] focus:bg-white border border-[#c7dcff] focus:border-[#1a64db] focus:ring-2 focus:ring-[#1a64db]/15 rounded-xl text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400 outline-none transition-all"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="relative flex-1 min-w-[170px] max-w-sm">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher nom, matricule, classe..."
-              className="w-full pl-8 pr-7 py-1 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-slate-400 transition-colors"
-            />
-            {search && (
+          {/* Droite : Actions Excel & Suppression globale */}
+          <div className="flex items-center gap-2 shrink-0">
+            {canCreateStudent && (
               <button
-                onClick={() => setSearch('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                type="button"
+                onClick={() => setIsExcelImportOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 bg-white hover:bg-[#f5f9ff] text-slate-800 font-bold text-xs sm:text-sm rounded-xl border border-[#cdddf5] shadow-2xs transition-colors cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                <FileSpreadsheet className="w-4 h-4 text-[#16a34a]" />
+                <span>Excel</span>
+              </button>
+            )}
+
+            {canDeleteStudent && students.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDeleteAllModal(true)}
+                className="p-2 bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 rounded-xl border border-[#cdddf5] hover:border-rose-200 shadow-2xs transition-colors cursor-pointer"
+                title="Supprimer tous les élèves"
+              >
+                <Trash2 className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Inscrire</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsExcelImportOpen(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs rounded-lg border border-slate-200 transition-colors cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
-            <span className="hidden sm:inline">Excel</span>
-          </button>
-
-          {students.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowDeleteAllModal(true)}
-              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-              title="Supprimer tous les élèves"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
+        {/* Message de confirmation Toast */}
+        {toastMessage && (
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{toastMessage}</span>
+            </div>
+            <button onClick={() => setToastMessage(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+              <X className="w-4 h-4" />
             </button>
+          </div>
+        )}
+
+        {/* VUE MOBILE (< 768px) : Cartes Responsives */}
+        <div className="md:hidden space-y-2.5">
+          {filteredStudents.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-[#c9ddfc] py-10 text-center text-slate-400 text-xs font-medium">
+              Aucun élève trouvé pour cette recherche.
+            </div>
+          ) : (
+            filteredStudents.map((std) => {
+              const studentClass = classes.find(c => c.id === std.classId);
+              const isActif = std.status === 'ACTIF';
+              const fin = getStudentFinance(std);
+              const avatarGrad = getAvatarGradient(std.id || std.matricule || std.lastName);
+
+              return (
+                <div
+                  key={std.id}
+                  onClick={() => setViewingStudent(std)}
+                  className="bg-white rounded-2xl border border-[#c9ddfc] p-3 shadow-xs space-y-2.5 cursor-pointer active:scale-[0.99] transition-all"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {std.photoUrl ? (
+                        <img
+                          src={std.photoUrl}
+                          alt={std.firstName}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-[#d6e4ff] shrink-0"
+                        />
+                      ) : (
+                        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGrad} text-white font-extrabold flex items-center justify-center text-xs shrink-0 shadow-xs`}>
+                          {std.firstName.charAt(0)}{std.lastName.charAt(0)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-extrabold text-slate-900 text-sm truncate">
+                          {std.lastName.toUpperCase()} {std.firstName}
+                        </p>
+                        <p className="text-[11px] font-mono text-slate-500">
+                          Mat : <span className="font-bold text-[#175cd3]">{std.matricule}</span>
+                        </p>
+                        <p className={`text-[11px] font-bold flex items-center gap-1 ${std.gender === 'F' ? 'text-[#e11d74]' : 'text-[#1d63dc]'}`}>
+                          <span>{std.gender === 'F' ? '♀' : '♂'}</span>
+                          <span>{std.gender === 'F' ? 'Fille' : 'Garçon'}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <span className={`px-2.5 py-0.5 rounded-full font-extrabold text-[10px] inline-flex items-center gap-1 shrink-0 ${
+                      isActif
+                        ? 'bg-[#e9f9ef] text-[#15803d] border border-[#bbf0cf]'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActif ? 'bg-[#16a34a]' : 'bg-rose-600'}`} />
+                      {std.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-slate-100">
+                    <div>
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#eef4ff] border border-[#d6e4ff] text-[#14356b] font-bold max-w-full">
+                        <GraduationCap className="w-3.5 h-3.5 text-[#1a64db] shrink-0" />
+                        <span className="truncate">{studentClass?.name || 'Non assigné'}</span>
+                      </span>
+                      <div className="mt-1.5 space-y-0.5">
+                        <p className="font-bold text-slate-700 flex items-center gap-1 truncate">
+                          <Users className="w-3 h-3 text-[#1a64db] shrink-0" />
+                          <span className="truncate">{std.parent?.fatherName || std.parent?.motherName || 'Tuteur'}</span>
+                        </p>
+                        <p className="text-slate-600 font-mono flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-[#1a64db] shrink-0" />
+                          <span>{std.parent?.fatherPhone || std.parent?.motherPhone || '—'}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      {!canViewPayments ? (
+                        <span className="text-slate-400">Accès restreint</span>
+                      ) : fin.annualFee > 0 ? (
+                        fin.remaining === 0 ? (
+                          <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>À jour ({formatFCFA(fin.totalPaid)})</span>
+                          </span>
+                        ) : (
+                          <div>
+                            <p className="text-[#dc2626] font-extrabold">
+                              Reste : {formatFCFA(fin.remaining)}
+                            </p>
+                            <p className="text-slate-500 font-medium">
+                              Versé : {formatFCFA(fin.totalPaid)}
+                            </p>
+                          </div>
+                        )
+                      ) : (
+                        <span className="text-slate-400">Non configuré</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t border-slate-100">
+                    {canRecordPayment && fin.remaining > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPayment(std, false);
+                          }}
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-[#22a447] to-[#15803d] text-white font-bold text-[11px] rounded-lg inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Encaisser</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenPayment(std, true);
+                          }}
+                          className="px-2.5 py-1.5 bg-gradient-to-b from-[#1a68e8] to-[#0f48b8] text-white font-bold text-[11px] rounded-lg inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Solder</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      {canGenerateCards && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadStudentCard(std);
+                          }}
+                          className="p-1.5 bg-[#fff7ed] border border-[#fed7aa] text-[#ea580c] rounded-lg cursor-pointer"
+                          title="Carte Scolaire PDF avec QR Code"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canViewBulletins && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadStudentBulletin(std);
+                          }}
+                          className="p-1.5 bg-[#eff6ff] border border-[#bfdbfe] text-[#1d4ed8] rounded-lg cursor-pointer"
+                          title="Bulletin de Notes PDF"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingStudent(std);
+                        }}
+                        className="p-1.5 bg-white border border-[#d4e0f5] text-[#475569] rounded-lg cursor-pointer"
+                        title="Dossier 360°"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      {canEditStudent && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditModal(std);
+                          }}
+                          className="p-1.5 bg-white border border-[#d4e0f5] text-[#2563eb] rounded-lg cursor-pointer"
+                          title="Modifier"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDeleteStudent && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingStudent({ id: std.id, name: `${std.lastName.toUpperCase()} ${std.firstName}` });
+                          }}
+                          className="p-1.5 bg-[#fff5f5] border border-[#fecdd3] text-[#e11d48] rounded-lg cursor-pointer"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
-      </div>
 
-      {/* Message de confirmation Toast */}
-      {toastMessage && (
-        <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs font-semibold flex items-center justify-between shadow-2xs animate-fadeIn">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{toastMessage}</span>
-          </div>
-          <button onClick={() => setToastMessage(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* 3. Tableau Centralisé des Élèves avec Opérations Directes */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="py-2 px-3">Élève & Matricule</th>
-                <th className="py-2 px-2.5">Classe</th>
-                <th className="py-2 px-2.5">Scolarité & Caisse</th>
-                <th className="py-2 px-2.5">Parent / Contact</th>
-                <th className="py-2 px-2.5">Statut</th>
-                <th className="py-2 px-3 text-right">Opérations Centralisées</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredStudents.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
-                    Aucun élève trouvé pour cette recherche.
-                  </td>
+        {/* VUE TABLETTE & BUREAU (>= 768px) : Tableau Exact de la Maquette */}
+        <div className="hidden md:block bg-white rounded-2xl border border-[#c9ddfc] overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-gradient-to-b from-[#f3f7ff] to-[#e7f0ff] border-b border-[#c9ddfc] text-[11px] font-extrabold text-[#16366d] uppercase tracking-wide">
+                  <th className="py-2.5 px-3.5 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#1a64db]" />
+                      <span>Élève &amp; Matricule</span>
+                    </span>
+                  </th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <GraduationCap className="w-3.5 h-3.5 text-[#1a64db]" />
+                      <span>Classe</span>
+                    </span>
+                  </th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Coins className="w-3.5 h-3.5 text-[#1a64db]" />
+                      <span>Scolarité &amp; Caisse</span>
+                    </span>
+                  </th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-[#1a64db]" />
+                      <span>Parent / Contact</span>
+                    </span>
+                  </th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-[#1a64db]" />
+                      <span>Statut</span>
+                    </span>
+                  </th>
+                  <th className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                    <span className="inline-flex items-center justify-end gap-1.5">
+                      <Settings className="w-3.5 h-3.5 text-[#1a64db]" />
+                      <span>Opérations Centralisées</span>
+                    </span>
+                  </th>
                 </tr>
-              ) : (
-                filteredStudents.map((std) => {
-                  const studentClass = classes.find(c => c.id === std.classId);
-                  const isActif = std.status === 'ACTIF';
-                  const fin = getStudentFinance(std);
+              </thead>
+              <tbody className="divide-y divide-[#e9f1fc]">
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-10 text-center text-slate-400 font-medium">
+                      Aucun élève trouvé pour cette recherche.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStudents.map((std) => {
+                    const studentClass = classes.find(c => c.id === std.classId);
+                    const isActif = std.status === 'ACTIF';
+                    const fin = getStudentFinance(std);
+                    const avatarGrad = getAvatarGradient(std.id || std.matricule || std.lastName);
 
-                  return (
-                    <tr 
-                      key={std.id} 
-                      onClick={() => setViewingStudent(std)}
-                      className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
-                      title="Cliquer pour ouvrir le Dossier Centralisé de l'élève (Paiements, Carte, Notes, Assiduité)"
-                    >
-                      {/* Élève */}
-                      <td className="py-1.5 sm:py-2 px-3">
-                        <div className="flex items-center gap-2.5">
-                          {std.photoUrl ? (
-                            <img
-                              src={std.photoUrl}
-                              alt={std.firstName}
-                              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-slate-200 shrink-0 group-hover:ring-2 group-hover:ring-blue-600 transition-all"
-                            />
-                          ) : (
-                            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-slate-900 text-white font-bold flex items-center justify-center text-xs shrink-0 group-hover:bg-blue-900 transition-colors">
-                              {std.firstName.charAt(0)}{std.lastName.charAt(0)}
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-bold text-slate-900 leading-snug group-hover:text-blue-900 transition-colors">
-                              {std.lastName.toUpperCase()} {std.firstName}
-                            </p>
-                            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
-                              <span>Mat: {std.matricule}</span>
-                              <span>•</span>
-                              <span>{std.gender === 'F' ? 'Fille' : 'Garçon'}</span>
+                    return (
+                      <tr
+                        key={std.id}
+                        onClick={() => setViewingStudent(std)}
+                        className="hover:bg-[#f4f8ff] transition-colors cursor-pointer group"
+                        title="Cliquer pour ouvrir le Dossier Centralisé de l'élève (Paiements, Carte, Notes, Assiduité)"
+                      >
+                        {/* 1. Élève & Matricule */}
+                        <td className="py-2.5 px-3.5">
+                          <div className="flex items-center gap-3">
+                            {std.photoUrl ? (
+                              <img
+                                src={std.photoUrl}
+                                alt={std.firstName}
+                                className="w-9 h-9 lg:w-10 lg:h-10 rounded-full object-cover border-2 border-[#d6e4ff] shrink-0 group-hover:ring-2 group-hover:ring-blue-500 transition-all shadow-2xs"
+                              />
+                            ) : (
+                              <div className={`w-9 h-9 lg:w-10 lg:h-10 rounded-full bg-gradient-to-br ${avatarGrad} text-white font-extrabold flex items-center justify-center text-xs sm:text-sm shrink-0 shadow-xs`}>
+                                {std.firstName.charAt(0)}{std.lastName.charAt(0)}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-[#111c33] text-xs sm:text-[13px] leading-snug group-hover:text-[#1455c0] transition-colors">
+                                {std.lastName.toUpperCase()} {std.firstName}
+                              </p>
+                              <p className="text-[11px] font-mono text-slate-500 leading-tight mt-0.5">
+                                Mat : <span className="font-bold text-[#175cd3]">{std.matricule}</span>
+                              </p>
+                              <p className={`text-[11px] font-bold flex items-center gap-1 mt-0.5 ${std.gender === 'F' ? 'text-[#e11d74]' : 'text-[#1d63dc]'}`}>
+                                <span>{std.gender === 'F' ? '♀' : '♂'}</span>
+                                <span>{std.gender === 'F' ? 'Fille' : 'Garçon'}</span>
+                              </p>
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Classe */}
-                      <td className="py-1.5 sm:py-2 px-2.5 font-semibold text-slate-700">
-                        {studentClass?.name || 'Non assigné'}
-                      </td>
+                        {/* 2. Classe */}
+                        <td className="py-2.5 px-3">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#eef4ff] border border-[#d6e4ff] text-[#14356b] font-bold text-[11px] sm:text-xs max-w-[200px]">
+                            <GraduationCap className="w-3.5 h-3.5 text-[#1a64db] shrink-0" />
+                            <span className="leading-tight">{studentClass?.name || 'Non assigné'}</span>
+                          </div>
+                        </td>
 
-                      {/* Scolarité & Situation en Caisse */}
-                      <td className="py-1.5 sm:py-2 px-2.5">
-                        {fin.annualFee > 0 ? (
-                          <div>
-                            {fin.remaining === 0 ? (
-                              <span className="text-emerald-700 font-bold flex items-center gap-1 text-[11px]">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        {/* 3. Scolarité & Caisse */}
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          {!canViewPayments ? (
+                            <span className="text-slate-400 text-[11px]">Accès restreint</span>
+                          ) : fin.annualFee > 0 ? (
+                            fin.remaining === 0 ? (
+                              <span className="text-emerald-700 font-extrabold inline-flex items-center gap-1.5 text-xs">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <span>À jour ({formatFCFA(fin.totalPaid)})</span>
                               </span>
                             ) : (
                               <div className="space-y-0.5">
-                                <span className="text-rose-600 font-bold flex items-center gap-1 text-[11px]">
-                                  <Clock className="w-3 h-3 text-rose-500" />
-                                  <span>Reste : {formatFCFA(fin.remaining)}</span>
-                                </span>
-                                <p className="text-[10px] text-slate-400">Versé : {formatFCFA(fin.totalPaid)}</p>
+                                <div className="flex items-start gap-1.5">
+                                  <Coins className="w-3.5 h-3.5 text-[#e11d48] shrink-0 mt-0.5" />
+                                  <div className="leading-tight">
+                                    <p className="text-[#dc2626] font-extrabold text-xs">
+                                      Reste :
+                                    </p>
+                                    <p className="text-[#dc2626] font-extrabold text-xs font-mono tabular-nums">
+                                      {formatFCFA(fin.remaining)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <p className="text-[11px] text-[#476085] font-medium font-mono tabular-nums">
+                                  Versé : {formatFCFA(fin.totalPaid)}
+                                </p>
                               </div>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 text-[10px]">Non configuré</span>
-                        )}
-                      </td>
-
-                      {/* Parent / Contact */}
-                      <td className="py-1.5 sm:py-2 px-2.5">
-                        <p className="text-slate-800 font-medium truncate max-w-[140px]">
-                          {std.parent?.fatherName || std.parent?.motherName || 'Tuteur'}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-mono">
-                          {std.parent?.fatherPhone || std.parent?.motherPhone || '—'}
-                        </p>
-                      </td>
-
-                      {/* Statut */}
-                      <td className="py-1.5 sm:py-2 px-2.5">
-                        <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                          isActif 
-                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                            : 'bg-rose-50 text-rose-800 border border-rose-200'
-                        }`}>
-                          {std.status}
-                        </span>
-                      </td>
-
-                      {/* Actions Centralisées */}
-                      <td className="py-1.5 sm:py-2 px-3 text-right">
-                        <div className="flex items-center justify-end gap-1 flex-wrap">
-                          {/* 1. Bouton Encaisser pour cet élève */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenPayment(std, false);
-                            }}
-                            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Encaisser un versement pour cet élève"
-                          >
-                            <CreditCard className="w-3.5 h-3.5" />
-                            <span>Encaisser</span>
-                          </button>
-
-                          {/* 2. Bouton Solder en 1 Clic si reliquat */}
-                          {fin.remaining > 0 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenPayment(std, true);
-                              }}
-                              className="px-2 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                              title={`Solder immédiatement le reliquat (${formatFCFA(fin.remaining)})`}
-                            >
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Solder</span>
-                            </button>
+                            )
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">Non configuré</span>
                           )}
+                        </td>
 
-                          {/* 3. Carte Scolaire PDF A4 avec QR Code */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownloadStudentCard(std);
-                            }}
-                            className="p-1.5 text-slate-500 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
-                            title="Télécharger / Imprimer la Carte Scolaire PDF avec QR Code"
-                          >
-                            <QrCode className="w-4 h-4 text-amber-700" />
-                          </button>
+                        {/* 4. Parent / Contact */}
+                        <td className="py-2.5 px-3">
+                          <p className="text-[#111c33] font-bold text-xs flex items-center gap-1.5 truncate max-w-[180px]">
+                            <Users className="w-3.5 h-3.5 text-[#1a64db] shrink-0" />
+                            <span className="truncate">{std.parent?.fatherName || std.parent?.motherName || 'Tuteur'}</span>
+                          </p>
+                          <p className="text-[11px] text-[#334155] font-mono font-semibold flex items-center gap-1.5 mt-1">
+                            <Phone className="w-3 h-3 text-[#1a64db] shrink-0" />
+                            <span>{std.parent?.fatherPhone || std.parent?.motherPhone || '—'}</span>
+                          </p>
+                        </td>
 
-                          {/* 4. Bulletin de Notes Trimestriel PDF */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownloadStudentBulletin(std);
-                            }}
-                            className="p-1.5 text-slate-500 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="Télécharger le Bulletin de Notes Trimestriel PDF"
-                          >
-                            <FileText className="w-4 h-4 text-blue-700" />
-                          </button>
+                        {/* 5. Statut */}
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <span className={`px-3 py-1 rounded-full font-extrabold text-[11px] inline-flex items-center gap-1.5 ${
+                            isActif
+                              ? 'bg-[#e9f9ef] text-[#15803d] border border-[#bbf0cf]'
+                              : 'bg-rose-50 text-rose-800 border border-rose-200'
+                          }`}>
+                            <span className={`w-2 h-2 rounded-full ${isActif ? 'bg-[#16a34a]' : 'bg-rose-600'}`} />
+                            <span>{std.status}</span>
+                          </span>
+                        </td>
 
-                          {/* 5. Dossier Complet 360° */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewingStudent(std);
-                            }}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                            title="Consulter le dossier 360° de l'élève"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
+                        {/* 6. Opérations Centralisées (2 lignes propres à droite) */}
+                        <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                          <div className="inline-flex flex-col items-end gap-1.5">
+                            {/* Ligne 1 : Encaisser + Solder (si reste à payer et permission) + QR + Bulletin */}
+                            <div className="flex items-center justify-end gap-1.5">
+                              {canRecordPayment && fin.remaining > 0 && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenPayment(std, false);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-gradient-to-b from-[#22a447] to-[#15803d] hover:from-[#26b54f] hover:to-[#168c43] text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                                    title="Encaisser un versement pour cet élève"
+                                  >
+                                    <CreditCard className="w-3.5 h-3.5" />
+                                    <span>Encaisser</span>
+                                  </button>
 
-                          {/* 6. Modifier */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditModal(std);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
-                            title="Modifier la fiche"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenPayment(std, true);
+                                    }}
+                                    className="px-2.5 py-1.5 bg-gradient-to-b from-[#1a68e8] to-[#0f48b8] hover:from-[#2574f5] hover:to-[#1353cf] text-white font-bold text-[11px] rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
+                                    title={`Solder immédiatement le reliquat (${formatFCFA(fin.remaining)})`}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Solder</span>
+                                  </button>
+                                </>
+                              )}
 
-                          {/* 7. Supprimer */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingStudent({ id: std.id, name: `${std.lastName.toUpperCase()} ${std.firstName}` });
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                            title="Supprimer l'élève"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                              {canGenerateCards && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadStudentCard(std);
+                                  }}
+                                  className="p-1.5 bg-[#fff7ed] hover:bg-[#ffedd5] border border-[#fed7aa] text-[#ea580c] rounded-lg transition-colors cursor-pointer"
+                                  title="Télécharger / Imprimer la Carte Scolaire PDF avec QR Code"
+                                >
+                                  <QrCode className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {canViewBulletins && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadStudentBulletin(std);
+                                  }}
+                                  className="p-1.5 bg-[#eff6ff] hover:bg-[#dbeafe] border border-[#bfdbfe] text-[#1d4ed8] rounded-lg transition-colors cursor-pointer"
+                                  title="Télécharger le Bulletin de Notes Trimestriel PDF"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Ligne 2 : Consulter + Modifier + Supprimer */}
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setViewingStudent(std);
+                                }}
+                                className="px-2 py-1 bg-white hover:bg-slate-50 border border-[#d4e0f5] text-[#475569] hover:text-slate-900 rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                title="Consulter le dossier 360° de l'élève"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+
+                              {canEditStudent && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditModal(std);
+                                  }}
+                                  className="px-2 py-1 bg-white hover:bg-blue-50 border border-[#d4e0f5] text-[#2563eb] rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="Modifier la fiche"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {canDeleteStudent && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingStudent({ id: std.id, name: `${std.lastName.toUpperCase()} ${std.firstName}` });
+                                  }}
+                                  className="px-2 py-1 bg-[#fff5f5] hover:bg-[#ffe4e6] border border-[#fecdd3] text-[#e11d48] rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                  title="Supprimer l'élève"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

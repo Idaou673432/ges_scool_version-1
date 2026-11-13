@@ -353,7 +353,13 @@ export const PaymentsModule: React.FC = () => {
 
   // Ouvrir le modal d'encaissement pour un élève spécifique ou vierge, avec option de solder
   const handleOpenAddForStudent = (targetStudent?: Student, settleFull: boolean = false) => {
-    const std = targetStudent || (students.length > 0 ? students[0] : undefined);
+    if (targetStudent) {
+      const targetFin = studentsFinancials.find(f => f.student.id === targetStudent.id);
+      if (targetFin && targetFin.remaining <= 0) return;
+    }
+    const firstUnpaidStudent = studentsFinancials.find(f => f.remaining > 0)?.student;
+    const std = targetStudent || firstUnpaidStudent;
+    if (!std) return;
     const defaultClass = classes.find(c => c.id === std?.classId);
     const stdFin = std ? studentsFinancials.find(f => f.student.id === std.id) : undefined;
     
@@ -390,6 +396,7 @@ export const PaymentsModule: React.FC = () => {
     if (!std) return;
     const cls = classes.find(c => c.id === std.classId);
     const stdFin = studentsFinancials.find(f => f.student.id === std.id);
+    if (stdFin && stdFin.remaining <= 0) return;
     const suggestedAmount = stdFin && stdFin.remaining > 0 
       ? Math.min(stdFin.remaining, cls?.monthlyFee || 25000) 
       : (cls?.monthlyFee || 25000);
@@ -409,6 +416,8 @@ export const PaymentsModule: React.FC = () => {
   const handleSubmitPayment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.studentId) return;
+    const currentFin = studentsFinancials.find(f => f.student.id === formData.studentId);
+    if (currentFin && currentFin.remaining <= 0) return;
 
     const newPayment = recordPayment({
       ...formData,
@@ -857,14 +866,16 @@ export const PaymentsModule: React.FC = () => {
 
           {/* Right: Quick Action Buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => handleOpenAddForStudent()}
-              className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Encaisser</span>
-            </button>
+            {totalRemainingToCollect > 0 && (
+              <button
+                type="button"
+                onClick={() => handleOpenAddForStudent()}
+                className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Encaisser</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -1004,16 +1015,18 @@ export const PaymentsModule: React.FC = () => {
                           {/* Actions */}
                           <td className="py-1.5 sm:py-2 px-3 text-right">
                             <div className="flex items-center justify-end gap-1">
-                              {/* Bouton Encaisser pour cet élève */}
-                              <button
-                                type="button"
-                                onClick={() => handleOpenAddForStudent(item.student)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                                title="Encaisser un versement"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Encaisser</span>
-                              </button>
+                              {/* Bouton Encaisser uniquement si reliquat restant */}
+                              {item.remaining > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAddForStudent(item.student)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Encaisser un versement"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Encaisser</span>
+                                </button>
+                              )}
 
                               {/* Bouton Solder Tout en 1 Clic si reliquat restant */}
                               {item.remaining > 0 && (
@@ -1231,17 +1244,9 @@ export const PaymentsModule: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Aucune clôture de caisse enregistrée</h3>
                   <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-                    À la fin de chaque journée ou service, cliquez sur le bouton ci-dessous pour saisir vos espèces comptées à l'aveugle et imprimer le procès-verbal officiel.
+                    À la fin de chaque journée ou service, utilisez le bouton « Faire la Clôture de Caisse du Jour » ci-dessus pour saisir vos espèces comptées à l'aveugle et imprimer le procès-verbal officiel.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsClosureModalOpen(true)}
-                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Effectuer la première clôture</span>
-                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1604,6 +1609,8 @@ export const PaymentsModule: React.FC = () => {
                   <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50/50 divide-y divide-slate-100 p-1">
                     {students
                       .filter(s => {
+                        const sFin = studentsFinancials.find(f => f.student.id === s.id);
+                        if (sFin && sFin.remaining <= 0) return false;
                         if (!modalStudentSearch) return true;
                         const q = modalStudentSearch.toLowerCase().trim();
                         return `${s.lastName} ${s.firstName}`.toLowerCase().includes(q) || s.matricule.toLowerCase().includes(q);

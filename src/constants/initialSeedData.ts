@@ -324,16 +324,7 @@ export const INITIAL_STUDENTS: Student[] = [
   }
 ];
 
-export const INITIAL_GRADES: EvaluationGrade[] = [
-  { id: 'grd-1', studentId: 'std-1', classId: 'cls-9', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'DEVOIR', score: 16.5, maxScore: 20, coefficient: 1, date: '2025-10-15' },
-  { id: 'grd-2', studentId: 'std-1', classId: 'cls-9', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 17, maxScore: 20, coefficient: 2, date: '2025-11-20' },
-  { id: 'grd-3', studentId: 'std-1', classId: 'cls-9', subjectId: 'subj-2', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'DEVOIR', score: 18, maxScore: 20, coefficient: 1, date: '2025-10-18' },
-  { id: 'grd-4', studentId: 'std-1', classId: 'cls-9', subjectId: 'subj-2', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 18.5, maxScore: 20, coefficient: 2, date: '2025-11-22' },
-  { id: 'grd-5', studentId: 'std-1', classId: 'cls-9', subjectId: 'subj-3', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 15, maxScore: 20, coefficient: 2, date: '2025-11-25' },
-  { id: 'grd-6', studentId: 'std-2', classId: 'cls-9', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'DEVOIR', score: 13, maxScore: 20, coefficient: 1, date: '2025-10-15' },
-  { id: 'grd-7', studentId: 'std-2', classId: 'cls-9', subjectId: 'subj-1', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 14, maxScore: 20, coefficient: 2, date: '2025-11-20' },
-  { id: 'grd-8', studentId: 'std-2', classId: 'cls-9', subjectId: 'subj-2', term: 'TRIMESTRE_1', academicYear: '2025-2026', type: 'COMPOSITION', score: 12.5, maxScore: 20, coefficient: 2, date: '2025-11-22' }
-];
+export const INITIAL_GRADES: EvaluationGrade[] = [];
 
 export const INITIAL_PAYMENTS: Payment[] = [
   {

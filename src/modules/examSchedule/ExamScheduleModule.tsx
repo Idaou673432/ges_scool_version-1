@@ -468,26 +468,8 @@ export const ExamScheduleModule: React.FC = () => {
               Aucune épreuve planifiée pour {activeClass?.name}
             </h3>
             <p className="text-xs text-slate-500">
-              Générez automatiquement l'emploi du temps complet avec toutes les matières en 1 clic, ou ajoutez les épreuves manuellement.
+              Utilisez les boutons « Générer Auto (1-Clic) » ou « + Épreuve » dans la barre ci-dessus pour planifier les épreuves.
             </p>
-          </div>
-          <div className="flex justify-center gap-2 pt-2">
-            <button
-              type="button"
-              onClick={() => setIsAutoGenerateModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Générer Auto en 1 Clic</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenAddSlot}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5 text-amber-400" />
-              <span>Ajouter manuellement</span>
-            </button>
           </div>
         </div>
       ) : viewMode === 'GRID' ? (

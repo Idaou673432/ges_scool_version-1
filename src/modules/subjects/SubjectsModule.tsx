@@ -5,12 +5,15 @@
 import React, { useState, useMemo } from 'react';
 import { BookOpen, Plus, Edit3, Trash2, Search, X } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Subject, SchoolLevelCategory } from '../../types';
 import { MALI_SCHOOL_LEVEL_CATEGORIES } from '../../constants/maliEducation';
 import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 
 export const SubjectsModule: React.FC = () => {
   const { settings, subjects, saveSubject, deleteSubject, deleteAllSubjects } = useSchool();
+  const { hasPermission } = useAuth();
+  const canManageSubjects = hasPermission('subjects:manage');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubj, setSelectedSubj] = useState<Subject | null>(null);
   const [deletingSubjId, setDeletingSubjId] = useState<string | null>(null);
@@ -144,24 +147,26 @@ export const SubjectsModule: React.FC = () => {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {subjects.length > 0 && (
+        {canManageSubjects && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {subjects.length > 0 && (
+              <button
+                onClick={() => setShowDeleteAllModal(true)}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Supprimer Tout ({subjects.length})</span>
+              </button>
+            )}
             <button
-              onClick={() => setShowDeleteAllModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Supprimer Tout ({subjects.length})</span>
+              <Plus className="w-3.5 h-3.5 text-amber-400" />
+              <span>+ Ajouter Matière</span>
             </button>
-          )}
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span>+ Ajouter Matière</span>
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-2xs">
@@ -195,26 +200,30 @@ export const SubjectsModule: React.FC = () => {
                       </span>
                     </td>
                     <td className="py-1.5 sm:py-2 px-3 sm:px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => {
-                            setSelectedSubj(sub);
-                            setFormData(sub);
-                            setIsModalOpen(true);
-                          }}
-                          className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                          title="Modifier"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => setDeletingSubjId(sub.id)}
-                          className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Supprimer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                        </button>
-                      </div>
+                      {canManageSubjects ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => {
+                              setSelectedSubj(sub);
+                              setFormData(sub);
+                              setIsModalOpen(true);
+                            }}
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                            title="Modifier"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingSubjId(sub.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Lecture seule</span>
+                      )}
                     </td>
                   </tr>
                 ))

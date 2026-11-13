@@ -5,6 +5,7 @@
 import React, { useState, useMemo } from 'react';
 import { Briefcase, Plus, Phone, Mail, Award, Edit3, Trash2, Printer, FileText, Search, X } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Teacher } from '../../types';
 import { formatFCFA } from '../../constants/maliEducation';
 import { PdfService } from '../../services/pdfService';
@@ -12,6 +13,8 @@ import { DeleteAllModal } from '../../components/common/DeleteAllModal';
 
 export const TeachersModule: React.FC = () => {
   const { teachers, subjects, settings, saveTeacher, deleteTeacher, deleteAllTeachers } = useSchool();
+  const { hasPermission } = useAuth();
+  const canManageTeachers = hasPermission('teachers:manage');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [deletingTeacherId, setDeletingTeacherId] = useState<string | null>(null);
@@ -108,24 +111,26 @@ export const TeachersModule: React.FC = () => {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {teachers.length > 0 && (
+        {canManageTeachers && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {teachers.length > 0 && (
+              <button
+                onClick={() => setShowDeleteAllModal(true)}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Supprimer Tout ({teachers.length})</span>
+              </button>
+            )}
             <button
-              onClick={() => setShowDeleteAllModal(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs rounded-lg border border-rose-200 transition-colors cursor-pointer"
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              <span>Supprimer Tout ({teachers.length})</span>
+              <Plus className="w-3.5 h-3.5 text-amber-400" />
+              <span>+ Ajouter Enseignant</span>
             </button>
-          )}
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span>+ Ajouter Enseignant</span>
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
@@ -145,31 +150,35 @@ export const TeachersModule: React.FC = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handlePrintSalarySlip(tch)}
-                    className="p-1 text-slate-400 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
-                    title="Télécharger Fiche de Paie PDF"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedTeacher(tch);
-                      setFormData(tch);
-                      setIsModalOpen(true);
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                    title="Modifier"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDeletingTeacherId(tch.id)}
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
-                    title="Supprimer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                  </button>
+                  {canManageTeachers && (
+                    <>
+                      <button
+                        onClick={() => handlePrintSalarySlip(tch)}
+                        className="p-1 text-slate-400 hover:text-emerald-700 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
+                        title="Télécharger Fiche de Paie PDF"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedTeacher(tch);
+                          setFormData(tch);
+                          setIsModalOpen(true);
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                        title="Modifier"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingTeacherId(tch.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                        title="Supprimer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

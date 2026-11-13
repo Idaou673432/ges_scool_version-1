@@ -104,6 +104,7 @@ export default defineConfig(() => {
       allowedHosts: true,
       // HMR is disabled in AI Studio (ignore WebSocket errors and prevent connection attempts)
       hmr: false,
+      ws: false,
       watch: null,
     },
     esbuild: {

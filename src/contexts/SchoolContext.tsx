@@ -587,11 +587,13 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     relevantSubjects.forEach(subj => {
       const subjGrades = studentGrades.filter(g => g.subjectId === subj.id);
       
-      let classScore = isFirstCycle ? 6.5 : 16.0;
-      let compositionScore = isFirstCycle ? 6.5 : 32.0;
-      let finalScore = isFirstCycle ? 6.5 : 16.0;
+      let classScore: number | undefined = undefined;
+      let compositionScore: number | undefined = undefined;
+      let finalScore = 0;
+      let hasGrades = false;
 
       if (subjGrades.length > 0) {
+        hasGrades = true;
         const classGrades = subjGrades.filter(g => g.type !== 'COMPOSITION' && g.type !== 'EXAMEN');
         const compGrades = subjGrades.filter(g => g.type === 'COMPOSITION' || g.type === 'EXAMEN');
 
@@ -612,13 +614,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         } else if (settings.missingCompScoreBehavior === 'ZERO') {
           compositionScore = 0;
-        } else {
-          compositionScore = isFirstCycle ? classScore : classScore * 2;
         }
 
-        const compSur20 = isFirstCycle 
-          ? compositionScore 
-          : (compGrades[0]?.maxScore === 20 ? compGrades[0].score : compositionScore / 2);
+        const compSur20 = isFirstCycle
+          ? (compositionScore ?? 0)
+          : (compGrades[0]?.maxScore === 20 ? compGrades[0].score : ((compositionScore ?? 0) / 2));
+
+        const classVal = classScore ?? 0;
+        const compVal = compositionScore ?? 0;
 
         if (isFirstCycle) {
           const mode1st = settings.calculationFormula1stCycle || 'MALI_OFFICIAL';
@@ -627,23 +630,23 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           if (classGrades.length > 0 && compGrades.length > 0) {
             if (mode1st === 'CLASS_ONLY') {
-              finalScore = classScore;
+              finalScore = classVal;
             } else if (mode1st === 'COMP_ONLY') {
-              finalScore = compositionScore;
+              finalScore = compVal;
             } else if (mode1st === 'CUSTOM') {
               const totalW = (wClass + wComp) || 1;
-              finalScore = (classScore * wClass + compositionScore * wComp) / totalW;
+              finalScore = (classVal * wClass + compVal * wComp) / totalW;
             } else {
-              finalScore = (classScore + compositionScore) / 2;
+              finalScore = (classVal + compVal) / 2;
             }
           } else if (compGrades.length > 0) {
             finalScore = settings.missingClassScoreBehavior === 'ZERO'
-              ? (mode1st === 'CUSTOM' ? (compositionScore * wComp) / (wClass + wComp) : compositionScore / 2)
-              : compositionScore;
+              ? (mode1st === 'CUSTOM' ? (compVal * wComp) / (wClass + wComp) : compVal / 2)
+              : compVal;
           } else {
             finalScore = settings.missingCompScoreBehavior === 'ZERO'
-              ? (mode1st === 'CUSTOM' ? (classScore * wClass) / (wClass + wComp) : classScore / 2)
-              : classScore;
+              ? (mode1st === 'CUSTOM' ? (classVal * wClass) / (wClass + wComp) : classVal / 2)
+              : classVal;
           }
         } else {
           const mode2nd = settings.calculationFormula2ndCycle || 'MALI_OFFICIAL';
@@ -652,25 +655,25 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
           if (classGrades.length > 0 && compGrades.length > 0) {
             if (mode2nd === 'CLASS_ONLY') {
-              finalScore = classScore;
+              finalScore = classVal;
             } else if (mode2nd === 'COMP_ONLY') {
               finalScore = compSur20;
             } else if (mode2nd === 'EQUAL_WEIGHT') {
-              finalScore = (classScore + compSur20) / 2;
+              finalScore = (classVal + compSur20) / 2;
             } else if (mode2nd === 'CUSTOM') {
               const totalW = (wClass + wComp) || 1;
-              finalScore = (classScore * wClass + compSur20 * wComp) / totalW;
+              finalScore = (classVal * wClass + compSur20 * wComp) / totalW;
             } else {
-              finalScore = (classScore + compositionScore) / 3;
+              finalScore = (classVal + compVal) / 3;
             }
           } else if (compGrades.length > 0) {
             finalScore = settings.missingClassScoreBehavior === 'ZERO'
-              ? (mode2nd === 'MALI_OFFICIAL' ? compositionScore / 3 : (compSur20 * wComp) / (wClass + wComp))
+              ? (mode2nd === 'MALI_OFFICIAL' ? compVal / 3 : (compSur20 * wComp) / (wClass + wComp))
               : compSur20;
           } else {
             finalScore = settings.missingCompScoreBehavior === 'ZERO'
-              ? (mode2nd === 'MALI_OFFICIAL' ? classScore / 3 : (classScore * wClass) / (wClass + wComp))
-              : classScore;
+              ? (mode2nd === 'MALI_OFFICIAL' ? classVal / 3 : (classVal * wClass) / (wClass + wComp))
+              : classVal;
           }
         }
       }
@@ -679,25 +682,31 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ? studentClass.customCoefficients[subj.id]
         : subj.coefficient;
 
-      finalScore = Math.round(finalScore * 100) / 100;
-      const weightedScore = Math.round(finalScore * effectiveCoeff * 100) / 100;
-      totalPoints += weightedScore;
-      totalCoefficients += effectiveCoeff;
+      finalScore = hasGrades ? Math.round(finalScore * 100) / 100 : 0;
+      const weightedScore = hasGrades ? Math.round(finalScore * effectiveCoeff * 100) / 100 : 0;
 
-      const { appreciation } = getMaliScoreAppreciation(finalScore, maxScore);
+      if (hasGrades) {
+        totalPoints += weightedScore;
+        totalCoefficients += effectiveCoeff;
+      }
+
+      const appreciation = hasGrades
+        ? getMaliScoreAppreciation(finalScore, maxScore).appreciation
+        : 'Non noté';
 
       subjectAverages.push({
         subjectId: subj.id,
         subjectName: subj.name,
         subjectCode: subj.code,
         coefficient: effectiveCoeff,
-        classAverage: isFirstCycle ? 6.4 : 12.8,
-        classScore: Math.round(classScore * 100) / 100,
-        compositionScore: Math.round(compositionScore * 100) / 100,
+        classAverage: 0,
+        classScore: classScore !== undefined ? Math.round(classScore * 100) / 100 : undefined,
+        compositionScore: compositionScore !== undefined ? Math.round(compositionScore * 100) / 100 : undefined,
         finalScore,
         maxScore,
         weightedScore,
-        appreciation
+        appreciation,
+        hasGrades
       });
     });
 
@@ -735,23 +744,25 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // 3. Compute and sort all class averages descending (1er to last)
     const classPerformances = classStudents.map(s => {
       if (s.id === student.id) {
-        return { studentId: s.id, average: activePerf.generalAverage };
+        return { studentId: s.id, average: activePerf.generalAverage, graded: activePerf.totalCoefficients > 0 };
       }
       const perf = calculateStudentPerformanceForTerm(s.id, s.classId, term);
-      return { studentId: s.id, average: perf.generalAverage };
+      return { studentId: s.id, average: perf.generalAverage, graded: perf.totalCoefficients > 0 };
     }).sort((a, b) => b.average - a.average);
 
-    // 4. Calculate exact class statistical extremes & mean
-    const classMaxAverage = classPerformances.length > 0 
-      ? Math.round(classPerformances[0].average * 100) / 100 
-      : (isFirstCycle ? 8.5 : 17.0);
-    const classMinAverage = classPerformances.length > 0 
-      ? Math.round(classPerformances[classPerformances.length - 1].average * 100) / 100 
-      : (isFirstCycle ? 4.5 : 9.0);
-    const sumAverages = classPerformances.reduce((acc, x) => acc + x.average, 0);
-    const classOverallAverage = classPerformances.length > 0 
-      ? Math.round((sumAverages / classPerformances.length) * 100) / 100 
-      : (isFirstCycle ? 6.5 : 13.0);
+    const gradedPerformances = classPerformances.filter(p => p.graded);
+
+    // 4. Calculate exact class statistical extremes & mean (0 when no student has grades yet)
+    const classMaxAverage = gradedPerformances.length > 0
+      ? Math.round(gradedPerformances[0].average * 100) / 100
+      : 0;
+    const classMinAverage = gradedPerformances.length > 0
+      ? Math.round(gradedPerformances[gradedPerformances.length - 1].average * 100) / 100
+      : 0;
+    const sumAverages = gradedPerformances.reduce((acc, x) => acc + x.average, 0);
+    const classOverallAverage = gradedPerformances.length > 0
+      ? Math.round((sumAverages / gradedPerformances.length) * 100) / 100
+      : 0;
 
     // 5. Determine exact competitive rank (handling ties / ex-aequo)
     let rankInClass = 1;
@@ -775,6 +786,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const passMark = isFirstCycle ? 5 : 10;
     const goodMark = isFirstCycle ? 6 : 12;
+    const hasAnyGrade = activePerf.totalCoefficients > 0;
 
     return {
       studentId: student.id,
@@ -796,8 +808,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       classOverallAverage,
       absencesCount,
       lateCount,
-      principalTeacherComment: activePerf.generalAverage >= goodMark ? 'Bons résultats, élève assidu(e).' : 'Doit fournir plus d\'efforts.',
-      directorDecision: activePerf.generalAverage >= passMark ? 'ADMIS' : 'A_AVERTISSEMENT'
+      principalTeacherComment: !hasAnyGrade ? '' : (activePerf.generalAverage >= goodMark ? 'Bons résultats, élève assidu(e).' : 'Doit fournir plus d\'efforts.'),
+      directorDecision: !hasAnyGrade ? 'EN_ATTENTE' : (activePerf.generalAverage >= passMark ? 'ADMIS' : 'A_AVERTISSEMENT')
     };
   };
 

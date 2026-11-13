@@ -175,6 +175,7 @@ export interface StudentSubjectAverage {
   weightedScore: number; // finalScore * coefficient
   appreciation: string;
   teacherName?: string;
+  hasGrades?: boolean;
 }
 
 export interface ReportCard {

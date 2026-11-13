@@ -11,9 +11,11 @@ import { secureLocalStorage } from '../services/secureStorage';
 interface AuthContextType {
   currentUser: User | null;
   users: User[];
+  isAdmin: boolean;
   loginAsUser: (userId: string) => void;
   logout: () => void;
   hasPermission: (permission: string) => boolean;
+  canAccessTab: (tab: string) => boolean;
   switchRoleSimulated: (role: UserRole) => void;
   saveUser: (user: Partial<User>) => User;
   deleteUser: (userId: string) => boolean;
@@ -30,7 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadedUsers = storageService.getUsers();
     setUsers(loadedUsers);
     const savedActiveId = secureLocalStorage.getItem('somasikolo_active_user_id');
-    const defaultUser = loadedUsers.find(u => u.id === savedActiveId) || loadedUsers[0];
+    const defaultUser = loadedUsers.find(u => u.id === savedActiveId && u.active) || loadedUsers.find(u => u.active) || loadedUsers[0];
     if (defaultUser) {
       setCurrentUser(defaultUser);
     }
@@ -42,7 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const loginAsUser = (userId: string) => {
-    const found = users.find(u => u.id === userId);
+    const found = users.find(u => u.id === userId && u.active);
     if (found) {
       setCurrentUser(found);
       secureLocalStorage.setItem('somasikolo_active_user_id', userId);
@@ -56,16 +58,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRoleSimulated = (role: UserRole) => {
-    const found = users.find(u => u.role === role);
+    if (!currentUser || !AuthService.isAdmin(currentUser.role)) return;
+    const found = users.find(u => u.role === role && u.active);
     if (found) {
       loginAsUser(found.id);
-    } else if (currentUser) {
-      const updated = { ...currentUser, role };
-      setCurrentUser(updated);
     }
   };
 
   const saveUser = (user: Partial<User>): User => {
+    if (!currentUser || !AuthService.hasPermission(currentUser.role, 'users:manage')) {
+      throw new Error('Action non autorisée : gestion des utilisateurs réservée à l\'administrateur.');
+    }
     const saved = storageService.saveUser(user);
     const updatedUsers = storageService.getUsers();
     setUsers(updatedUsers);
@@ -76,6 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteUser = (userId: string): boolean => {
+    if (!currentUser || !AuthService.hasPermission(currentUser.role, 'users:manage')) {
+      return false;
+    }
     const res = storageService.deleteUser(userId);
     if (res) {
       const updatedUsers = storageService.getUsers();
@@ -98,14 +104,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return AuthService.hasPermission(currentUser.role, permission);
   };
 
+  const canAccessTab = (tab: string): boolean => {
+    if (!currentUser) return false;
+    return AuthService.canAccessTab(currentUser.role, tab);
+  };
+
+  const isAdmin = AuthService.isAdmin(currentUser?.role);
+
   return (
     <AuthContext.Provider
       value={{
         currentUser,
         users,
+        isAdmin,
         loginAsUser,
         logout,
         hasPermission,
+        canAccessTab,
         switchRoleSimulated,
         saveUser,
         deleteUser,

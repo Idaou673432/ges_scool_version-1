@@ -15,20 +15,13 @@ import {
   PanelLeftClose, 
   PanelLeftOpen, 
   X, 
-  Cloud, 
-  QrCode, 
-  Download, 
   ChevronDown,
   AlertTriangle,
-  CheckCircle2,
-  Building2,
-  Calendar
+  CheckCircle2
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { AuthService } from '../../services/authService';
-import { PwaInstallModal } from '../common/PwaInstallModal';
-import { CloudSchoolSwitcherModal } from '../common/CloudSchoolSwitcherModal';
 
 interface HeaderProps {
   onSearchQuery?: (q: string) => void;
@@ -47,12 +40,10 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebarCollapse,
   onOpenMobileMenu
 }) => {
-  const { settings, payments, cloudSchoolCode, isFeatureEnabled } = useSchool();
-  const { currentUser, users, loginAsUser } = useAuth();
+  const { settings, payments, isFeatureEnabled } = useSchool();
+  const { currentUser, users, isAdmin, hasPermission, loginAsUser } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showPwaModal, setShowPwaModal] = useState(false);
-  const [showCloudModal, setShowCloudModal] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [search, setSearch] = useState('');
   
@@ -73,7 +64,8 @@ export const Header: React.FC<HeaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const pendingPayments = payments.filter(p => p.remainingAmount > 0);
+  const canViewPayments = hasPermission('payments:view') && isFeatureEnabled('payments');
+  const pendingPayments = canViewPayments ? payments.filter(p => p.remainingAmount > 0) : [];
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
@@ -182,15 +174,17 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="absolute right-0 mt-1.5 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-50 text-xs">
               <div className="px-3 pb-2 border-b border-slate-100 flex items-center justify-between">
                 <span className="font-bold text-slate-900 uppercase text-[10px]">
-                  Alertes de Scolarité
+                  {canViewPayments ? 'Alertes de Scolarité' : 'Notifications'}
                 </span>
-                <span className="bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded-full font-bold text-[10px]">
-                  {pendingPayments.length} retard(s)
-                </span>
+                {canViewPayments && (
+                  <span className="bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded-full font-bold text-[10px]">
+                    {pendingPayments.length} retard(s)
+                  </span>
+                )}
               </div>
 
               <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
-                {pendingPayments.slice(0, 5).map((p) => (
+                {canViewPayments && pendingPayments.slice(0, 5).map((p) => (
                   <div key={p.id} className="p-2.5 hover:bg-slate-50 flex items-start gap-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
@@ -261,40 +255,24 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Options secondaires */}
               <div className="py-1 space-y-0.5">
-                {/* Cloud & Multi-écoles */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    setShowCloudModal(true);
-                  }}
-                  className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-slate-50 text-slate-700 flex items-center justify-between transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Code Cloud</span>
-                  </div>
-                  <span className="font-mono text-[10px] bg-slate-100 px-1 py-0.2 rounded text-slate-600 font-bold">
-                    {cloudSchoolCode || 'Principal'}
-                  </span>
-                </button>
-
-                {/* Installer App */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    setShowPwaModal(true);
-                  }}
-                  className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Installer l'application</span>
-                </button>
+                {/* Verrouiller / Changer d'utilisateur (pour tous les rôles) */}
+                {onLock && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onLock();
+                    }}
+                    className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-rose-50 text-rose-700 flex items-center gap-2 transition-colors cursor-pointer font-semibold"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Déconnexion / Changer de session</span>
+                  </button>
+                )}
               </div>
 
-              {/* Basculer de compte / Multi-Rôles */}
-              {users.length > 1 && (
+              {/* Basculer de compte / Multi-Rôles : STRICTEMENT RÉSERVÉ À L'ADMINISTRATEUR */}
+              {isAdmin && users.length > 1 && (
                 <div className="py-1 border-t border-slate-100">
                   <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 px-2.5 block mb-1">
                     Changer de compte ({users.length}) :
@@ -327,22 +305,6 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
 
-              {/* Verrouiller */}
-              {onLock && (
-                <div className="pt-1 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUserMenu(false);
-                      onLock();
-                    }}
-                    className="w-full px-2.5 py-1.5 text-left rounded-lg hover:bg-rose-50 text-rose-600 font-medium flex items-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Verrouiller l'écran</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -376,9 +338,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Modals Utiles */}
-      <PwaInstallModal isOpen={showPwaModal} onClose={() => setShowPwaModal(false)} />
-      <CloudSchoolSwitcherModal isOpen={showCloudModal} onClose={() => setShowCloudModal(false)} />
     </header>
   );
 };

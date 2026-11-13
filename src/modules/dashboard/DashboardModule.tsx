@@ -8,11 +8,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { 
-  Users, CreditCard, Award, School, QrCode, Plus, ArrowUpRight, 
+  Users, Award, School, QrCode, ArrowUpRight, 
   FileText, Calendar, CheckCircle2, AlertCircle, Clock, ChevronRight,
   TrendingUp, Download, Eye, Sparkles
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { formatFCFA, getMaliScoreAppreciation } from '../../constants/maliEducation';
 import { NavTab } from '../../components/layout/Sidebar';
 import { PdfService } from '../../services/pdfService';
@@ -34,6 +35,9 @@ export const DashboardModule: React.FC<DashboardProps> = ({
   onViewStudentProfile
 }) => {
   const { stats, students, classes, payments, settings, generateReportCard, isFeatureEnabled } = useSchool();
+  const { hasPermission } = useAuth();
+  const canViewPayments = isFeatureEnabled('payments') && hasPermission('payments:view');
+  const canViewGrades = isFeatureEnabled('grades') && hasPermission('grades:view');
   const [activeDashboardTab, setActiveDashboardTab] = useState<'OVERVIEW' | 'ACADEMIC'>('OVERVIEW');
   const [localViewingStudent, setLocalViewingStudent] = useState<Student | null>(null);
 
@@ -61,7 +65,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
         counted++;
       }
     });
-    return counted > 0 ? (sum / counted).toFixed(2) : '14.50';
+    return counted > 0 ? (sum / counted).toFixed(2) : '0.00';
   }, [activeStudents, generateReportCard, settings.activeTerm]);
 
   // Répartition par cycle scolaire au Mali
@@ -123,7 +127,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             <span>Vue Générale</span>
           </button>
 
-          {isFeatureEnabled('grades') && (
+          {canViewGrades && (
             <button
               type="button"
               onClick={() => setActiveDashboardTab('ACADEMIC')}
@@ -139,39 +143,19 @@ export const DashboardModule: React.FC<DashboardProps> = ({
           )}
         </div>
 
-        {/* Right: Actions Rapides (SANS Scanner QR) */}
+        {/* Right: Actions Rapides */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {isFeatureEnabled('students') && (
+          {hasPermission('reports:view') && (
             <button
               type="button"
-              onClick={() => onNavigate('students')}
-              className="flex items-center gap-1 px-2.5 py-1 bg-blue-900 hover:bg-blue-800 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer shadow-2xs"
+              onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
+              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer border border-slate-200"
+              title="Générer le rapport officiel MEN"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Inscrire Élève</span>
+              <Download className="w-3.5 h-3.5 text-slate-600" />
+              <span>Rapport MEN</span>
             </button>
           )}
-
-          {isFeatureEnabled('payments') && (
-            <button
-              type="button"
-              onClick={() => onNavigate('payments')}
-              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-            >
-              <CreditCard className="w-3.5 h-3.5" />
-              <span>Encaisser</span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
-            className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer border border-slate-200"
-            title="Générer le rapport officiel MEN"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-600" />
-            <span>Rapport MEN</span>
-          </button>
         </div>
       </div>
 
@@ -181,7 +165,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
           {/* Grille 2 Colonnes : Trésorerie & Cycles */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 sm:gap-3">
             {/* Graphique de Trésorerie Mensuelle */}
-            {isFeatureEnabled('payments') && (
+            {canViewPayments && (
               <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 p-3 sm:p-4 space-y-2">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div>
@@ -219,7 +203,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
             )}
 
             {/* Répartition par Cycle */}
-            <div className={`${isFeatureEnabled('payments') ? 'lg:col-span-4' : 'lg:col-span-12'} bg-white rounded-2xl border border-slate-200 p-5 space-y-3 flex flex-col justify-between`}>
+            <div className={`${canViewPayments ? 'lg:col-span-4' : 'lg:col-span-12'} bg-white rounded-2xl border border-slate-200 p-5 space-y-3 flex flex-col justify-between`}>
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-900">Répartition par Cycle</h3>
@@ -241,17 +225,19 @@ export const DashboardModule: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
-              <button
-                onClick={() => onNavigate('classes')}
-                className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer text-center"
-              >
-                Gérer les classes & effectifs
-              </button>
+              {hasPermission('classes:view') && (
+                <button
+                  onClick={() => onNavigate('classes')}
+                  className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer text-center"
+                >
+                  Gérer les classes & effectifs
+                </button>
+              )}
             </div>
           </div>
 
           {/* Tableau des Règlements en Attente (Rappels de Caisse) */}
-          {isFeatureEnabled('payments') && (
+          {canViewPayments && (
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
               <div className="p-2.5 sm:p-3 border-b border-slate-100 flex items-center justify-between">
                 <div>
@@ -274,14 +260,13 @@ export const DashboardModule: React.FC<DashboardProps> = ({
                       <th className="py-2 px-3">Élève & Matricule</th>
                       <th className="py-2 px-2.5">Classe</th>
                       <th className="py-2 px-2.5 text-right">Montant Payé</th>
-                      <th className="py-2 px-2.5 text-right">Reste à Régler</th>
-                      <th className="py-2 px-3 text-right">Action</th>
+                      <th className="py-2 px-3 text-right">Reste à Régler</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {pendingPayments.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-6 text-center text-slate-400 font-medium">
+                        <td colSpan={4} className="py-6 text-center text-slate-400 font-medium">
                           Tous les élèves sont à jour de leurs règlements de scolarité.
                         </td>
                       </tr>
@@ -298,17 +283,8 @@ export const DashboardModule: React.FC<DashboardProps> = ({
                           <td className="py-1.5 sm:py-2 px-2.5 text-right font-mono font-medium text-emerald-700 tabular-nums">
                             {formatFCFA(p.amountPaid)}
                           </td>
-                          <td className="py-1.5 sm:py-2 px-2.5 text-right font-mono font-bold text-rose-600 tabular-nums">
+                          <td className="py-1.5 sm:py-2 px-3 text-right font-mono font-bold text-rose-600 tabular-nums">
                             {formatFCFA(p.remainingAmount)}
-                          </td>
-                          <td className="py-1.5 sm:py-2 px-3 text-right">
-                            <button
-                              type="button"
-                              onClick={() => onNavigate('payments')}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-md text-xs transition-colors cursor-pointer"
-                            >
-                              Encaisser
-                            </button>
                           </td>
                         </tr>
                       ))
@@ -322,7 +298,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
       )}
 
       {/* VUE 2 : RÉSULTATS ACADÉMIQUES & NOTES */}
-      {activeDashboardTab === 'ACADEMIC' && isFeatureEnabled('grades') && (
+      {activeDashboardTab === 'ACADEMIC' && canViewGrades && (
         <AcademicSuccessCharts onNavigateToGrades={() => onNavigate('grades')} />
       )}
 
@@ -334,14 +310,14 @@ export const DashboardModule: React.FC<DashboardProps> = ({
           student={localViewingStudent}
           isOpen={Boolean(localViewingStudent)}
           onClose={() => setLocalViewingStudent(null)}
-          onNavigateToBulletin={() => {
+          onNavigateToBulletin={hasPermission('bulletins:generate') || hasPermission('bulletins:view') ? () => {
             setLocalViewingStudent(null);
             onNavigate('bulletins');
-          }}
-          onNavigateToPayments={() => {
+          } : undefined}
+          onNavigateToPayments={hasPermission('payments:view') ? () => {
             setLocalViewingStudent(null);
             onNavigate('payments');
-          }}
+          } : undefined}
         />
       )}
     </div>

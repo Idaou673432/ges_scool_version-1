@@ -23,6 +23,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { cloudSyncService } from '../../services/cloudSyncService';
 
 interface CloudSchoolSwitcherModalProps {
@@ -44,10 +45,11 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
     students,
     classes
   } = useSchool();
+  const { isAdmin } = useAuth();
 
   const [inputCode, setInputCode] = useState(cloudSchoolCode);
   const [schoolName, setSchoolName] = useState(settings.schoolName || '');
-  const [pinCode, setPinCode] = useState(settings.adminPassword || '00223');
+  const [pinCode, setPinCode] = useState(isAdmin ? (settings.adminPassword || '') : '');
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -260,10 +262,10 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">Code PIN Direction</label>
                   <input
-                    type="text"
+                    type="password"
                     value={pinCode}
                     onChange={(e) => setPinCode(e.target.value)}
-                    placeholder="00223"
+                    placeholder="••••••"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold"
                   />
                 </div>
