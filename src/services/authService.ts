@@ -2,7 +2,7 @@
  * SomaSikolo - Service d'Authentification & Contrôle d'Accès basé sur les Rôles (RBAC)
  */
 
-import { UserRole, Permission } from '../types';
+import { User, UserRole, Permission } from '../types';
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ADMIN: ['*'], // Full access (includes users:manage, modules:manage, security:admin)
@@ -94,6 +94,11 @@ export class AuthService {
 
   public static isAdmin(role: UserRole | undefined | null): boolean {
     return role === 'ADMIN';
+  }
+
+  public static isPrimaryAdmin(user?: Pick<User, 'id' | 'username'> | null): boolean {
+    if (!user) return false;
+    return user.id === 'u-admin' || user.username?.trim().toLowerCase() === 'admin';
   }
 
   public static getRoleLabel(role: UserRole): string {

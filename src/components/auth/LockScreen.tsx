@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { AuthService } from '../../services/authService';
 import { secureSessionStorage } from '../../services/secureStorage';
 
 interface LockScreenProps {
@@ -47,7 +48,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
 
     // 2. Vérifier le mot de passe maître administrateur
     if (cleanInput === expectedPassword || cleanInput === '0022390070321' || cleanInput === '00223') {
-      const adminUser = users.find(u => u.role === 'ADMIN') || users[0];
+      const adminUser = users.find(u => AuthService.isPrimaryAdmin(u)) || users.find(u => u.role === 'ADMIN') || users[0];
       if (adminUser) loginAsUser(adminUser.id);
       setError(false);
       secureSessionStorage.setItem('somasikolo_unlocked', 'true');

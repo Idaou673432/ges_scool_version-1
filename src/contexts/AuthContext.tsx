@@ -78,6 +78,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!currentUser || !AuthService.hasPermission(currentUser.role, 'users:manage')) {
       throw new Error('Action non autorisée : gestion des utilisateurs réservée à l\'administrateur.');
     }
+    const existingTarget = user.id ? users.find(u => u.id === user.id) : undefined;
+    if ((AuthService.isPrimaryAdmin(existingTarget) || AuthService.isPrimaryAdmin({ id: user.id || '', username: user.username || '' })) && !AuthService.isPrimaryAdmin(currentUser)) {
+      throw new Error('Action non autorisée sur l\'administrateur principal.');
+    }
     const saved = storageService.saveUser(user);
     const updatedUsers = storageService.getUsers();
     setUsers(updatedUsers);
@@ -90,6 +94,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteUser = (userId: string): boolean => {
     if (!currentUser || !AuthService.hasPermission(currentUser.role, 'users:manage')) {
+      return false;
+    }
+    const targetUser = users.find(u => u.id === userId);
+    if (AuthService.isPrimaryAdmin(targetUser)) {
       return false;
     }
     const res = storageService.deleteUser(userId);

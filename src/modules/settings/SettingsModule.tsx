@@ -120,7 +120,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   };
 
   const handleOpenEditUser = (u: User) => {
-    if (!canManageUsers) return;
+    if (!canManageUsers || AuthService.isPrimaryAdmin(u)) return;
     setUserEditing(u);
     setUserFormData({
       fullName: u.fullName,
@@ -151,6 +151,10 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
     }
 
     const cleanUsername = userFormData.username.trim().toLowerCase();
+    if (cleanUsername === 'admin') {
+      setUserModalError('L\'identifiant "admin" est réservé au système et ne peut pas être utilisé.');
+      return;
+    }
     const duplicate = users.find(u => 
       u.username.toLowerCase() === cleanUsername &&
       (!userEditing || u.id !== userEditing.id)
@@ -178,7 +182,10 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   };
 
   const handleConfirmDeleteUser = () => {
-    if (!userDeleting || !canManageUsers) return;
+    if (!userDeleting || !canManageUsers || AuthService.isPrimaryAdmin(userDeleting)) {
+      setUserDeleting(null);
+      return;
+    }
 
     if (userDeleting.role === 'ADMIN') {
       const adminCount = users.filter(u => u.role === 'ADMIN').length;
@@ -252,6 +259,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
 
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
+      if (AuthService.isPrimaryAdmin(u)) return false;
       if (userRoleFilter !== 'ALL' && u.role !== userRoleFilter) return false;
       if (!userSearch.trim()) return true;
       const q = userSearch.toLowerCase().trim();
