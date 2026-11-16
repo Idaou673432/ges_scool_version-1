@@ -131,6 +131,12 @@ export function AppContent() {
     setIsUnlocked(false);
   };
 
+  useEffect(() => {
+    const onForceLock = () => setIsUnlocked(false);
+    window.addEventListener('somasikolo_session_locked', onForceLock);
+    return () => window.removeEventListener('somasikolo_session_locked', onForceLock);
+  }, []);
+
   // Detection scan de reçu anti-fraude (par caméra externe ou lien direct)
   const [externalReceiptNumber, setExternalReceiptNumber] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {

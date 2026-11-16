@@ -615,7 +615,7 @@ class StorageService {
       }
     } else {
       saved = {
-        id: `u-${Date.now()}`,
+        id: `u-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         username: user.username || `user-${Date.now().toString().slice(-4)}`,
         fullName: user.fullName || 'Nouvel Utilisateur',
         email: user.email || '',
@@ -774,7 +774,7 @@ class StorageService {
       classes[idx] = saved;
     } else {
       saved = {
-        id: `cls-${Date.now()}`,
+        id: `cls-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         name: cls.name || 'Nouvelle Classe',
         category: cls.category || 'FONDAMENTAL_2',
         level: cls.level || '7ème',
@@ -809,7 +809,7 @@ class StorageService {
       subjects[idx] = saved;
     } else {
       saved = {
-        id: `subj-${Date.now()}`,
+        id: `subj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         code: subj.code || 'MAT',
         name: subj.name || 'Nouvelle Matière',
         coefficient: subj.coefficient || 1,
@@ -850,7 +850,7 @@ class StorageService {
       teachers[idx] = saved;
     } else {
       saved = {
-        id: `tch-${Date.now()}`,
+        id: `tch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         firstName: teacher.firstName || '',
         lastName: teacher.lastName || '',
         gender: teacher.gender || 'M',
@@ -918,8 +918,12 @@ class StorageService {
       saved = { ...grades[existingIdx], ...grade } as EvaluationGrade;
       grades[existingIdx] = saved;
     } else {
+      const yearVal = grade.academicYear || '2025-2026';
+      const deterministicId = (grade.studentId && grade.subjectId && grade.term && grade.type)
+        ? `grd_${yearVal}_${grade.term}_${grade.type}_${grade.studentId}_${grade.subjectId}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120)
+        : `grd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       saved = {
-        id: grade.id || `grd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: grade.id || deterministicId,
         studentId: grade.studentId || '',
         classId: grade.classId || '',
         subjectId: grade.subjectId || '',
@@ -1029,8 +1033,9 @@ class StorageService {
     records.forEach(rec => {
       if (!rec.studentId || !rec.date) return;
       const index = updated.findIndex(r => r.studentId === rec.studentId && r.date === rec.date);
+      const deterministicAttId = `att_${rec.date}_${rec.studentId}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 120);
       const fullRecord: AttendanceRecord = {
-        id: rec.id || `att-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        id: rec.id || (index >= 0 ? updated[index].id : deterministicAttId),
         date: rec.date,
         studentId: rec.studentId,
         studentMatricule: rec.studentMatricule || '',

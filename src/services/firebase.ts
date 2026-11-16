@@ -29,7 +29,9 @@ const dbId = configData.firestoreDatabaseId && configData.firestoreDatabaseId !=
 
 try {
   firestoreInstance = initializeFirestore(app, {
-    localCache: memoryLocalCache()
+    localCache: memoryLocalCache(),
+    experimentalForceLongPolling: true,
+    experimentalLongPollingOptions: { timeoutSeconds: 20 }
   }, dbId);
 } catch {
   firestoreInstance = dbId
@@ -66,6 +68,19 @@ export interface FirestoreErrorInfo {
   };
 }
 
+export function isFirestoreOfflineError(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code || '';
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return (
+    code === 'unavailable' ||
+    code === 'deadline-exceeded' ||
+    msg.includes('client is offline') ||
+    msg.includes('could not reach cloud firestore backend') ||
+    msg.includes('network error') ||
+    msg.includes('failed to fetch')
+  );
+}
+
 export function handleFirestoreError(
   error: unknown,
   operationType: OperationType,
@@ -88,7 +103,11 @@ export function handleFirestoreError(
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  if (isFirestoreOfflineError(error)) {
+    console.warn('Firestore Offline Notice: ', JSON.stringify(errInfo));
+  } else {
+    console.error('Firestore Error: ', JSON.stringify(errInfo));
+  }
   if (rethrow) {
     throw new Error(JSON.stringify(errInfo));
   }
@@ -96,20 +115,18 @@ export function handleFirestoreError(
 }
 
 export async function testFirestoreConnection(schoolCode: string = 'ECOLE-PRINCIPALE'): Promise<boolean> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return false;
+  }
   try {
     await getDocFromServer(doc(db, `schools/${schoolCode}/settings`, 'config'));
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration (Firestore client offline).');
+    if (isFirestoreOfflineError(error)) {
+      console.warn('Firestore client is currently offline; operating in local fallback mode until reconnected.');
     }
     return false;
   }
-}
-
-// Startup connectivity verification
-if (typeof window !== 'undefined') {
-  testFirestoreConnection();
 }
 
 export default app;

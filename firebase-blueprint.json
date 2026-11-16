@@ -97,6 +97,10 @@
       "schema": { "$ref": "#/entities/GenericRecord" },
       "description": "School audit trail logs"
     },
+    "/schools/{schoolCode}/active_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/GenericRecord" },
+      "description": "Connected workstations and active multi-device presence heartbeat"
+    },
     "/scan_history/{docId}": {
       "schema": { "$ref": "#/entities/GenericRecord" },
       "description": "Global QR scan history entries"

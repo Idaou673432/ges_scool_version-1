@@ -24,7 +24,8 @@ import {
   AttendanceRecord
 } from '../types';
 import { storageService } from '../services/storageService';
-import { cloudSyncService } from '../services/cloudSyncService';
+import { cloudSyncService, ActiveDeviceSession } from '../services/cloudSyncService';
+import { ExamScheduleService } from '../services/examScheduleService';
 import { getMaliScoreAppreciation, getRelatedTermsForPeriod, getEvaluationsPerTrimesterForClass } from '../constants/maliEducation';
 import { secureLocalStorage } from '../services/secureStorage';
 
@@ -49,9 +50,11 @@ interface SchoolContextType {
   syncStatus: SyncStatus;
   syncStatusMessage: string;
   isCloudConnected: boolean;
+  activeDevices: ActiveDeviceSession[];
   switchOrJoinSchool: (schoolCode: string, schoolName?: string, pinCode?: string) => Promise<boolean>;
   forceCloudPush: () => Promise<boolean>;
   forceSyncPayments: () => Promise<boolean>;
+  resyncNow: () => Promise<boolean>;
   
   // Domain Actions
   refreshData: () => void;
@@ -111,6 +114,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [cloudSchoolCode, setCloudSchoolCode] = useState<string>(() => cloudSyncService.getActiveSchoolCode());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('SYNCING');
   const [syncStatusMessage, setSyncStatusMessage] = useState<string>('Connexion Cloud...');
+  const [activeDevices, setActiveDevices] = useState<ActiveDeviceSession[]>([]);
 
   // Avoid circular sync loops
   const isSyncingFromCloud = useRef<boolean>(false);
@@ -152,7 +156,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             ...(newSettings.enabledFeatures || {})
           }
         };
-        storageService.updateSettings(mergedSettings);
+        try {
+          secureLocalStorage.setJSON('somasikolo_settings', mergedSettings);
+        } catch {}
         setSettings(mergedSettings);
         isSyncingFromCloud.current = false;
       },
@@ -258,6 +264,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setAttendanceRecords(cloudAttendance);
         isSyncingFromCloud.current = false;
       },
+      onActiveDevicesChange: (devices) => {
+        setActiveDevices(devices);
+      },
       onSyncStatusChange: (status, msg) => {
         setSyncStatus(status);
         if (msg) setSyncStatusMessage(msg);
@@ -265,8 +274,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     // 2. Hydrate from permanent Cloud Firestore (or bootstrap Cloud if brand new school)
+    const currentSettingsSnapshot = storageService.getSettings();
     cloudSyncService.bootstrapCloudIfEmpty(cloudSchoolCode, {
-      settings: storageService.getSettings(),
+      settings: currentSettingsSnapshot,
       users: storageService.getUsers(),
       students: storageService.getStudents(),
       classes: storageService.getClasses(),
@@ -276,18 +286,15 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       payments: storageService.getPayments(),
       expenses: storageService.getExpenses(),
       cash_closures: storageService.getClosures(),
-      attendance: storageService.getAttendanceRecords()
+      attendance: storageService.getAttendanceRecords(),
+      exam_sessions: ExamScheduleService.getSessions(currentSettingsSnapshot.currentAcademicYear),
+      exam_slots: ExamScheduleService.getSlots()
     });
 
-    // 3. Mobile device resume & online handler: automatically fetch fresh payments on wake up
+    // 3. Mobile/PC wake-up & online reconnect handler: resync ALL collections from Cloud Firestore
     const handleResumeOrOnline = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        cloudSyncService.fetchAllCloudPayments(cloudSchoolCode).then((fresh) => {
-          if (fresh && fresh.length > 0) {
-            secureLocalStorage.setJSON('somasikolo_payments', fresh);
-            setPayments(fresh);
-          }
-        });
+      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') {
+        cloudSyncService.resyncAllFromCloud(cloudSchoolCode);
       }
     };
 
@@ -313,16 +320,64 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSyncStatus('SYNCING');
     setSyncStatusMessage(`Connexion à l'établissement [${cleanCode}]...`);
 
+    const existsStatus = await cloudSyncService.checkSchoolExistsInCloud(cleanCode);
+    if (existsStatus === 'ERROR') {
+      setSyncStatus('ERROR');
+      setSyncStatusMessage(`Impossible de joindre le Cloud pour [${cleanCode}]`);
+      return false;
+    }
+
     const success = await cloudSyncService.connectOrRegisterSchool(
       cleanCode,
       schoolName || settings.schoolName || 'Établissement Scolaire',
       pinCode || settings.adminPassword || '00223'
     );
 
-    if (success) {
-      setCloudSchoolCode(cleanCode);
-      cloudSyncService.bootstrapCloudIfEmpty(cleanCode, {
-        settings,
+    if (!success) {
+      setSyncStatus('ERROR');
+      setSyncStatusMessage(`Échec de connexion à [${cleanCode}]`);
+      return false;
+    }
+
+    if (existsStatus === 'FOUND') {
+      // Clear local domain caches so the remote school hydrates cleanly without old school data bleed
+      try {
+        secureLocalStorage.setJSON('somasikolo_students', []);
+        secureLocalStorage.setJSON('somasikolo_classes', []);
+        secureLocalStorage.setJSON('somasikolo_subjects', []);
+        secureLocalStorage.setJSON('somasikolo_teachers', []);
+        secureLocalStorage.setJSON('somasikolo_grades', []);
+        secureLocalStorage.setJSON('somasikolo_payments', []);
+        secureLocalStorage.setJSON('soma_expenses', []);
+        secureLocalStorage.setJSON('kalangest_cash_closures', []);
+        secureLocalStorage.setJSON('somasikolo_attendance', []);
+        secureLocalStorage.setJSON('soma_exam_sessions', []);
+        secureLocalStorage.setJSON('soma_exam_slots', []);
+        secureLocalStorage.setJSON('soma_pending_offline_payments', []);
+      } catch {}
+
+      if (cleanCode === cloudSchoolCode) {
+        await cloudSyncService.resyncAllFromCloud(cleanCode);
+      } else {
+        setCloudSchoolCode(cleanCode);
+      }
+      return true;
+    }
+
+    // Brand new school code (EMPTY in Cloud): preserve updated schoolName / pin if supplied
+    const nextSettings: SchoolSettings = {
+      ...settings,
+      ...(schoolName?.trim() ? { schoolName: schoolName.trim() } : {}),
+      ...(pinCode?.trim() ? { adminPassword: pinCode.trim() } : {})
+    };
+    try {
+      secureLocalStorage.setJSON('somasikolo_settings', nextSettings);
+    } catch {}
+    setSettings(nextSettings);
+
+    if (cleanCode === cloudSchoolCode) {
+      await cloudSyncService.pushAllDataToCloud(cleanCode, {
+        settings: nextSettings,
         users: storageService.getUsers(),
         students,
         classes,
@@ -332,11 +387,28 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         payments,
         expenses,
         cash_closures: closures,
-        attendance: attendanceRecords
+        attendance: attendanceRecords,
+        exam_sessions: ExamScheduleService.getSessions(nextSettings.currentAcademicYear),
+        exam_slots: ExamScheduleService.getSlots()
       });
-      return true;
+      setSyncStatus('CONNECTED');
+      setSyncStatusMessage(`Établissement [${cleanCode}] initialisé sur le Cloud`);
+    } else {
+      setCloudSchoolCode(cleanCode);
     }
-    return false;
+    return true;
+  };
+
+  // Resync all data on demand from Cloud Firestore
+  const resyncNow = async (): Promise<boolean> => {
+    setSyncStatus('SYNCING');
+    setSyncStatusMessage(`Actualisation depuis le Cloud [${cloudSchoolCode}]...`);
+    const ok = await cloudSyncService.resyncAllFromCloud(cloudSchoolCode);
+    if (!ok) {
+      setSyncStatus('ERROR');
+      setSyncStatusMessage('Impossible d\'actualiser depuis le Cloud');
+    }
+    return ok;
   };
 
   // Push all local data to Cloud database
@@ -354,7 +426,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       payments,
       expenses,
       cash_closures: closures,
-      attendance: attendanceRecords
+      attendance: attendanceRecords,
+      exam_sessions: ExamScheduleService.getSessions(settings.currentAcademicYear),
+      exam_slots: ExamScheduleService.getSlots()
     });
     if (ok) {
       setSyncStatus('CONNECTED');
@@ -602,9 +676,16 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const handleSaveAttendanceBatch = (records: Partial<AttendanceRecord>[]) => {
     const res = storageService.saveAttendanceBatch(records);
     refreshData();
-    res.forEach((r) => {
-      cloudSyncService.syncDoc('attendance', r, cloudSchoolCode);
-    });
+    const touchedKeys = new Set(
+      records
+        .filter(r => r.studentId && r.date)
+        .map(r => `${r.date}__${r.studentId}`)
+    );
+    res
+      .filter(r => touchedKeys.has(`${r.date}__${r.studentId}`))
+      .forEach((r) => {
+        cloudSyncService.syncDoc('attendance', r, cloudSchoolCode);
+      });
   };
 
   const handleDeleteAttendanceRecord = (id: string) => {
@@ -932,9 +1013,11 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         syncStatus,
         syncStatusMessage,
         isCloudConnected: syncStatus === 'CONNECTED',
+        activeDevices,
         switchOrJoinSchool,
         forceCloudPush,
         forceSyncPayments,
+        resyncNow,
         refreshData,
         updateSettings: handleUpdateSettings,
         saveStudent: handleSaveStudent,

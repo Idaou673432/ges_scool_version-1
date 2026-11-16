@@ -6,6 +6,7 @@
       // AI Studio Environment Constraint: HMR is disabled. Provide MockWebSocket to prevent Vite HMR connection failures.
       (function() {
         try {
+          const NativeWebSocket = window.WebSocket;
           class MockWebSocket extends EventTarget {
             static CONNECTING = 0;
             static OPEN = 1;
@@ -44,7 +45,23 @@
             }
           }
 
-          window.WebSocket = MockWebSocket;
+          window.WebSocket = function(url, protocols) {
+            const urlStr = String(url || '');
+            const isViteHmr =
+              protocols === 'vite-hmr' ||
+              (Array.isArray(protocols) && protocols.includes('vite-hmr')) ||
+              (urlStr.includes(window.location.host) && !urlStr.includes('/api/'));
+            if (isViteHmr || !NativeWebSocket) {
+              return new MockWebSocket(url, protocols);
+            }
+            return protocols !== undefined
+              ? new NativeWebSocket(url, protocols)
+              : new NativeWebSocket(url);
+          };
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
 
           const origError = console.error;
           console.error = function(...args) {

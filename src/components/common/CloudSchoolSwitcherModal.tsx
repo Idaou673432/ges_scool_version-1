@@ -20,7 +20,8 @@ import {
   UploadCloud,
   CheckCircle2,
   MessageCircle,
-  ExternalLink
+  ExternalLink,
+  DownloadCloud
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,8 +41,10 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
     settings, 
     syncStatus, 
     syncStatusMessage, 
+    activeDevices,
     switchOrJoinSchool, 
     forceCloudPush,
+    resyncNow,
     students,
     classes
   } = useSchool();
@@ -128,7 +131,23 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
     }
   };
 
-  const currentAppUrl = typeof window !== 'undefined' ? window.location.origin : 'https://somasikolo.vercel.app';
+  const handleResyncFromCloud = async () => {
+    setIsProcessing(true);
+    setErrorMessage('');
+    try {
+      const ok = await resyncNow();
+      if (ok) {
+        setSuccessMessage('Données actualisées depuis le Cloud avec succès !');
+        setTimeout(() => setSuccessMessage(''), 2500);
+      } else {
+        setErrorMessage('Impossible de récupérer les données depuis le Cloud.');
+      }
+    } catch {
+      setErrorMessage('Erreur réseau ou Cloud.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in">
@@ -175,6 +194,53 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
                 {students.length} élève(s) et {classes.length} classe(s) reliés au code établissement.
               </p>
             </div>
+          </div>
+
+          {/* Live Active Workstations / Devices */}
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-black uppercase text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Postes connectés en direct ({Math.max(1, activeDevices.length)})</span>
+              </p>
+              <span className="text-[10px] font-bold text-slate-500">Synchronisation temps réel</span>
+            </div>
+            {activeDevices.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {activeDevices.map((dev) => (
+                  <div
+                    key={dev.id}
+                    className={`px-3 py-2 rounded-xl border text-xs flex items-center gap-2 ${
+                      dev.isCurrentDevice
+                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    {dev.deviceType === 'MOBILE' ? (
+                      <Smartphone className="w-4 h-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <Laptop className="w-4 h-4 text-blue-600 shrink-0" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold truncate flex items-center gap-1.5">
+                        <span className="truncate">{dev.displayName}</span>
+                        {dev.isCurrentDevice && (
+                          <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-600 text-white shrink-0">
+                            Cet appareil
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-semibold">{dev.role}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-2">
+                <Laptop className="w-3.5 h-3.5 text-slate-400" />
+                <span>Ce poste est actif. Partagez le code ou le lien ci-dessous pour connecter d'autres appareils.</span>
+              </div>
+            )}
           </div>
 
           {/* Current Active School Code Box */}
@@ -286,25 +352,36 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
               <button
                 type="submit"
                 disabled={isProcessing}
                 className="w-full sm:flex-1 py-3 px-4 bg-blue-900 hover:bg-blue-800 active:scale-98 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
               >
                 {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
-                <span>Se Connecter à cet Établissement</span>
+                <span>Se Connecter</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResyncFromCloud}
+                disabled={isProcessing}
+                className="w-full sm:w-auto py-3 px-3.5 bg-slate-800 hover:bg-slate-700 active:scale-98 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                title="Récupérer immédiatement les dernières modifications depuis le Cloud"
+              >
+                <DownloadCloud className="w-4 h-4" />
+                <span>Actualiser</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleUploadAll}
                 disabled={isProcessing}
-                className="w-full sm:w-auto py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto py-3 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                 title="Synchroniser immédiatement toutes les données locales vers le cloud"
               >
                 <UploadCloud className="w-4 h-4" />
-                <span>Envoyer vers le Cloud</span>
+                <span>Envoyer</span>
               </button>
             </div>
           </form>
@@ -326,8 +403,8 @@ export const CloudSchoolSwitcherModal: React.FC<CloudSchoolSwitcherModalProps> =
               <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex items-start gap-2">
                 <Smartphone className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <strong className="block text-slate-900 dark:text-white">2. Sur Téléphone (Enseignants)</strong>
-                  <span className="text-slate-500">Ouvrez le lien Vercel, entrez le même code <strong className="text-blue-600">{cloudSchoolCode}</strong> : les notes saisies se mettent à jour partout en direct !</span>
+                  <strong className="block text-slate-900 dark:text-white">2. Sur Téléphone ou Autre PC</strong>
+                  <span className="text-slate-500">Ouvrez le lien direct partagé (ou entrez le même code <strong className="text-blue-600">{cloudSchoolCode}</strong>) : toutes les données restent identiques et en direct sur chaque poste !</span>
                 </div>
               </div>
             </div>

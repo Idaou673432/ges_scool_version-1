@@ -43,7 +43,8 @@ service cloud.firestore {
         'attendance',
         'exam_sessions',
         'exam_slots',
-        'audit_logs'
+        'audit_logs',
+        'active_sessions'
       ];
       allow write: if isValidSchoolCode(schoolCode) && isValidId(docId) && collectionName in [
         'users',
@@ -58,7 +59,8 @@ service cloud.firestore {
         'attendance',
         'exam_sessions',
         'exam_slots',
-        'audit_logs'
+        'audit_logs',
+        'active_sessions'
       ];
     }
 

@@ -14,7 +14,7 @@ import {
   writeBatch,
   Unsubscribe
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { db, handleFirestoreError, isFirestoreOfflineError, OperationType } from './firebase';
 import {
   Student,
   SchoolClass,
@@ -33,6 +33,16 @@ import {
 } from '../types';
 import { secureLocalStorage } from './secureStorage';
 import { getPublicBaseUrl } from './urlService';
+import { AuthService } from './authService';
+
+export interface ActiveDeviceSession {
+  id: string;
+  displayName: string;
+  role: string;
+  deviceType: 'MOBILE' | 'PC';
+  lastSeenAt: string;
+  isCurrentDevice?: boolean;
+}
 
 /**
  * Strips undefined values recursively so that serialization and Firestore never crash
@@ -90,6 +100,7 @@ export interface CloudSyncListeners {
   onExamSessionsChange?: (sessions: ExamSession[]) => void;
   onExamSlotsChange?: (slots: ExamSlot[]) => void;
   onAuditLogsChange?: (logs: AuditLog[]) => void;
+  onActiveDevicesChange?: (devices: ActiveDeviceSession[]) => void;
   onSyncStatusChange?: (status: 'CONNECTED' | 'SYNCING' | 'OFFLINE' | 'ERROR', msg?: string) => void;
 }
 
@@ -104,7 +115,9 @@ class CloudSyncService {
   private currentListeners: CloudSyncListeners | null = null;
   private isOnline: boolean = typeof navigator !== 'undefined' ? navigator.onLine : true;
   private sseReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private presenceTimer: ReturnType<typeof setInterval> | null = null;
   private firestoreHydratedCode: string | null = null;
+  private presenceInfo: { displayName: string; role: string } = { displayName: 'Poste Connecté', role: 'UTILISATEUR' };
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -116,7 +129,71 @@ class CloudSyncService {
         this.isOnline = false;
         this.currentListeners?.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne local');
       });
+      window.addEventListener('beforeunload', () => {
+        if (this.activeSchoolCode) {
+          deleteDoc(doc(db, `schools/${this.activeSchoolCode}/active_sessions`, DEVICE_CLIENT_ID)).catch(() => {});
+        }
+      });
     }
+  }
+
+  public getDeviceId(): string {
+    return DEVICE_CLIENT_ID;
+  }
+
+  public setActiveUserPresence(user?: Partial<User> | null): void {
+    if (!user) {
+      this.presenceInfo = { displayName: 'Poste en attente', role: 'VERROUILLE' };
+    } else if (AuthService.isPrimaryAdmin(user as User)) {
+      this.presenceInfo = { displayName: 'Direction (Système)', role: 'ADMIN' };
+    } else {
+      this.presenceInfo = {
+        displayName: user.fullName || user.username || 'Utilisateur',
+        role: user.role || 'UTILISATEUR'
+      };
+    }
+    if (this.activeSchoolCode && this.isOnline) {
+      this.publishPresence(this.activeSchoolCode);
+    }
+  }
+
+  private getDeviceType(): 'MOBILE' | 'PC' {
+    if (typeof navigator === 'undefined') return 'PC';
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ? 'MOBILE' : 'PC';
+  }
+
+  private async publishPresence(code: string): Promise<void> {
+    if (!code || !this.isOnline) return;
+    try {
+      await setDoc(
+        doc(db, `schools/${code}/active_sessions`, DEVICE_CLIENT_ID),
+        cleanForFirestore({
+          id: DEVICE_CLIENT_ID,
+          displayName: this.presenceInfo.displayName,
+          role: this.presenceInfo.role,
+          deviceType: this.getDeviceType(),
+          lastSeenAt: new Date().toISOString()
+        }),
+        { merge: true }
+      );
+    } catch {}
+  }
+
+  public async checkSchoolExistsInCloud(schoolCode: string): Promise<'FOUND' | 'EMPTY' | 'ERROR'> {
+    const code = schoolCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || this.getActiveSchoolCode();
+    const res = await this.fetchAllFromFirestore(code);
+    return res.status;
+  }
+
+  public async resyncAllFromCloud(schoolCode?: string): Promise<boolean> {
+    const code = (schoolCode || this.getActiveSchoolCode()).trim().toUpperCase();
+    const res = await this.fetchAllFromFirestore(code);
+    if (res.status === 'FOUND') {
+      this.applyFullServerStore(res.data);
+      this.currentListeners?.onSyncStatusChange?.('CONNECTED', `Synchronisé en direct [${code}]`);
+      return true;
+    }
+    return res.status === 'EMPTY';
   }
 
   public markHasUserData(schoolCode?: string): void {
@@ -252,6 +329,10 @@ class CloudSyncService {
     | { status: 'EMPTY' }
     | { status: 'ERROR' }
   > {
+    if (!this.isOnline || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+      this.currentListeners?.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne local (synchronisation auto dès reconnexion)');
+      return { status: 'ERROR' };
+    }
     try {
       const settingsSnap = await getDocFromServer(doc(db, `schools/${code}/settings`, 'config'));
 
@@ -342,6 +423,9 @@ class CloudSyncService {
         }
       };
     } catch (e) {
+      if (isFirestoreOfflineError(e)) {
+        this.currentListeners?.onSyncStatusChange?.('OFFLINE', 'Mode hors-ligne (données locales actives)');
+      }
       handleFirestoreError(e, OperationType.GET, `schools/${code}`);
       return { status: 'ERROR' };
     }
@@ -357,7 +441,7 @@ class CloudSyncService {
   ): Promise<boolean> {
     const code = schoolCode.trim().toUpperCase() || this.getActiveSchoolCode();
 
-    // 1. Check permanent Cloud Firestore first
+    // 1. Check permanent Cloud Firestore first (also validates server connectivity via getDocFromServer)
     const firestoreResult = await this.fetchAllFromFirestore(code);
     if (firestoreResult.status === 'FOUND') {
       const firestoreData = firestoreResult.data;
@@ -441,6 +525,45 @@ class CloudSyncService {
     this.connectSSE(code);
     this.connectBroadcastChannel(code);
     this.connectFirestoreListeners(code);
+    this.startPresenceSync(code);
+  }
+
+  private startPresenceSync(code: string): void {
+    if (this.presenceTimer) {
+      clearInterval(this.presenceTimer);
+      this.presenceTimer = null;
+    }
+    this.publishPresence(code);
+    this.presenceTimer = setInterval(() => {
+      if (this.isOnline) {
+        this.publishPresence(code);
+      }
+    }, 35000);
+
+    try {
+      const presencePath = `schools/${code}/active_sessions`;
+      const unsubPresence = onSnapshot(collection(db, presencePath), (snapshot) => {
+        const now = Date.now();
+        const devices: ActiveDeviceSession[] = [];
+        snapshot.forEach((docSnap) => {
+          const d = docSnap.data() as ActiveDeviceSession;
+          const seenMs = d?.lastSeenAt ? Date.parse(d.lastSeenAt) : 0;
+          if (seenMs && now - seenMs <= 120000) {
+            devices.push({
+              id: docSnap.id,
+              displayName: d.displayName || 'Poste',
+              role: d.role || 'UTILISATEUR',
+              deviceType: d.deviceType === 'MOBILE' ? 'MOBILE' : 'PC',
+              lastSeenAt: d.lastSeenAt,
+              isCurrentDevice: docSnap.id === DEVICE_CLIENT_ID
+            });
+          }
+        });
+        devices.sort((a, b) => (a.isCurrentDevice ? -1 : b.isCurrentDevice ? 1 : b.lastSeenAt.localeCompare(a.lastSeenAt)));
+        this.currentListeners?.onActiveDevicesChange?.(devices);
+      }, () => {});
+      this.firestoreUnsubscribers.push(unsubPresence);
+    } catch {}
   }
 
   private fetchServerState(code: string): void {
@@ -448,8 +571,12 @@ class CloudSyncService {
       .then(res => res.json())
       .then(data => {
         if (data.success && data.store) {
+          // Authoritative Cloud Firestore always wins over local Node server state once hydrated!
+          if (this.firestoreHydratedCode === code) {
+            return;
+          }
           // NEVER overwrite real Firestore or local user data with a restarted server's factory seed!
-          if (data.store.isSeed && (this.firestoreHydratedCode === code || this.hasLocalUserData(code))) {
+          if (data.store.isSeed && this.hasLocalUserData(code)) {
             return;
           }
           this.applyFullServerStore(data.store);
@@ -595,38 +722,50 @@ class CloudSyncService {
   private handleIncomingMutation(mutationType: string, payload: any, code: string): void {
     if (!this.currentListeners || !payload) return;
 
+    // When Cloud Firestore is hydrated, Firestore onSnapshot delivers atomic per-collection updates across all devices/URLs.
+    // Only use local Node server SSE store replay as a fallback when Firestore is not hydrated.
+    const isFirestoreActive = this.firestoreHydratedCode === code;
+
     switch (mutationType) {
       case 'SYNC_SETTINGS':
-        this.currentListeners.onSettingsChange?.(payload);
+        if (!isFirestoreActive) {
+          this.currentListeners.onSettingsChange?.(payload);
+        }
         break;
 
       case 'SYNC_PAYMENT':
-        this.fetchAllCloudPayments(code).then(payments => {
-          this.currentListeners?.onPaymentsChange?.(payments);
-        });
+        if (!isFirestoreActive) {
+          this.fetchAllCloudPayments(code).then(payments => {
+            this.currentListeners?.onPaymentsChange?.(payments);
+          });
+        }
         break;
 
       case 'SYNC_EXPENSE':
       case 'DELETE_EXPENSE':
-        fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
-          .then(r => r.json())
-          .then(res => {
-            if (Array.isArray(res.store?.expenses)) {
-              this.currentListeners?.onExpensesChange?.(res.store.expenses);
-            }
-          });
+        if (!isFirestoreActive) {
+          fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
+            .then(r => r.json())
+            .then(res => {
+              if (Array.isArray(res.store?.expenses)) {
+                this.currentListeners?.onExpensesChange?.(res.store.expenses);
+              }
+            });
+        }
         break;
 
       case 'SYNC_DOC':
       case 'DELETE_DOC':
       case 'CLEAR_COLLECTION':
-        fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
-          .then(r => r.json())
-          .then(res => {
-            if (res.store && !res.store.isSeed) {
-              this.applyFullServerStore(res.store);
-            }
-          });
+        if (!isFirestoreActive) {
+          fetch(`/api/sync/state?school=${encodeURIComponent(code)}`)
+            .then(r => r.json())
+            .then(res => {
+              if (res.store && !res.store.isSeed) {
+                this.applyFullServerStore(res.store);
+              }
+            });
+        }
         break;
     }
   }
@@ -637,11 +776,13 @@ class CloudSyncService {
       const settingsPath = `schools/${code}/settings`;
       const settingsDocRef = doc(db, settingsPath, 'config');
       const unsubSettings = onSnapshot(settingsDocRef, (snapshot) => {
+        if (snapshot.metadata.fromCache) return;
         if (snapshot.exists()) {
           this.firestoreHydratedCode = code;
           this.markHasUserData(code);
           const data = snapshot.data() as SchoolSettings;
           this.currentListeners?.onSettingsChange?.(data);
+          this.currentListeners?.onSyncStatusChange?.('CONNECTED', `En direct avec [${code}] (Multi-postes actif)`);
         }
       }, (err) => handleFirestoreError(err, OperationType.GET, `${settingsPath}/config`));
       this.firestoreUnsubscribers.push(unsubSettings);
@@ -854,12 +995,17 @@ class CloudSyncService {
   private reconnectAll(): void {
     const code = this.getActiveSchoolCode();
     if (this.currentListeners) {
-      this.fetchServerState(code);
+      this.resyncAllFromCloud(code);
       this.connectSSE(code);
+      this.publishPresence(code);
     }
   }
 
   public stopRealtimeSync(): void {
+    if (this.presenceTimer) {
+      clearInterval(this.presenceTimer);
+      this.presenceTimer = null;
+    }
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
@@ -1088,20 +1234,10 @@ class CloudSyncService {
   }
 
   /**
-   * Fetch all cloud payments directly for the given school
+   * Fetch all cloud payments directly for the given school (Firestore authoritative first)
    */
   public async fetchAllCloudPayments(schoolCode?: string): Promise<Payment[]> {
     const code = schoolCode || this.getActiveSchoolCode();
-
-    try {
-      const res = await fetch(`/api/sync/state?school=${encodeURIComponent(code)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.store && !data.store.isSeed && Array.isArray(data.store.payments)) {
-          return data.store.payments;
-        }
-      }
-    } catch {}
 
     const paymentsPath = `schools/${code}/payments`;
     try {
@@ -1134,11 +1270,24 @@ class CloudSyncService {
         (b.receiptNumber || '').localeCompare(a.receiptNumber || '') ||
         (b.id || '').localeCompare(a.id || '')
       );
-      return list;
+      if (list.length > 0 || this.firestoreHydratedCode === code) {
+        return list;
+      }
     } catch (e) {
       handleFirestoreError(e, OperationType.LIST, paymentsPath);
-      return [];
     }
+
+    try {
+      const res = await fetch(`/api/sync/state?school=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.store && !data.store.isSeed && Array.isArray(data.store.payments)) {
+          return data.store.payments;
+        }
+      }
+    } catch {}
+
+    return [];
   }
 
   // --- Cloud item level operations ---

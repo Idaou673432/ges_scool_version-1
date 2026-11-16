@@ -7,12 +7,13 @@ import {
   Settings, CheckCircle2, Save, Key, Eye, EyeOff, Image, Trash2, Lock, Unlock, 
   ShieldAlert, ShieldCheck, Upload, Calendar, RotateCcw, Calculator, Sliders, Check,
   GraduationCap, Building2, Wrench, Globe, Sparkles, BookOpen, Users, UserPlus,
-  Edit3, UserCheck, AlertCircle, RefreshCw, Phone, Mail, Shield, Search, X
+  Edit3, UserCheck, AlertCircle, RefreshCw, Phone, Mail, Shield, Search, X, Cloud
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { MALI_ACADEMIES, DEFAULT_EVALUATION_MONTHS, getTermLabel, MALI_DEFAULT_CLASSES, MALI_DEFAULT_SUBJECTS } from '../../constants/maliEducation';
 import { PwaInstallModal } from '../../components/common/PwaInstallModal';
+import { CloudSchoolSwitcherModal } from '../../components/common/CloudSchoolSwitcherModal';
 import { SchoolEnabledFeatures, SchoolCategory, User, UserRole, Subject } from '../../types';
 import { secureLocalStorage } from '../../services/secureStorage';
 import { compressImageToDataUrl } from '../../utils/imageCompression';
@@ -67,6 +68,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
   const [testResult, setTestResult] = useState<'IDLE' | 'SUCCESS' | 'FAIL'>('IDLE');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showPwaModal, setShowPwaModal] = useState(false);
+  const [showCloudModal, setShowCloudModal] = useState(false);
   const [storageStats, setStorageStats] = useState(() => secureLocalStorage.getStorageUsage());
   const [cleanToast, setCleanToast] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'INFO' | 'USERS_ROLES' | 'LOGO_SECURITY' | 'FEATURES' | 'EVALUATION_CALENDAR' | 'CALCULATION_FORMULA'>(initialTab || 'INFO');
@@ -767,7 +769,7 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
               }`}
             >
               <Users className="w-3 h-3 text-amber-400" />
-              <span>Comptes & Rôles ({users.length})</span>
+              <span>Comptes & Rôles ({users.filter(u => !AuthService.isPrimaryAdmin(u)).length})</span>
             </button>
           )}
           <button
@@ -974,17 +976,28 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
           {/* ================= TAB 1: FICHE ECOLE (INFO) ================= */}
           {activeTab === 'INFO' && (
             <form onSubmit={handleSubmit} className="bg-white border border-slate-200/90 rounded-xl p-3 sm:p-4 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
                 <div className="font-bold text-slate-900 text-xs">
                   Informations Officielles de l'Établissement
                 </div>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
-                >
-                  <Save className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Sauvegarder</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCloudModal(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                    title="Connecter plusieurs appareils et partager l'accès"
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Multi-Postes ({cloudSchoolCode})</span>
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Sauvegarder</span>
+                  </button>
+                </div>
               </div>
 
               {/* SÉLECTEUR RAPIDE DU TYPE D'ÉTABLISSEMENT & ATTRIBUTS */}
@@ -2380,6 +2393,8 @@ export const SettingsModule: React.FC<SettingsModuleProps> = ({ initialTab = 'IN
 
       {/* PWA Installation Modal */}
       <PwaInstallModal isOpen={showPwaModal} onClose={() => setShowPwaModal(false)} />
+      {/* Multi-Device Cloud Switcher Modal */}
+      <CloudSchoolSwitcherModal isOpen={showCloudModal} onClose={() => setShowCloudModal(false)} />
     </div>
   );
 };

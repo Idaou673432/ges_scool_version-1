@@ -6,7 +6,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { storageService } from '../services/storageService';
 import { AuthService } from '../services/authService';
-import { secureLocalStorage } from '../services/secureStorage';
+import { secureLocalStorage, secureSessionStorage } from '../services/secureStorage';
 import { cloudSyncService } from '../services/cloudSyncService';
 
 interface AuthContextType {
@@ -33,7 +33,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loadedUsers = storageService.getUsers();
     setUsers(loadedUsers);
     const savedActiveId = secureLocalStorage.getItem('somasikolo_active_user_id');
-    const defaultUser = loadedUsers.find(u => u.id === savedActiveId && u.active) || loadedUsers.find(u => u.active) || loadedUsers[0];
+    if (savedActiveId) {
+      const matched = loadedUsers.find(u => u.id === savedActiveId && u.active);
+      if (matched) {
+        setCurrentUser(matched);
+        return;
+      }
+      // Le compte actif a été supprimé ou désactivé sur un autre poste : verrouiller proprement
+      secureLocalStorage.removeItem('somasikolo_active_user_id');
+      secureSessionStorage.removeItem('somasikolo_unlocked');
+      setCurrentUser(null);
+      window.dispatchEvent(new CustomEvent('somasikolo_session_locked'));
+      return;
+    }
+    const defaultUser =
+      loadedUsers.find(u => !AuthService.isPrimaryAdmin(u) && u.active) ||
+      loadedUsers.find(u => u.active) ||
+      loadedUsers[0];
     if (defaultUser) {
       setCurrentUser(defaultUser);
     }
@@ -51,6 +67,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       window.removeEventListener('somasikolo_users_updated', handleRemoteUsersUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    cloudSyncService.setActiveUserPresence(currentUser);
+  }, [currentUser]);
 
   const loginAsUser = (userId: string) => {
     const found = users.find(u => u.id === userId && u.active);
@@ -106,13 +126,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const updatedUsers = storageService.getUsers();
       setUsers(updatedUsers);
       if (currentUser && currentUser.id === userId) {
-        const nextUser = updatedUsers[0] || null;
-        setCurrentUser(nextUser);
-        if (nextUser) {
-          secureLocalStorage.setItem('somasikolo_active_user_id', nextUser.id);
-        } else {
-          secureLocalStorage.removeItem('somasikolo_active_user_id');
-        }
+        secureLocalStorage.removeItem('somasikolo_active_user_id');
+        secureSessionStorage.removeItem('somasikolo_unlocked');
+        setCurrentUser(null);
+        window.dispatchEvent(new CustomEvent('somasikolo_session_locked'));
       }
     }
     return res;

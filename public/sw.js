@@ -9,12 +9,15 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Pass through fetch for seamless online/offline handling
-  if (event.request.method === 'GET') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match(event.request);
-      })
-    );
+  if (event.request.method !== 'GET') return;
+  const reqUrl = new URL(event.request.url);
+  // Never intercept cross-origin requests (Firestore, Firebase, fonts) or /api/ streams
+  if (reqUrl.origin !== self.location.origin || reqUrl.pathname.startsWith('/api/')) {
+    return;
   }
+  event.respondWith(
+    fetch(event.request).catch(() => {
+      return caches.match(event.request);
+    })
+  );
 });
