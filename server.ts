@@ -566,6 +566,11 @@ async function startServer() {
       server: { middlewareMode: true, hmr: false, ws: false },
       appType: 'spa'
     });
+    app.get('/@vite-plugin-pwa/pwa-entry-point-loaded', (_req: Request, res: Response) => {
+      res.setHeader('Content-Type', 'application/javascript');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+      return res.send('export default function registerDevSW() {}\n');
+    });
     app.get('/@vite/client', async (_req: Request, res: Response, next: () => void) => {
       try {
         const result = await vite.transformRequest('/@vite/client');
@@ -575,15 +580,16 @@ async function startServer() {
               'transport.connect(createHMRHandler(handleMessage));',
               '/* HMR disabled */'
             )
-            .replaceAll(
-              'throw new Error("send was called before connect");',
+            .replace(
+              /throw new Error\(["']send was called before connect["']\);?/g,
               'return;'
             )
-            .replaceAll(
-              'throw new Error("invoke was called before connect");',
+            .replace(
+              /throw new Error\(["']invoke was called before connect["']\);?/g,
               'return;'
             );
           res.setHeader('Content-Type', 'application/javascript');
+          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
           return res.send(patched);
         }
       } catch {

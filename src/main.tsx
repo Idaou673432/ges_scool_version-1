@@ -4,6 +4,25 @@ import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 
+// Unregister stale dev service workers when running with PWA disabled in dev
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.DEV) {
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => {
+      for (const registration of registrations) {
+        const scriptUrl =
+          registration.active?.scriptURL ||
+          registration.waiting?.scriptURL ||
+          registration.installing?.scriptURL ||
+          '';
+        if (scriptUrl.includes('dev-sw.js')) {
+          registration.unregister().catch(() => {});
+        }
+      }
+    })
+    .catch(() => {});
+}
+
 // Register Service Worker for offline PWA support and cache-first shell loading in production
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
   try {
