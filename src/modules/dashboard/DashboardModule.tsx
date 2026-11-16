@@ -10,13 +10,12 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 import { 
   Users, Award, School, QrCode, ArrowUpRight, 
   FileText, Calendar, CheckCircle2, AlertCircle, Clock, ChevronRight,
-  TrendingUp, Download, Eye, Sparkles
+  TrendingUp, Eye, Sparkles
 } from 'lucide-react';
 import { useSchool } from '../../contexts/SchoolContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatFCFA, getMaliScoreAppreciation } from '../../constants/maliEducation';
 import { NavTab } from '../../components/layout/Sidebar';
-import { PdfService } from '../../services/pdfService';
 import { AcademicSuccessCharts } from '../../components/dashboard/AcademicSuccessCharts';
 import { ScanHistoryPanel } from '../../components/dashboard/ScanHistoryPanel';
 import { ScanHistoryService } from '../../services/scanHistoryService';
@@ -34,7 +33,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
   onOpenQrScanner,
   onViewStudentProfile
 }) => {
-  const { stats, students, classes, payments, settings, generateReportCard, isFeatureEnabled } = useSchool();
+  const { students, classes, payments, settings, generateReportCard, isFeatureEnabled } = useSchool();
   const { hasPermission } = useAuth();
   const canViewPayments = isFeatureEnabled('payments') && hasPermission('payments:view');
   const canViewGrades = isFeatureEnabled('grades') && hasPermission('grades:view');
@@ -144,19 +143,7 @@ export const DashboardModule: React.FC<DashboardProps> = ({
         </div>
 
         {/* Right: Actions Rapides */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {hasPermission('reports:view') && (
-            <button
-              type="button"
-              onClick={() => PdfService.generateMenOfficialReportPdf(stats, students, classes, settings)}
-              className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-colors cursor-pointer border border-slate-200"
-              title="Générer le rapport officiel MEN"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-600" />
-              <span>Rapport MEN</span>
-            </button>
-          )}
-        </div>
+        <div className="flex items-center gap-1.5 shrink-0" />
       </div>
 
       {/* VUE 1 : VUE GÉNÉRALE & GESTION COURANTE */}
